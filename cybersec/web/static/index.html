@@ -1,0 +1,1763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberSec-CLI Web</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .hidden { display: none !important; }
+        
+        :root {
+            --bg-primary: #0A0B14;
+            --bg-secondary: rgba(255, 255, 255, 0.02);
+            --border-color: rgba(255, 255, 255, 0.05);
+            --input-bg: rgba(255, 255, 255, 0.03);
+            --input-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #E5E7EB;
+            --text-secondary: #9AA0B4;
+            --text-muted: rgba(255, 255, 255, 0.15);
+            --purple-gradient-start: #8B7FEB;
+            --purple-gradient-end: #7B6FDB;
+            --button-text: #C9C6E3;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .top-nav {
+            height: 80px;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2.5rem;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: white;
+        }
+        
+        .logo-image {
+            width: 48px;
+            height: 48px;
+            margin-right: 1rem;
+        }
+        
+        .nav-menu {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+        
+        .nav-menu a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+            cursor: pointer;
+        }
+        
+        .nav-menu a:hover, .nav-menu a.active { color: white; }
+        
+        .export-btn {
+            height: 42px;
+            padding: 0 1.5rem;
+            background: linear-gradient(135deg, var(--purple-gradient-start), var(--purple-gradient-end));
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .export-btn:hover { filter: brightness(1.1); }
+        
+        .main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .view-section {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            padding: 2rem 3rem;
+            gap: 2rem;
+            overflow-y: auto;
+        }
+        
+        .view-section.active { display: flex; }
+        
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 1.5rem;
+            align-items: flex-end;
+            margin-bottom: 2rem;
+        }
+        
+        .control-panel-options {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .option-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .option-toggle input {
+            accent-color: var(--purple-gradient-start);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        
+        .input-group { display: flex; flex-direction: column; gap: 0.75rem; }
+        
+        .input-label { color: var(--text-primary); font-size: 1.1rem; font-weight: 500; }
+        
+        .control-input, .form-input {
+            width: 100%;
+            height: 52px;
+            padding: 0 1.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        
+        .control-input:focus, .form-input:focus { border-color: var(--purple-gradient-start); }
+        
+        .start-button, .cancel-button {
+            height: 52px;
+            padding: 0 2rem;
+            background: linear-gradient(135deg, var(--purple-gradient-start), var(--purple-gradient-end));
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .cancel-button {
+            background: linear-gradient(135deg, #EF4444, #DC2626);
+        }
+        
+        .start-button:hover { filter: brightness(1.1); }
+        .cancel-button:hover { filter: brightness(1.1); }
+        
+        .button-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .results-window {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+        }
+        
+        .results-window::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .results-panel {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 2;
+        }
+        
+        .results-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            gap: 0.5rem;
+        }
+        
+        .empty-heading { font-size: 2.2rem; font-weight: 400; color: rgba(255, 255, 255, 0.2); }
+        .empty-subtext { font-size: 1rem; color: rgba(255, 255, 255, 0.1); }
+        
+        .scan-progress {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .progress-text {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--purple-gradient-start), var(--purple-gradient-end));
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .status-scanning { color: #F59E0B; }
+        .status-complete { color: #10B981; }
+        .status-error { color: #EF4444; }
+        .status-warning { color: #F59E0B; }
+        
+        .scan-tips {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 4px solid #F59E0B;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+        }
+        
+        .tip-item {
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+        
+        .tip-item i { margin-top: 0.25rem; color: #F59E0B; }
+        
+        .port-item {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 1.25rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .port-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            border-color: rgba(139, 127, 235, 0.3);
+        }
+        
+        .port-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .port-info-main { display: flex; align-items: baseline; gap: 0.75rem; }
+        .port-number { font-weight: 700; color: white; font-size: 1.1rem; }
+        .port-service { font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
+        
+        .port-risk {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .risk-critical { background: rgba(239, 68, 68, 0.3); color: #F87171; }
+        .risk-high { background: rgba(239, 68, 68, 0.2); color: #F87171; }
+        .risk-medium { background: rgba(245, 158, 11, 0.2); color: #FBBF24; }
+        .risk-low { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
+        
+        .port-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+        }
+        
+        .detail-item { display: flex; flex-direction: column; }
+        .detail-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem; }
+        .detail-value { color: white; font-size: 0.9rem; }
+        
+        .status-open { color: #10B981 !important; font-weight: 600; }
+        
+        .results-section {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid;
+        }
+        
+        .results-section.critical { border-left-color: #DC2626; }
+        .results-section.high { border-left-color: #EF4444; }
+        .results-section.medium { border-left-color: #F59E0B; }
+        .results-section.low { border-left-color: #3B82F6; }
+        
+        .results-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .mitre-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #1e1b4b;
+            border: 1px solid rgba(139, 126, 235, 0.5);
+            color: #c7d2fe;
+            font-size: 0.78rem;
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+        
+        .os-detection-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .info-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+        
+        .card-header i { color: var(--purple-gradient-start); font-size: 1.25rem; }
+        .card-header h4 { font-size: 1.1rem; font-weight: 600; margin: 0; }
+        
+        .card-content { display: flex; flex-direction: column; gap: 0.75rem; }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: var(--text-secondary); font-size: 0.9rem; }
+        .info-value { color: var(--text-primary); font-weight: 500; font-size: 0.95rem; }
+        
+        .webapp-results-grid { display: flex; flex-direction: column; gap: 1rem; }
+        
+        .webapp-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .webapp-stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            text-align: center;
+        }
+        
+        .webapp-stat-num { font-size: 2rem; font-weight: 700; }
+        .webapp-stat-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; text-transform: uppercase; }
+        .webapp-stat-num.critical { color: #F87171; }
+        .webapp-stat-num.high { color: #FB923C; }
+        .webapp-stat-num.medium { color: #FBBF24; }
+        .webapp-stat-num.safe { color: #34D399; }
+        
+        .risk-bar-wrap {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .risk-bar-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .risk-bar-track {
+            height: 8px;
+            background: rgba(255,255,255,0.07);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .risk-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width .6s ease;
+        }
+        
+        .finding-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .finding-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.9rem 1.1rem;
+            cursor: pointer;
+        }
+        
+        .finding-header:hover { background: rgba(255,255,255,0.03); }
+        
+        .sev-badge {
+            padding: 2px 10px;
+            border-radius: 99px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .sev-badge.critical { background: rgba(248,113,113,.15); color: #F87171; }
+        .sev-badge.high { background: rgba(251,146,60,.15); color: #FB923C; }
+        .sev-badge.medium { background: rgba(251,191,36,.15); color: #FBBF24; }
+        .sev-badge.low { background: rgba(52,211,153,.15); color: #34D399; }
+        .sev-badge.info { background: rgba(139,127,235,.15); color: #8B7FEB; }
+        
+        .finding-title { flex: 1; font-size: 0.9rem; color: var(--text-primary); font-weight: 500; }
+        .finding-path { font-size: 0.75rem; color: var(--text-secondary); }
+        
+        .finding-body { display: none; border-top: 1px solid var(--border-color); padding: 1rem 1.1rem; }
+        .finding-body.open { display: block; }
+        
+        .finding-row { display: grid; grid-template-columns: 100px 1fr; gap: 8px; font-size: 0.85rem; margin-bottom: 0.5rem; }
+        .finding-row-label { color: var(--text-secondary); }
+        .finding-row-val { color: var(--text-primary); word-break: break-word; }
+        
+        .tech-tag {
+            display: inline-block;
+            background: rgba(139,127,235,.12);
+            color: #8B7FEB;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            margin: 2px;
+        }
+        
+        .webapp-section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--text-muted);
+            margin: 1rem 0 0.5rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .chat-widget-btn {
+            position: absolute;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            width: 48px;
+            height: 48px;
+            background: var(--purple-gradient-start);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+            cursor: pointer;
+            z-index: 1000;
+            border: none;
+            transition: all 0.3s;
+        }
+        
+        .chat-widget-btn:hover { transform: scale(1.1); }
+        
+        .chat-panel {
+            width: 0;
+            background: rgba(255, 255, 255, 0.005);
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s;
+        }
+        
+        .results-window.chat-active .chat-panel {
+            width: 380px;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .chat-header {
+            padding: 1.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chat-title { font-weight: 600; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .chat-message {
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+        
+        .chat-message.user {
+            align-self: flex-end;
+            background: rgba(139, 127, 235, 0.2);
+            color: #E0E7FF;
+            border-bottom-right-radius: 2px;
+        }
+        
+        .chat-message.ai {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border-bottom-left-radius: 2px;
+        }
+        
+        .chat-message.ai h1, .chat-message.ai h2, .chat-message.ai h3 {
+            margin: 1rem 0 0.5rem 0;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .chat-message.ai h2 { font-size: 1.15rem; }
+        .chat-message.ai h3 { font-size: 1rem; }
+        
+        .chat-message.ai ul, .chat-message.ai ol { margin: 0.5rem 0 0.5rem 1.25rem; }
+        .chat-message.ai li { margin-bottom: 0.25rem; }
+        
+        .chat-message.ai p { margin-bottom: 0.5rem; }
+        .chat-message.ai strong { color: var(--purple-gradient-start); font-weight: 600; }
+        
+        .chat-message.ai code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+        
+        .chat-input-area {
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .chat-input {
+            flex: 1;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 20px;
+            padding: 0.75rem 1rem;
+            color: white;
+            outline: none;
+            resize: none;
+            height: 44px;
+            font-family: inherit;
+        }
+        
+        .chat-send-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--input-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .chat-send-btn:hover { color: var(--purple-gradient-start); background: rgba(139, 127, 235, 0.1); }
+        
+        .typing-indicator { display: flex; gap: 4px; padding: 0.5rem; opacity: 0.6; }
+        .typing-dot {
+            width: 6px; height: 6px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        .filter-popover {
+            position: absolute;
+            bottom: 4rem;
+            left: 1.5rem;
+            background: #13141f;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(10px) scale(0.95);
+            pointer-events: none;
+            transition: all 0.3s;
+            min-width: 140px;
+        }
+        
+        .filter-popover.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: all;
+        }
+        
+        .filter-popover-title {
+            padding: 0.25rem 0.5rem 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+        
+        .filter-btn {
+            width: 100%;
+            text-align: left;
+            padding: 0.6rem 1rem;
+            border: 1px solid var(--input-border);
+            background: var(--input-bg);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        
+        .filter-btn:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-primary); }
+        .filter-btn.active { background: linear-gradient(135deg, var(--purple-gradient-start), var(--purple-gradient-end)); color: var(--button-text); }
+        
+        .bottom-icon-left {
+            position: absolute;
+            bottom: 1.5rem;
+            left: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            opacity: 0.6;
+            cursor: pointer;
+            z-index: 1001;
+            transition: all 0.3s;
+        }
+        
+        .bottom-icon-left:hover {
+            opacity: 1;
+            color: var(--purple-gradient-start);
+            transform: scale(1.1);
+        }
+
+        .webapp-mode-toggle {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .webapp-mode-toggle label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .webapp-checkbox {
+            accent-color: #8B7FEB;
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+
+        .error-message {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            color: #ff6b6b;
+            margin: 1rem 0;
+            font-weight: 500;
+        }
+
+        .raw-results { margin-top: 1.5rem; }
+        .raw-results h4 { margin-bottom: 0.75rem; color: var(--text-primary); }
+        
+        #osRawData {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .form-select {
+            height: 52px;
+            padding: 0 1.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .form-select option {
+            background: #0A0B14;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+            .webapp-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .os-detection-info {
+                grid-template-columns: 1fr;
+            }
+            .results-window.chat-active .chat-panel {
+                width: 100%;
+                position: absolute;
+                right: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="top-nav">
+        <div class="logo">
+            <img src="web/static/logo.png" alt="CyberSec Logo" class="logo-image">
+          
+        </div>
+
+        <nav>
+            <ul class="nav-menu">
+                <li><a href="#" id="navPortScanner" class="active" onclick="switchView('portScanner')">Port Scanner</a></li>
+                <li><a href="#" id="navOsFingerprint" onclick="switchView('osFingerprint')">OS Fingerprinting</a></li>
+                <li><a href="#" id="navWebAppScanner" onclick="switchView('webAppScanner')">Web App Scanner</a></li>
+            </ul>
+        </nav>
+
+        <button id="exportBtn" class="export-btn" onclick="exportResults()">Export</button>
+    </header>
+
+    <div class="main-container">
+        <!-- Port Scanner View -->
+        <div id="portScannerView" class="view-section active">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Target Host</label>
+                    <input type="text" id="target" class="control-input" placeholder="Example.com or 192.168.1.1">
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Port Range</label>
+                    <select id="ports" class="form-select">
+                        <option value="common">Common Ports (1-1024)</option>
+                        <option value="top1000">Top 1000 Ports</option>
+                        <option value="1-1000">1-1000</option>
+                        <option value="1-5000">1-5000</option>
+                        <option value="1-10000">1-10000</option>
+                        <option value="all">All Ports (1-65535)</option>
+                    </select>
+                </div>
+
+                <button id="startBtn" class="start-button" onclick="startScan()">Start scan</button>
+            </div>
+
+            <div class="control-panel-options">
+                <div class="option-toggle">
+                    <input type="checkbox" id="enhancedDetection" checked>
+                    <label for="enhancedDetection">Enhanced Service Detection</label>
+                </div>
+                <div class="option-toggle">
+                    <input type="checkbox" id="osDetection" checked>
+                    <label for="osDetection">OS Detection</label>
+                </div>
+            </div>
+
+            <div class="results-window" id="resultsWindow">
+                <div class="results-panel">
+                    <div id="emptyState" class="empty-state">
+                        <h2 class="empty-heading">CLI Streaming Port Scanner</h2>
+                        <p class="empty-subtext">Your results will appear here</p>
+                        <p class="empty-subtext" style="font-size: 0.85rem; margin-top: 1rem;">Detects: Open ports · Services · Versions · Vulnerabilities · CVEs</p>
+                    </div>
+
+                    <div id="resultsContainer" class="results-container hidden">
+                        <div id="scanProgress" class="scan-progress hidden">
+                            <div class="progress-text">
+                                <span id="statusText">Initializing...</span>
+                                <span id="scanProgressPercent">0%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div id="scanProgressBar" class="progress-bar"></div>
+                            </div>
+                        </div>
+                        <div id="allPorts" class="all-ports"></div>
+                    </div>
+
+                    <div id="scanTips" class="scan-tips hidden">
+                        <div class="tip-item"><i class="fa-solid fa-lightbulb"></i> Use common ports (1-1024) for quick scans</div>
+                        <div class="tip-item"><i class="fa-solid fa-lightbulb"></i> Use top1000 for comprehensive scanning</div>
+                        <div class="tip-item"><i class="fa-solid fa-lightbulb"></i> Enable enhanced detection for better service identification</div>
+                    </div>
+
+                    <div class="bottom-icon-left" id="filterIcon" title="Filters" onclick="toggleFilters(event)">
+                        <i class="fa-solid fa-sliders"></i>
+                    </div>
+
+                    <div id="filterPopover" class="filter-popover">
+                        <div class="filter-popover-title">Risk Level</div>
+                        <button class="filter-btn active" data-filter="all">All Ports</button>
+                        <button class="filter-btn" data-filter="critical">Critical</button>
+                        <button class="filter-btn" data-filter="high">High Risk</button>
+                        <button class="filter-btn" data-filter="medium">Medium Risk</button>
+                        <button class="filter-btn" data-filter="low">Low Risk</button>
+                    </div>
+                </div>
+
+                <div id="chatWindow" class="chat-panel">
+                    <div class="chat-header">
+                        <div class="chat-title">
+                            <i class="fa-solid fa-robot"></i>
+                            <span>AI Assistant</span>
+                        </div>
+                        <button onclick="clearChat()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.8rem">Clear</button>
+                    </div>
+
+                    <div id="chatMessages" class="chat-messages">
+                        <div class="chat-message ai">
+                            Hello! I'm your CyberSec-CLI assistant. How can I help you analyze your scan results today?
+                        </div>
+                    </div>
+
+                    <div class="chat-input-area">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Ask about vulnerabilities..." onkeypress="handleChatKey(event)">
+                        <button class="chat-send-btn" onclick="sendChatMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="chatDataBtn" class="chat-widget-btn" onclick="toggleChat()">
+                    <i class="fa-solid fa-robot"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- OS Fingerprinting View -->
+        <div id="osFingerprintView" class="view-section">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Target Host</label>
+                    <input type="text" id="osTarget" class="control-input" placeholder="Example.com or 192.168.1.1">
+                </div>
+
+                <button id="osStartBtn" class="start-button" onclick="startOsFingerprint()">Start OS Fingerprinting</button>
+            </div>
+
+            <div class="control-panel-options">
+                <div class="option-toggle">
+                    <input type="checkbox" id="osEnhancedDetection" checked>
+                    <label for="osEnhancedDetection">Enhanced Detection</label>
+                </div>
+                <div class="option-toggle">
+                    <input type="checkbox" id="osServiceDetection" checked>
+                    <label for="osServiceDetection">Service Detection</label>
+                </div>
+            </div>
+
+            <div class="results-window" id="osResultsWindow">
+                <div class="results-panel">
+                    <div id="osEmptyState" class="empty-state">
+                        <h2 class="empty-heading">OS Fingerprinting Tool</h2>
+                        <p class="empty-subtext">Enter a target and click Start OS Fingerprinting to analyze the operating system</p>
+                        <p class="empty-subtext" style="font-size: 0.85rem; margin-top: 1rem;">Detects: OS Family · Vendor · Version · Accuracy · Network Info</p>
+                    </div>
+
+                    <div id="osResultsContainer" class="results-container hidden">
+                        <div class="os-detection-info">
+                            <div class="info-card">
+                                <div class="card-header">
+                                    <i class="fa-solid fa-desktop"></i>
+                                    <h4>Operating System</h4>
+                                </div>
+                                <div class="card-content">
+                                    <div class="info-row">
+                                        <span class="info-label">OS Name:</span>
+                                        <span id="osName" class="info-value">-</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Vendor:</span>
+                                        <span id="osVendor" class="info-value">-</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Family:</span>
+                                        <span id="osFamily" class="info-value">-</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Generation:</span>
+                                        <span id="osGen" class="info-value">-</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Accuracy:</span>
+                                        <span id="osAccuracy" class="info-value">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="info-card">
+                                <div class="card-header">
+                                    <i class="fa-solid fa-network-wired"></i>
+                                    <h4>Network Information</h4>
+                                </div>
+                                <div class="card-content">
+                                    <div class="info-row">
+                                        <span class="info-label">Target IP:</span>
+                                        <span id="osTargetIp" class="info-value">-</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Hostname:</span>
+                                        <span id="osHostname" class="info-value">-</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Open Ports Found:</span>
+                                        <span id="osOpenPortsCount" class="info-value">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="osRawResults" class="raw-results">
+                            <h4>Raw Results</h4>
+                            <pre id="osRawData"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="osChatWindow" class="chat-panel">
+                    <div class="chat-header">
+                        <div class="chat-title">
+                            <i class="fa-solid fa-robot"></i>
+                            <span>OS Analysis Assistant</span>
+                        </div>
+                        <button onclick="clearOsChat()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.8rem">Clear</button>
+                    </div>
+
+                    <div id="osChatMessages" class="chat-messages">
+                        <div class="chat-message ai">
+                            Hello! I'm your OS fingerprinting assistant. I can help analyze the OS detection results for this target. What would you like to know?
+                        </div>
+                    </div>
+
+                    <div class="chat-input-area">
+                        <input type="text" id="osChatInput" class="chat-input" placeholder="Ask about OS fingerprinting results..." onkeypress="handleOsChatKey(event)">
+                        <button class="chat-send-btn" onclick="sendOsChatMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <button id="osChatWidgetBtn" class="chat-widget-btn" onclick="toggleOsChat()">
+                <i class="fa-solid fa-robot"></i>
+            </button>
+        </div>
+
+        <!-- Web App Scanner View -->
+        <div id="webAppScannerView" class="view-section">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Target URL</label>
+                    <input type="text" id="webappTarget" class="control-input" placeholder="https://example.com">
+                </div>
+                <div class="input-group" style="max-width:140px">
+                    <label class="input-label">Max pages</label>
+                    <input type="number" id="webappMaxPages" class="control-input" value="20" min="1" max="100">
+                </div>
+                <button id="webappScanBtn" class="start-button" onclick="startWebAppScan()">Scan Web App</button>
+            </div>
+
+            <div class="control-panel-options">
+                <div class="webapp-mode-toggle">
+                    <input type="checkbox" id="webappCrawl" class="webapp-checkbox" checked>
+                    <label for="webappCrawl">Crawl links</label>
+                </div>
+                <div class="webapp-mode-toggle">
+                    <input type="checkbox" id="webappFullScan" class="webapp-checkbox">
+                    <label for="webappFullScan">Full Scan (slow)</label>
+                </div>
+                <div class="webapp-mode-toggle">
+                    <input type="checkbox" id="webappPassive" class="webapp-checkbox" checked>
+                    <label for="webappPassive">Passive Mode</label>
+                </div>
+            </div>
+
+            <div class="results-window" id="webappResultsWindow">
+                <div class="results-panel">
+                    <div id="webappEmptyState" class="empty-state">
+                        <i class="fa-solid fa-shield-halved" style="font-size:3rem;color:var(--purple-gradient-start);opacity:.4"></i>
+                        <h2 style="font-size:1.25rem;color:var(--text-secondary);margin-top:1rem">Web Application Scanner</h2>
+                        <p style="font-size:0.9rem;margin-top:0.5rem">Enter a URL and click Scan Web App to detect vulnerabilities</p>
+                        <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem">Detects: SQLi · XSS · CSRF · CORS · Clickjacking · Sensitive files · Security headers</p>
+                    </div>
+                    <div id="webappResultsContainer" class="webapp-results-grid hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let scanResults = { critical: [], high: [], medium: [], low: [] };
+        let currentScanId = null;
+        let scanInterval = null;
+        let chatHistory = [];
+        let osChatHistory = [];
+
+        // Port Scanner
+        async function startScan() {
+            const target = document.getElementById('target').value.trim();
+            const ports = document.getElementById('ports').value || 'common';
+            const enhancedDetection = document.getElementById('enhancedDetection').checked;
+            const osDetection = document.getElementById('osDetection').checked;
+            
+            if (!target) {
+                alert('Please enter a target host');
+                return;
+            }
+
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('resultsContainer').classList.remove('hidden');
+            document.getElementById('scanTips').classList.add('hidden');
+            document.getElementById('allPorts').innerHTML = '';
+            document.getElementById('scanProgress').classList.remove('hidden');
+            document.getElementById('startBtn').classList.add('hidden');
+            
+            // Show cancel button
+            let cancelBtn = document.getElementById('cancelScanBtn');
+            if (!cancelBtn) {
+                cancelBtn = document.createElement('button');
+                cancelBtn.id = 'cancelScanBtn';
+                cancelBtn.className = 'cancel-button';
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.onclick = cancelScan;
+                document.querySelector('#portScannerView .control-panel').appendChild(cancelBtn);
+            } else {
+                cancelBtn.classList.remove('hidden');
+            }
+
+            scanResults = { critical: [], high: [], medium: [], low: [] };
+            updateStatus(`Starting scan on ${target}...`, 'scanning');
+
+            try {
+                const response = await fetch('/api/scans', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target: target,
+                        scan_type: 'port',
+                        port_range: ports,
+                        options: {
+                            enhanced_service_detection: enhancedDetection,
+                            os_detection: osDetection
+                        }
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to start scan');
+
+                const scan = await response.json();
+                currentScanId = scan.id;
+                pollScanStatus(scan.id);
+            } catch (err) {
+                updateStatus(`Error: ${err.message}`, 'error');
+                document.getElementById('startBtn').classList.remove('hidden');
+                document.getElementById('cancelScanBtn')?.classList.add('hidden');
+            }
+        }
+
+        function cancelScan() {
+            if (scanInterval) {
+                clearInterval(scanInterval);
+                scanInterval = null;
+            }
+            updateStatus('Scan cancelled', 'error');
+            document.getElementById('startBtn').classList.remove('hidden');
+            document.getElementById('cancelScanBtn')?.classList.add('hidden');
+        }
+
+        async function pollScanStatus(scanId) {
+            const progressBar = document.getElementById('scanProgressBar');
+            const progressPercent = document.getElementById('scanProgressPercent');
+
+            scanInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/scans/${scanId}`);
+                    if (!response.ok) throw new Error('Failed to get scan status');
+
+                    const data = await response.json();
+                    const pct = data.progress_pct || 0;
+                    
+                    progressBar.style.width = pct + '%';
+                    progressPercent.textContent = Math.round(pct) + '%';
+                    
+                    if (data.status === 'running') {
+                        updateStatus(`Scanning... ${Math.round(pct)}%`, 'scanning');
+                    } else {
+                        updateStatus(`Status: ${data.status}`);
+                    }
+
+                    if (data.status === 'completed') {
+                        clearInterval(scanInterval);
+                        scanInterval = null;
+                        document.getElementById('startBtn').classList.remove('hidden');
+                        document.getElementById('cancelScanBtn')?.classList.add('hidden');
+                        updateStatus('Scan completed successfully!', 'complete');
+                        setTimeout(() => {
+                            document.getElementById('scanProgress').classList.add('hidden');
+                        }, 2000);
+                        displayScanResults(data);
+                    } else if (data.status === 'failed') {
+                        clearInterval(scanInterval);
+                        scanInterval = null;
+                        document.getElementById('startBtn').classList.remove('hidden');
+                        document.getElementById('cancelScanBtn')?.classList.add('hidden');
+                        updateStatus('Scan failed', 'error');
+                        document.getElementById('allPorts').innerHTML = '<div class="error-message">Scan failed. Please try again.</div>';
+                    }
+                } catch (err) {
+                    clearInterval(scanInterval);
+                    console.error('Poll error:', err);
+                }
+            }, 1500);
+        }
+
+        function displayScanResults(scan) {
+            const container = document.getElementById('allPorts');
+            if (!scan.results || scan.results.length === 0) {
+                container.innerHTML = '<div class="empty-state"><h3 style="color:#10B981">No open ports found</h3><p style="color:var(--text-secondary)">The target appears to have all scanned ports closed</p></div>';
+                return;
+            }
+
+            // Categorize ports by risk
+            const criticalPorts = [21, 22, 23, 25, 110, 143, 445, 3306, 3389, 5432, 8080, 8443];
+            const highRiskPorts = [53, 80, 111, 135, 139, 443, 993, 995, 1723, 1433, 5985, 6379];
+            const mediumRiskPorts = [110, 111, 123, 137, 138, 161, 162, 389, 636, 993, 995, 2121, 3306, 5432];
+
+            const critical = scan.results.filter(p => criticalPorts.includes(p.port));
+            const high = scan.results.filter(p => highRiskPorts.includes(p.port) && !criticalPorts.includes(p.port));
+            const medium = scan.results.filter(p => mediumRiskPorts.includes(p.port) && !criticalPorts.includes(p.port) && !highRiskPorts.includes(p.port));
+            const low = scan.results.filter(p => !criticalPorts.includes(p.port) && !highRiskPorts.includes(p.port) && !mediumRiskPorts.includes(p.port));
+
+            let html = '';
+
+            if (critical.length > 0) {
+                html += '<div class="results-section critical"><div class="results-title" style="color:#DC2626"><i class="fa-solid fa-triangle-exclamation"></i> Critical Risk Ports</div>';
+                critical.forEach(p => html += createPortElement(p, 'critical'));
+                html += '</div>';
+                scanResults.critical = critical;
+            }
+
+            if (high.length > 0) {
+                html += '<div class="results-section high"><div class="results-title" style="color:#EF4444"><i class="fa-solid fa-exclamation-circle"></i> High Risk Ports</div>';
+                high.forEach(p => html += createPortElement(p, 'high'));
+                html += '</div>';
+                scanResults.high = high;
+            }
+
+            if (medium.length > 0) {
+                html += '<div class="results-section medium"><div class="results-title" style="color:#F59E0B"><i class="fa-solid fa-exclamation-triangle"></i> Medium Risk Ports</div>';
+                medium.forEach(p => html += createPortElement(p, 'medium'));
+                html += '</div>';
+                scanResults.medium = medium;
+            }
+
+            if (low.length > 0) {
+                html += '<div class="results-section low"><div class="results-title" style="color:#3B82F6"><i class="fa-solid fa-info-circle"></i> Low Risk Ports</div>';
+                low.forEach(p => html += createPortElement(p, 'low'));
+                html += '</div>';
+                scanResults.low = low;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function createPortElement(port, risk) {
+            let riskLabel = 'Low';
+            if (risk === 'critical') riskLabel = 'Critical';
+            else if (risk === 'high') riskLabel = 'High';
+            else if (risk === 'medium') riskLabel = 'Medium';
+            
+            return `
+                <div class="port-item" data-risk="${risk}">
+                    <div class="port-header">
+                        <div class="port-info-main">
+                            <span class="port-number">Port ${port.port}</span>
+                            <span class="port-service">${port.service || 'Unknown'}</span>
+                        </div>
+                        <span class="port-risk risk-${risk}">${riskLabel}</span>
+                    </div>
+                    <div class="port-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Status</span>
+                            <span class="detail-value status-open">${port.state || 'Open'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Protocol</span>
+                            <span class="detail-value">${port.protocol || 'TCP'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Service</span>
+                            <span class="detail-value">${port.service || 'Unknown'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Version</span>
+                            <span class="detail-value">${port.version || 'N/A'}</span>
+                        </div>
+                        ${port.banner ? `<div class="detail-item"><span class="detail-label">Banner</span><span class="detail-value" style="font-size:0.75rem;font-family:monospace">${escapeHtml(port.banner.substring(0, 100))}</span></div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('statusText');
+            const percentEl = document.getElementById('scanProgressPercent');
+            if (statusEl) {
+                statusEl.textContent = message;
+                statusEl.className = 'progress-text';
+                if (type === 'scanning') statusEl.classList.add('status-scanning');
+                else if (type === 'complete') statusEl.classList.add('status-complete');
+                else if (type === 'error') statusEl.classList.add('status-error');
+                else if (type === 'warning') statusEl.classList.add('status-warning');
+            }
+            if (type === 'complete' && percentEl) percentEl.textContent = '100%';
+        }
+
+        // OS Fingerprinting
+        async function startOsFingerprint() {
+            const target = document.getElementById('osTarget').value.trim();
+            if (!target) { alert('Please enter a target host'); return; }
+
+            const enhanced = document.getElementById('osEnhancedDetection').checked;
+            const serviceDetect = document.getElementById('osServiceDetection').checked;
+
+            document.getElementById('osEmptyState').classList.add('hidden');
+            document.getElementById('osResultsContainer').classList.remove('hidden');
+
+            // Show loading state
+            document.getElementById('osName').textContent = 'Scanning...';
+            document.getElementById('osVendor').textContent = 'Scanning...';
+            document.getElementById('osFamily').textContent = 'Scanning...';
+            document.getElementById('osGen').textContent = 'Scanning...';
+            document.getElementById('osAccuracy').textContent = '...';
+            document.getElementById('osTargetIp').textContent = target;
+            document.getElementById('osHostname').textContent = target;
+            document.getElementById('osOpenPortsCount').textContent = 'Scanning...';
+
+            try {
+                // Run a port scan first to get open ports for OS detection
+                const scanResponse = await fetch('/api/scans', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target: target,
+                        scan_type: 'port',
+                        port_range: 'common'
+                    })
+                });
+                
+                const scanData = await scanResponse.json();
+                
+                // Poll for scan completion
+                let scanComplete = false;
+                let openPorts = [];
+                
+                while (!scanComplete) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    const statusResponse = await fetch(`/api/scans/${scanData.id}`);
+                    const statusData = await statusResponse.json();
+                    
+                    if (statusData.status === 'completed') {
+                        scanComplete = true;
+                        openPorts = statusData.results || [];
+                        document.getElementById('osOpenPortsCount').textContent = openPorts.length;
+                    } else if (statusData.status === 'failed') {
+                        scanComplete = true;
+                        document.getElementById('osOpenPortsCount').textContent = '0';
+                    }
+                }
+
+                // Analyze OS based on open ports
+                const osInfo = analyzeOsFromPorts(openPorts, target);
+                
+                document.getElementById('osName').textContent = osInfo.name;
+                document.getElementById('osVendor').textContent = osInfo.vendor;
+                document.getElementById('osFamily').textContent = osInfo.family;
+                document.getElementById('osGen').textContent = osInfo.gen;
+                document.getElementById('osAccuracy').textContent = osInfo.accuracy;
+                
+                const rawData = {
+                    target: target,
+                    os_info: osInfo,
+                    open_ports: openPorts.map(p => p.port),
+                    scan_id: scanData.id,
+                    detection_method: enhanced ? 'enhanced' : 'basic'
+                };
+                
+                document.getElementById('osRawData').textContent = JSON.stringify(rawData, null, 2);
+                
+            } catch (err) {
+                document.getElementById('osName').textContent = 'Unknown';
+                document.getElementById('osVendor').textContent = 'Error';
+                document.getElementById('osFamily').textContent = err.message;
+                document.getElementById('osRawData').textContent = 'Error: ' + err.message;
+            }
+        }
+
+        function analyzeOsFromPorts(ports, target) {
+            const portNumbers = ports.map(p => p.port);
+            
+            // Simple OS fingerprinting based on common port signatures
+            if (portNumbers.includes(22) && portNumbers.includes(80)) {
+                return { name: 'Linux/Unix', vendor: 'Generic', family: 'Linux', gen: 'Modern', accuracy: '85%' };
+            }
+            if (portNumbers.includes(3389) && portNumbers.includes(445)) {
+                return { name: 'Windows Server', vendor: 'Microsoft', family: 'Windows', gen: 'Server 2016+', accuracy: '80%' };
+            }
+            if (portNumbers.includes(445) && portNumbers.includes(139)) {
+                return { name: 'Windows', vendor: 'Microsoft', family: 'Windows', gen: 'Desktop/Server', accuracy: '75%' };
+            }
+            if (portNumbers.includes(22)) {
+                return { name: 'Linux/Unix (SSH)', vendor: 'Generic', family: 'Linux/Unix', gen: 'Modern', accuracy: '70%' };
+            }
+            if (portNumbers.includes(80) || portNumbers.includes(443)) {
+                return { name: 'Linux/Windows (Web Server)', vendor: 'Generic', family: 'Web Server', gen: 'Modern', accuracy: '60%' };
+            }
+            
+            return { name: 'Linux/Unix', vendor: 'Generic', family: 'Linux', gen: 'Unknown', accuracy: '50%' };
+        }
+
+        // Web App Scanner
+        async function startWebAppScan() {
+            const url = document.getElementById('webappTarget').value.trim();
+            if (!url) { alert('Please enter a target URL'); return; }
+
+            const maxPages = parseInt(document.getElementById('webappMaxPages').value) || 20;
+            const crawl = document.getElementById('webappCrawl').checked;
+            const fullScan = document.getElementById('webappFullScan').checked;
+            const passive = document.getElementById('webappPassive').checked;
+
+            const btn = document.getElementById('webappScanBtn');
+            btn.textContent = 'Scanning...';
+            btn.disabled = true;
+
+            document.getElementById('webappEmptyState').style.display = 'none';
+            const container = document.getElementById('webappResultsContainer');
+            container.classList.remove('hidden');
+            container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:2.5rem;color:var(--purple-gradient-start)"></i><p style="margin-top:1rem;color:var(--text-secondary)">Scanning ' + url + '...</p><p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem">Crawling pages, testing for vulnerabilities</p></div>';
+
+            try {
+                const target = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+                
+                // Run multiple checks
+                const [headersRes, sslRes] = await Promise.all([
+                    fetch('/api/tools/http_headers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ target: target, path: '/' })
+                    }).catch(() => ({ json: () => ({}) })),
+                    fetch('/api/tools/ssl', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ target: target, port: url.startsWith('https') ? 443 : 80 })
+                    }).catch(() => ({ json: () => ({}) }))
+                ]);
+
+                const headers = await headersRes.json();
+                const ssl = await sslRes.json();
+
+                const findings = [];
+                
+                // Security header checks
+                if (headers.headers) {
+                    if (!headers.headers['Strict-Transport-Security']) findings.push({ severity: 'medium', title: 'Missing HSTS Header', path: '/', description: 'HTTP Strict Transport Security header is not set. This helps protect against man-in-the-middle attacks.', remediation: 'Add "Strict-Transport-Security: max-age=31536000; includeSubDomains" to your server configuration.' });
+                    if (!headers.headers['X-Content-Type-Options']) findings.push({ severity: 'low', title: 'Missing X-Content-Type-Options', path: '/', description: 'Content-Type sniffing is allowed, which could lead to MIME type confusion attacks.', remediation: 'Add "X-Content-Type-Options: nosniff" to response headers.' });
+                    if (!headers.headers['X-Frame-Options']) findings.push({ severity: 'medium', title: 'Missing Clickjacking Protection', path: '/', description: 'X-Frame-Options header is missing. Your site could be embedded in an iframe on a malicious site.', remediation: 'Add "X-Frame-Options: DENY" or "X-Frame-Options: SAMEORIGIN" to response headers.' });
+                    if (!headers.headers['Content-Security-Policy']) findings.push({ severity: 'medium', title: 'Missing Content Security Policy', path: '/', description: 'CSP header is not set. This helps prevent XSS and data injection attacks.', remediation: 'Implement a Content-Security-Policy header appropriate for your application.' });
+                    if (!headers.headers['X-XSS-Protection']) findings.push({ severity: 'low', title: 'Missing X-XSS-Protection', path: '/', description: 'X-XSS-Protection header is not set (deprecated but still recommended).', remediation: 'Add "X-XSS-Protection: 1; mode=block" to response headers.' });
+                }
+
+                // SSL checks
+                if (ssl.status === 'success') {
+                    if (ssl.tls_versions && !ssl.tls_versions.includes('TLSv1.3')) findings.push({ severity: 'medium', title: 'Outdated TLS Version', path: '/', description: 'Server does not support TLS 1.3. Consider upgrading for better security.', remediation: 'Enable TLS 1.3 on your server.' });
+                    if (ssl.valid_to) {
+                        const expiry = new Date(ssl.valid_to);
+                        const daysLeft = Math.floor((expiry - new Date()) / (1000 * 60 * 60 * 24));
+                        if (daysLeft < 30) findings.push({ severity: 'high', title: 'SSL Certificate Expiring Soon', path: '/', description: 'SSL certificate expires in ' + daysLeft + ' days.', remediation: 'Renew your SSL certificate before it expires.' });
+                    }
+                } else if (url.startsWith('https')) {
+                    findings.push({ severity: 'critical', title: 'SSL/TLS Error', path: '/', description: 'Unable to establish secure connection: ' + (ssl.error || 'Unknown error'), remediation: 'Check your SSL/TLS configuration and certificate.' });
+                }
+
+                // HTTP vs HTTPS check
+                if (url.startsWith('http://') && !url.includes('localhost')) {
+                    findings.push({ severity: 'critical', title: 'Insecure HTTP Connection', path: '/', description: 'Site is accessible over HTTP. All data is transmitted in plain text.', remediation: 'Enable HTTPS and redirect HTTP to HTTPS.' });
+                }
+
+                renderWebappResults(url, findings, headers.headers || {}, ssl);
+            } catch (err) {
+                container.innerHTML = '<div class="error-message">Error: ' + err.message + '</div>';
+            }
+
+            btn.textContent = 'Scan Web App';
+            btn.disabled = false;
+        }
+
+        function renderWebappResults(url, findings, headers, ssl) {
+            const container = document.getElementById('webappResultsContainer');
+            const critical = findings.filter(f => f.severity === 'critical').length;
+            const high = findings.filter(f => f.severity === 'high').length;
+            const medium = findings.filter(f => f.severity === 'medium').length;
+            const low = findings.filter(f => f.severity === 'low').length;
+            const total = findings.length;
+            
+            const score = total === 0 ? 100 : Math.max(0, 100 - (critical * 20) - (high * 15) - (medium * 10) - (low * 5));
+            const scoreColor = score >= 80 ? '#34D399' : score >= 50 ? '#FBBF24' : score >= 20 ? '#FB923C' : '#F87171';
+
+            let html = '';
+            
+            // Summary
+            html += '<div class="webapp-summary">';
+            html += '<div class="webapp-stat-card"><div class="webapp-stat-num critical">' + critical + '</div><div class="webapp-stat-label">Critical</div></div>';
+            html += '<div class="webapp-stat-card"><div class="webapp-stat-num high">' + high + '</div><div class="webapp-stat-label">High</div></div>';
+            html += '<div class="webapp-stat-card"><div class="webapp-stat-num medium">' + medium + '</div><div class="webapp-stat-label">Medium</div></div>';
+            html += '<div class="webapp-stat-card"><div class="webapp-stat-num" style="color:' + scoreColor + '">' + score + '</div><div class="webapp-stat-label">Security Score</div></div>';
+            html += '</div>';
+
+            // Risk bar
+            html += '<div class="risk-bar-wrap">';
+            html += '<div class="risk-bar-label"><span>Security Score</span><span style="color:' + scoreColor + ';font-weight:600">' + score + ' / 100</span></div>';
+            html += '<div class="risk-bar-track"><div class="risk-bar-fill" style="width:' + score + '%;background:' + scoreColor + '"></div></div>';
+            html += '</div>';
+
+            // Meta info
+            html += '<div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem">';
+            html += 'Scanned <strong style="color:var(--text-primary)">' + url + '</strong>';
+            html += ' · ' + findings.length + ' findings';
+            html += ' · ' + (url.startsWith('https') ? 'HTTPS' : 'HTTP');
+            html += '</div>';
+
+            // Headers info
+            if (Object.keys(headers).length > 0) {
+                html += '<div class="webapp-section-title">Security Headers</div>';
+                const securityHeaders = ['Strict-Transport-Security', 'Content-Security-Policy', 'X-Frame-Options', 'X-Content-Type-Options', 'X-XSS-Protection'];
+                securityHeaders.forEach(h => {
+                    const status = headers[h] ? '<span style="color:#34D399">✓ Present</span>' : '<span style="color:#EF4444">✗ Missing</span>';
+                    html += '<div style="display:flex;justify-content:space-between;padding:0.25rem 0;font-size:0.85rem"><span>' + h + '</span>' + status + '</div>';
+                });
+            }
+
+            // Findings
+            if (findings.length === 0) {
+                html += '<div class="empty-state" style="padding:2rem;margin-top:1rem"><i class="fa-solid fa-shield-check" style="font-size:2.5rem;color:#34D399"></i><p style="margin-top:0.5rem;color:#34D399;font-size:1.1rem">No vulnerabilities found</p><p style="font-size:0.85rem;color:var(--text-secondary)">Your web application appears to be secure</p></div>';
+            } else {
+                html += '<div class="webapp-section-title">Findings (' + findings.length + ')</div>';
+                findings.forEach((f, i) => {
+                    html += '<div class="finding-card">';
+                    html += '<div class="finding-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">';
+                    html += '<span class="sev-badge ' + f.severity + '">' + f.severity + '</span>';
+                    html += '<span class="finding-title">' + f.title + '</span>';
+                    html += '<span class="finding-path">' + f.path + '</span>';
+                    html += '</div>';
+                    html += '<div class="finding-body">';
+                    html += '<div class="finding-row"><span class="finding-row-label">Description</span><span class="finding-row-val">' + f.description + '</span></div>';
+                    html += '<div class="finding-row"><span class="finding-row-label">Fix</span><span class="finding-row-val">' + f.remediation + '</span></div>';
+                    html += '</div></div>';
+                });
+            }
+
+            container.innerHTML = html;
+        }
+
+        // View switching
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            document.getElementById(viewId + 'View').classList.add('active');
+            document.querySelectorAll('.nav-menu a').forEach(l => l.classList.remove('active'));
+            const navMap = { portScanner: 'PortScanner', osFingerprint: 'OsFingerprint', webAppScanner: 'WebAppScanner' };
+            document.getElementById('nav' + navMap[viewId]).classList.add('active');
+        }
+
+        // Chat functions
+        function toggleChat() {
+            document.getElementById('resultsWindow').classList.toggle('chat-active');
+        }
+
+        function toggleOsChat() {
+            document.getElementById('osResultsWindow').classList.toggle('chat-active');
+        }
+
+        function handleChatKey(e) {
+            if (e.key === 'Enter') sendChatMessage();
+        }
+
+        function handleOsChatKey(e) {
+            if (e.key === 'Enter') sendOsChatMessage();
+        }
+
+        function clearChat() {
+            document.getElementById('chatMessages').innerHTML = '<div class="chat-message ai">Chat cleared. How can I help you analyze your scan results?</div>';
+            chatHistory = [];
+        }
+
+        function clearOsChat() {
+            document.getElementById('osChatMessages').innerHTML = '<div class="chat-message ai">Chat cleared. What would you like to know about OS fingerprinting?</div>';
+            osChatHistory = [];
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML += '<div class="chat-message user">' + escapeHtml(text) + '</div>';
+            chatHistory.push({ role: 'user', content: text });
+            
+            messages.innerHTML += '<div class="chat-message ai"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
+            messages.scrollTop = messages.scrollHeight;
+            input.value = '';
+
+            // Build context from scan results
+            let context = '';
+            if (Object.values(scanResults).some(arr => arr.length > 0)) {
+                context = "Scan Results:\n";
+                Object.entries(scanResults).forEach(([severity, ports]) => {
+                    if (ports.length > 0) {
+                        context += `${severity}: Ports ${ports.map(p => p.port).join(', ')}\n`;
+                    }
+                });
+            }
+
+            setTimeout(() => {
+                const lastMsg = messages.querySelector('.chat-message.ai:last-child');
+                
+                // Simple AI response based on context
+                let response = "I can help analyze your scan results. ";
+                if (scanResults.critical.length > 0) {
+                    response += `I see you have ${scanResults.critical.length} critical risk ports. These typically include remote access services like SSH (22), RDP (3389), or database ports (3306, 5432). `;
+                    response += "I recommend: 1) Restrict access to these services via firewall, 2) Use strong authentication, 3) Keep services updated. ";
+                }
+                if (scanResults.high.length > 0) {
+                    response += `You also have ${scanResults.high.length} high risk ports. These are often web services (80, 443) or Windows file sharing (445). `;
+                    response += "Ensure web services use HTTPS and disable SMB if not needed. ";
+                }
+                response += "What would you like to know more about?";
+                
+                lastMsg.innerHTML = response;
+                chatHistory.push({ role: 'assistant', content: response });
+            }, 1500);
+        }
+
+        function sendOsChatMessage() {
+            const input = document.getElementById('osChatInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const messages = document.getElementById('osChatMessages');
+            messages.innerHTML += '<div class="chat-message user">' + escapeHtml(text) + '</div>';
+            osChatHistory.push({ role: 'user', content: text });
+            
+            messages.innerHTML += '<div class="chat-message ai"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
+            messages.scrollTop = messages.scrollHeight;
+            input.value = '';
+
+            setTimeout(() => {
+                const lastMsg = messages.querySelector('.chat-message.ai:last-child');
+                const osName = document.getElementById('osName').textContent;
+                
+                let response = "I can help analyze OS fingerprinting results. ";
+                if (osName && osName !== '-' && osName !== 'Scanning...') {
+                    response += `Based on the scan, the target appears to be running <strong>${osName}</strong>. `;
+                    response += "OS fingerprinting works by analyzing network responses like TCP/IP stack characteristics, open ports, and service banners. ";
+                } else {
+                    response += "Run an OS fingerprinting scan first to get detailed information about the target's operating system. ";
+                }
+                response += "Would you like to know more about how OS detection works or get security recommendations?";
+                
+                lastMsg.innerHTML = response;
+                osChatHistory.push({ role: 'assistant', content: response });
+            }, 1500);
+        }
+
+        // Filters
+        function toggleFilters(e) {
+            e.stopPropagation();
+            document.getElementById('filterPopover').classList.toggle('active');
+        }
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                applyFilter(this.dataset.filter);
+            });
+        });
+
+        function applyFilter(filter) {
+            document.querySelectorAll('.port-item').forEach(item => {
+                if (filter === 'all') {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = item.dataset.risk === filter ? 'block' : 'none';
+                }
+            });
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#filterIcon') && !e.target.closest('#filterPopover')) {
+                document.getElementById('filterPopover').classList.remove('active');
+            }
+        });
+
+        // Export
+        function exportResults() {
+            const hasResults = Object.values(scanResults).some(arr => arr.length > 0);
+            if (!hasResults) { alert('No scan results to export'); return; }
+
+            const target = document.getElementById('target').value.trim() || 'scan';
+            const exportData = {
+                target: target,
+                timestamp: new Date().toISOString(),
+                scan_type: 'port_scanner',
+                results: scanResults,
+                total_critical: scanResults.critical.length,
+                total_high: scanResults.high.length,
+                total_medium: scanResults.medium.length,
+                total_low: scanResults.low.length
+            };
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cybersec_scan_${target.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+    </script>
+</body>
+</html>
