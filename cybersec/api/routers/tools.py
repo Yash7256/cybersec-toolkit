@@ -28,11 +28,16 @@ router = APIRouter(prefix="/tools", tags=["tools"])
 async def run_dns_lookup(target: str, record_type: str = "A") -> Dict[str, Any]:
     try:
         import dns.resolver
+
         resolver = dns.resolver.Resolver()
         resolver.timeout = 5
         resolver.lifetime = 10
 
-        all_types = ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA"] if record_type == "ALL" else [record_type]
+        all_types = (
+            ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA"]
+            if record_type == "ALL"
+            else [record_type]
+        )
         result = {
             "target": target,
             "status": "success",
@@ -69,7 +74,9 @@ async def run_whois_lookup(target: str) -> Dict[str, Any]:
                 "domain_name": w.domain_name,
                 "registrar": w.registrar,
                 "creation_date": str(w.creation_date) if w.creation_date else None,
-                "expiration_date": str(w.expiration_date) if w.expiration_date else None,
+                "expiration_date": str(w.expiration_date)
+                if w.expiration_date
+                else None,
                 "name_servers": w.name_servers,
                 "status": w.status,
                 "status_code": "success",
@@ -99,7 +106,15 @@ async def run_ssl_check(target: str, port: int = 443) -> Dict[str, Any]:
                     cipher = ssock.cipher()
 
                     from cryptography import x509
-                    x509_cert = x509.load_der_x509_certificate(cert)
+
+                    try:
+                        x509_cert = x509.load_der_x509_certificate(cert)
+                    except Exception as e:
+                        return {
+                            "target": f"{target}:{port}",
+                            "error": f"Failed to parse certificate: {str(e)}",
+                            "status": "failed",
+                        }
 
                     cn = None
                     try:
@@ -121,9 +136,17 @@ async def run_ssl_check(target: str, port: int = 443) -> Dict[str, Any]:
                         "status": "success",
                     }
         except ssl.SSLError as e:
-            return {"target": f"{target}:{port}", "error": str(e), "status": "ssl_error"}
+            return {
+                "target": f"{target}:{port}",
+                "error": str(e),
+                "status": "ssl_error",
+            }
         except socket.timeout:
-            return {"target": f"{target}:{port}", "error": "Connection timeout", "status": "failed"}
+            return {
+                "target": f"{target}:{port}",
+                "error": "Connection timeout",
+                "status": "failed",
+            }
         except Exception as e:
             return {"target": f"{target}:{port}", "error": str(e), "status": "failed"}
 
@@ -171,25 +194,42 @@ async def run_traceroute(target: str, max_hops: int = 30) -> Dict[str, Any]:
                     hop_number = int(parts[0])
                     rest = " ".join(parts[1:])
                     if rest.startswith("*") or rest == "* * *":
-                        hops.append({
-                            "hop_number": hop_number,
-                            "ip": None,
-                            "hostname": None,
-                            "rtt_ms": None,
-                        })
+                        hops.append(
+                            {
+                                "hop_number": hop_number,
+                                "ip": None,
+                                "hostname": None,
+                                "rtt_ms": None,
+                            }
+                        )
                     else:
                         addr_parts = rest.split()
-                        hops.append({
-                            "hop_number": hop_number,
-                            "ip": addr_parts[0] if addr_parts else None,
-                            "hostname": None,
-                            "rtt_ms": None,
-                        })
-            return {"target": target, "max_hops": max_hops, "hops": hops, "status": "success"}
+                        hops.append(
+                            {
+                                "hop_number": hop_number,
+                                "ip": addr_parts[0] if addr_parts else None,
+                                "hostname": None,
+                                "rtt_ms": None,
+                            }
+                        )
+            return {
+                "target": target,
+                "max_hops": max_hops,
+                "hops": hops,
+                "status": "success",
+            }
         except FileNotFoundError:
-            return {"target": target, "error": "traceroute command not found", "status": "failed"}
+            return {
+                "target": target,
+                "error": "traceroute command not found",
+                "status": "failed",
+            }
         except subprocess.TimeoutExpired:
-            return {"target": target, "error": "Traceroute timeout", "status": "timeout"}
+            return {
+                "target": target,
+                "error": "Traceroute timeout",
+                "status": "timeout",
+            }
         except Exception as e:
             return {"target": target, "error": str(e), "status": "failed"}
 
@@ -235,7 +275,11 @@ async def run_ping(target: str, count: int = 4) -> Dict[str, Any]:
                 "status": "success",
             }
         except FileNotFoundError:
-            return {"target": target, "error": "ping command not found", "status": "failed"}
+            return {
+                "target": target,
+                "error": "ping command not found",
+                "status": "failed",
+            }
         except subprocess.TimeoutExpired:
             return {"target": target, "error": "Ping timeout", "status": "timeout"}
         except Exception as e:
@@ -246,11 +290,52 @@ async def run_ping(target: str, count: int = 4) -> Dict[str, Any]:
 
 async def run_subdomain_enum(domain: str, wordlist: str = None) -> Dict[str, Any]:
     common_subdomains = [
-        "www", "mail", "ftp", "localhost", "webmail", "smtp", "pop", "ns1", "webdisk",
-        "ns2", "cpanel", "whm", "autodiscover", "autoconfig", "m", "imap", "test",
-        "ns", "blog", "pop3", "dev", "www2", "admin", "forum", "news", "vpn", "ns3",
-        "mail2", "new", "mysql", "old", "lists", "support", "mobile", "mx", "static",
-        "docs", "beta", "shop", "sql", "secure", "demo", "v2", "api", "cdn", "stats",
+        "www",
+        "mail",
+        "ftp",
+        "localhost",
+        "webmail",
+        "smtp",
+        "pop",
+        "ns1",
+        "webdisk",
+        "ns2",
+        "cpanel",
+        "whm",
+        "autodiscover",
+        "autoconfig",
+        "m",
+        "imap",
+        "test",
+        "ns",
+        "blog",
+        "pop3",
+        "dev",
+        "www2",
+        "admin",
+        "forum",
+        "news",
+        "vpn",
+        "ns3",
+        "mail2",
+        "new",
+        "mysql",
+        "old",
+        "lists",
+        "support",
+        "mobile",
+        "mx",
+        "static",
+        "docs",
+        "beta",
+        "shop",
+        "sql",
+        "secure",
+        "demo",
+        "v2",
+        "api",
+        "cdn",
+        "stats",
     ]
 
     loop = asyncio.get_event_loop()
@@ -282,6 +367,7 @@ async def run_subdomain_enum(domain: str, wordlist: str = None) -> Dict[str, Any
 async def run_geoip_lookup(target: str) -> Dict[str, Any]:
     try:
         import httpx
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(f"http://ip-api.com/json/{target}")
             if response.status_code == 200:
@@ -303,7 +389,11 @@ async def run_geoip_lookup(target: str) -> Dict[str, Any]:
                         "asn": data.get("as"),
                         "status": "success",
                     }
-            return {"target": target, "error": "GeoIP lookup failed", "status": "failed"}
+            return {
+                "target": target,
+                "error": "GeoIP lookup failed",
+                "status": "failed",
+            }
     except Exception as e:
         return {"target": target, "error": str(e), "status": "failed"}
 
@@ -332,7 +422,8 @@ async def ssl_tool(
     db: DBSession,
     current_user: OptionalUser,
 ) -> Dict[str, Any]:
-    return await run_ssl_check(request.target, request.port)
+    host = request.host or request.target
+    return await run_ssl_check(host, request.port)
 
 
 @router.post("/http_headers")

@@ -57,7 +57,7 @@ const api = {
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await fetch(`${API_BASE}/auth/token`, {
+      const response = await fetch(`${API_BASE}/api/auth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -77,7 +77,7 @@ const api = {
     },
 
     async register(email, password) {
-      return this.request('/auth/register', {
+      return this.request('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
@@ -96,7 +96,7 @@ const api = {
 
   scans: {
     async create(target, scanType, portRange, options = {}) {
-      return this.request('/scans/', {
+      return this.request('/api/scans/', {
         method: 'POST',
         body: JSON.stringify({
           target,
@@ -108,25 +108,25 @@ const api = {
     },
 
     async get(scanId) {
-      return this.request(`/scans/${scanId}`);
+      return this.request(`/api/scans/${scanId}`);
     },
 
     async getStatus(scanId) {
-      return this.request(`/scans/${scanId}/status`);
+      return this.request(`/api/scans/${scanId}/status`);
     },
 
     async list(page = 1, status = null) {
       const params = new URLSearchParams({ page, page_size: 20 });
       if (status) params.append('status_filter', status);
-      return this.request(`/scans/?${params}`);
+      return this.request(`/api/scans/?${params}`);
     },
 
     async delete(scanId) {
-      return this.request(`/scans/${scanId}`, { method: 'DELETE' });
+      return this.request(`/api/scans/${scanId}`, { method: 'DELETE' });
     },
 
     async export(scanId, format) {
-      const response = await fetch(`${API_BASE}/reports/scan/${scanId}/${format}`, {
+      const response = await fetch(`${API_BASE}/api/reports/scan/${scanId}/${format}`, {
         headers: {
           'Authorization': `Bearer ${this.token}`,
         },
@@ -150,56 +150,56 @@ const api = {
 
   tools: {
     async dns(target, recordType = 'A') {
-      return this.request('/tools/dns', {
+      return this.request('/api/tools/dns', {
         method: 'POST',
         body: JSON.stringify({ target, record_type: recordType }),
       });
     },
 
     async whois(target) {
-      return this.request('/tools/whois', {
+      return this.request('/api/tools/whois', {
         method: 'POST',
         body: JSON.stringify({ target }),
       });
     },
 
     async ping(target, count = 4) {
-      return this.request('/tools/ping', {
+      return this.request('/api/tools/ping', {
         method: 'POST',
         body: JSON.stringify({ target, count }),
       });
     },
 
     async traceroute(target, maxHops = 30) {
-      return this.request('/tools/traceroute', {
+      return this.request('/api/tools/traceroute', {
         method: 'POST',
         body: JSON.stringify({ target, max_hops: maxHops }),
       });
     },
 
     async ssl(host, port = 443) {
-      return this.request('/tools/ssl', {
+      return this.request('/api/tools/ssl', {
         method: 'POST',
         body: JSON.stringify({ host, port }),
       });
     },
 
     async headers(url) {
-      return this.request('/tools/http_headers', {
+      return this.request('/api/tools/http_headers', {
         method: 'POST',
         body: JSON.stringify({ target: url }),
       });
     },
 
     async subdomains(domain, wordlistSize = 'small') {
-      return this.request('/tools/subdomain', {
+      return this.request('/api/tools/subdomain', {
         method: 'POST',
         body: JSON.stringify({ domain, wordlist: wordlistSize }),
       });
     },
 
     async geo(ip) {
-      return this.request('/tools/geoip', {
+      return this.request('/api/tools/geoip', {
         method: 'POST',
         body: JSON.stringify({ target: ip }),
       });
@@ -207,7 +207,7 @@ const api = {
   },
 
   async streamChat(message, scanId = null, toolName = null, toolResultId = null, history = []) {
-    const response = await fetch(`${API_BASE}/ai/chat`, {
+    const response = await fetch(`${API_BASE}/api/ai/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -25,10 +25,10 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 scanner = AsyncPortScanner()
 
 
-async def run_scan_background(scan_id: UUID, db_url: str) -> None:
-    from cybersec.database.session import create_engine_and_session
+async def run_scan_background(scan_id: UUID) -> None:
+    from cybersec.database.session import get_session_maker
 
-    engine, session_maker = create_engine_and_session()
+    session_maker = get_session_maker()
 
     async with session_maker() as db:
         result = await db.execute(select(Scan).where(Scan.id == scan_id))
@@ -59,7 +59,9 @@ async def run_scan_background(scan_id: UUID, db_url: str) -> None:
                     service=port_result.service,
                     version=port_result.version,
                     banner=port_result.banner,
-                    cves=[cve.__dict__ for cve in port_result.cves] if port_result.cves else None,
+                    cves=[cve.__dict__ for cve in port_result.cves]
+                    if port_result.cves
+                    else None,
                 )
                 db.add(scan_result)
 
@@ -67,15 +69,15 @@ async def run_scan_background(scan_id: UUID, db_url: str) -> None:
             scan.completed_at = report.timestamp
             await db.commit()
 
-            logger.info(f"Scan {scan_id} completed with {len(report.open_ports)} open ports")
+            logger.info(
+                f"Scan {scan_id} completed with {len(report.open_ports)} open ports"
+            )
 
         except Exception as e:
             logger.error(f"Scan {scan_id} failed: {e}")
             scan.status = ScanStatus.FAILED.value
-            scan.completed_at = report.timestamp if 'report' in locals() else None
+            scan.completed_at = report.timestamp if "report" in locals() else None
             await db.commit()
-
-        await engine.dispose()
 
 
 @router.post("/", response_model=ScanRead, status_code=status.HTTP_201_CREATED)
@@ -106,10 +108,7 @@ async def create_scan(
     await db.commit()
     await db.refresh(scan)
 
-    from cybersec.config import get_settings
-    settings = get_settings()
-
-    background_tasks.add_task(run_scan_background, scan.id, settings.database.url)
+    background_tasks.add_task(run_scan_background, scan.id)
 
     return scan
 
@@ -224,7 +223,9 @@ async def get_scan_status(
         )
 
     open_count_result = await db.execute(
-        select(func.count()).select_from(ScanResult).where(
+        select(func.count())
+        .select_from(ScanResult)
+        .where(
             ScanResult.scan_id == scan_id,
             ScanResult.state == "open",
         )

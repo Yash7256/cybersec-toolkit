@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 from groq import RateLimitError, APIError
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +25,7 @@ from cybersec.database.models import Scan, ScanResult, ToolResult
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
-class ChatRequest(Dict[str, Any]):
+class ChatRequest(BaseModel):
     message: str
     scan_id: Optional[str] = None
     tool_name: Optional[str] = None
@@ -74,17 +75,19 @@ async def fetch_scan_context(
 
     results_list = []
     for r in results:
-        results_list.append({
-            "id": str(r.id),
-            "port": r.port,
-            "protocol": r.protocol,
-            "state": r.state,
-            "service": r.service,
-            "version": r.version,
-            "banner": r.banner,
-            "cves": r.cves,
-            "risk_score": 0.0,
-        })
+        results_list.append(
+            {
+                "id": str(r.id),
+                "port": r.port,
+                "protocol": r.protocol,
+                "state": r.state,
+                "service": r.service,
+                "version": r.version,
+                "banner": r.banner,
+                "cves": r.cves,
+                "risk_score": 0.0,
+            }
+        )
 
     context_builder = ContextBuilder()
     context = context_builder.build_scan_context(scan_dict, results_list)
@@ -129,6 +132,7 @@ async def chat(
     current_user: OptionalUser,
 ) -> StreamingResponse:
     from cybersec.config import get_settings
+
     settings = get_settings()
 
     if not settings.groq.api_key:
@@ -155,7 +159,9 @@ async def chat(
 
     if request.tool_result_id:
         try:
-            tool_name, tool_context = await fetch_tool_context(request.tool_result_id, db)
+            tool_name, tool_context = await fetch_tool_context(
+                request.tool_result_id, db
+            )
             if tool_name == "ssl":
                 system_prompt = SSL_ANALYST_PROMPT
             elif tool_name == "dns":
@@ -193,10 +199,12 @@ async def chat(
 
             messages = []
             for msg in conversation_history:
-                messages.append({
-                    "role": msg.get("role", "user"),
-                    "content": msg.get("content", ""),
-                })
+                messages.append(
+                    {
+                        "role": msg.get("role", "user"),
+                        "content": msg.get("content", ""),
+                    }
+                )
             messages.append({"role": "user", "content": current_message})
 
             def on_token(token: str) -> None:
@@ -233,6 +241,7 @@ async def analyze_scan(
     current_user: OptionalUser,
 ) -> Dict[str, Any]:
     from cybersec.config import get_settings
+
     settings = get_settings()
 
     if not settings.groq.api_key:
@@ -286,6 +295,7 @@ async def list_models(
     current_user: OptionalUser,
 ) -> Dict[str, Any]:
     from cybersec.config import get_settings
+
     settings = get_settings()
 
     if not settings.groq.api_key:

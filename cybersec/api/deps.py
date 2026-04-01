@@ -55,9 +55,9 @@ async def get_current_user(
 
 async def optional_current_user(
     token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    db: DBSession = None,
+    db: Annotated[Optional[AsyncSession], Depends(get_db)] = None,
 ) -> Optional[User]:
-    if token is None:
+    if token is None or db is None:
         return None
 
     payload = verify_token(token)

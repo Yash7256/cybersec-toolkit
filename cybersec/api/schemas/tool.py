@@ -27,8 +27,11 @@ class WHOISRequest(BaseModel):
 
 
 class SSLRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=255)
+    host: str = Field(min_length=1, max_length=255, alias="host")
+    target: Optional[str] = None
     port: int = Field(default=443, ge=1, le=65535)
+
+    model_config = {"populate_by_name": True}
 
 
 class HTTPHeadersRequest(BaseModel):

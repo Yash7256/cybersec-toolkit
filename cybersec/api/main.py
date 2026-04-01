@@ -5,6 +5,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from cybersec.api.routers import auth, scans, tools, reports, ai
 from cybersec.config import get_settings
@@ -32,19 +33,24 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.include_router(auth.router)
-    app.include_router(scans.router)
-    app.include_router(tools.router)
-    app.include_router(reports.router)
-    app.include_router(ai.router)
-
-    # Mount static files
-    static_path = Path("/home/yash/cybersec/public")
+    # Mount static files - relative to package location
+    static_path = Path(__file__).parent.parent / "web" / "static"
     if static_path.exists():
-        app.mount(
-            "/", StaticFiles(directory=str(static_path), html=True), name="static"
-        )
         app.mount("/static", StaticFiles(directory=str(static_path)), name="assets")
+
+        @app.get("/")
+        @app.get("/{path:path}")
+        async def serve_spa(path: str = ""):
+            index_path = static_path / "index.html"
+            if index_path.exists():
+                return FileResponse(str(index_path))
+
+    # Add /api prefix to all routers
+    app.include_router(auth.router, prefix="/api")
+    app.include_router(scans.router, prefix="/api")
+    app.include_router(tools.router, prefix="/api")
+    app.include_router(reports.router, prefix="/api")
+    app.include_router(ai.router, prefix="/api")
 
     return app
 
