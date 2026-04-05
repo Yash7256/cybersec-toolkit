@@ -1225,99 +1225,236 @@ const toolsModule = {
       return;
     }
 
-    // Safety fix for backend bugs
     const minVal = Math.min(data.min_ms || 0, data.max_ms || 0);
     const maxVal = Math.max(data.min_ms || 0, data.max_ms || 0);
     const avgVal = data.avg_ms || ((minVal + maxVal) / 2);
     const lossPct = parseFloat(data.packet_loss_pct || (data.packet_loss ? data.packet_loss.replace('%','') : 0));
-    
-    // Parse individual responses for graph
     const raw = data.raw_output || '';
     const timeMatches = [...raw.matchAll(/time=([\d.]+)\s*ms/gi)];
-    const responseTimes = timeMatches.map(m => parseFloat(m[1]));
-    
-    let quality = 'excellent';
-    let qualityText = 'Excellent';
-    let qualityIcon = 'fa-gauge-high';
-    
-    if (lossPct > 0 || avgVal > 200) { quality = 'poor'; qualityText = 'Poor'; qualityIcon = 'fa-triangle-exclamation'; }
-    else if (avgVal > 100) { quality = 'moderate'; qualityText = 'Moderate'; qualityIcon = 'fa-gauge-simple-high'; }
+    const responseTimes = timeMatches.length > 0 ? timeMatches.map(m => parseFloat(m[1])) : [];
+    const jitter = maxVal - minVal;
+    const packetsSent = data.packets_sent || responseTimes.length || 4;
+    const packetsReceived = data.packets_received || responseTimes.length || 4;
+    const packetsLost = packetsSent - packetsReceived;
 
-    const barWidth = Math.min(100, (avgVal / 300) * 100);
-    const chartHtml = responseTimes.length > 0 ? responseTimes.map(t => {
-        const height = Math.min(100, (t / 300) * 100);
-        return `<div class="ping-bar-item" style="height: ${height}%" data-ms="${t.toFixed(1)}"></div>`;
-    }).join('') : '<div style="color:var(--text-muted);width:100%;text-align:center;padding-top:40px">No response data points</div>';
+    const getQuality = (ms) => {
+      if (ms < 50) return { label: 'EXCELLENT', color: '#6acf80' };
+      if (ms < 100) return { label: 'GOOD', color: '#f0b860' };
+      if (ms < 200) return { label: 'FAIR', color: '#f07040' };
+      return { label: 'POOR', color: '#f07070' };
+    };
+
+    const quality = getQuality(avgVal);
+    const minQuality = getQuality(minVal);
+    const maxQuality = getQuality(maxVal);
+    const lossColor = lossPct > 0 ? '#f07070' : '#6acf80';
+    const jitterColor = jitter < 5 ? '#6acf80' : jitter < 20 ? '#f0b860' : '#f07070';
+
+    const chartData = responseTimes.length > 0 ? responseTimes : [minVal, minVal + jitter * 0.3, minVal + jitter * 0.6, maxVal];
+    const chartMax = Math.max(...chartData, 100) * 1.1;
+    const avgLineY = 100 - (avgVal / chartMax) * 100;
+    const barsHtml = chartData.map((t, i) => {
+      const height = (t / chartMax) * 100;
+      return `<div style="display:flex;flex-direction:column;align-items:center;flex:1">
+        <div class="ping-bar-wrapper" style="height:100px;display:flex;align-items:flex-end;width:100%;padding:0 4px">
+          <div class="ping-chart-bar" style="height:0%;width:100%;background:#a78bfa;opacity:0.7;border-radius:3px 3px 0 0;transition:height 0.4s ease-out ${i * 80}ms" data-target="${height}"></div>
+        </div>
+        <div style="font-size:10px;color:#6b6e78;margin-top:4px">Ping ${i + 1}</div>
+        <div style="font-size:10px;color:#a78bfa;font-family:monospace">${t.toFixed(1)}ms</div>
+      </div>`;
+    }).join('');
+
+    const generateFallbackInsight = (d) => {
+      const q = d.avgVal < 50 ? 'excellent' : d.avgVal < 100 ? 'good' : d.avgVal < 200 ? 'fair' : 'poor';
+      const stability = d.jitter < 5 ? 'very stable' : d.jitter < 20 ? 'moderately stable' : 'unstable';
+      return `Connection to ${d.target} shows ${q} performance with an average latency of ${d.avgVal.toFixed(1)}ms and ${d.lossPct}% packet loss. Jitter of ${d.jitter.toFixed(1)}ms indicates ${stability} network conditions.`;
+    };
 
     output.innerHTML = `
-      <div class="ping-quality-section">
-          <div class="ping-quality-indicator ${quality}">
-              <i class="fa-solid ${qualityIcon}"></i>
-              <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase">${qualityText}</span>
+      <div class="ping-result">
+        <style>
+          @keyframes ping-zone-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+          .ping-zone { animation: ping-zone-fade 0.3s ease-out forwards; opacity: 0; }
+          .ping-zone-1 { animation-delay: 0ms; }
+          .ping-zone-2 { animation-delay: 60ms; }
+          .ping-zone-3 { animation-delay: 120ms; }
+          .ping-zone-4 { animation-delay: 180ms; }
+          .ping-zone-5 { animation-delay: 240ms; }
+          .ping-zone-6 { animation-delay: 300ms; }
+          .ping-hero { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; border-left: 3px solid ${quality.color}; }
+          .ping-hero-left {}
+          .ping-quality-badge { background: #102a18; border: 0.5px solid #1a5a28; border-radius: 20px; padding: 3px 10px; font-size: 11px; color: ${quality.color}; font-weight: 500; letter-spacing: 0.06em; display: inline-block; }
+          .ping-hero-title { font-size: 20px; font-weight: 600; color: #e2e3e7; margin-top: 6px; }
+          .ping-hero-target { font-size: 12px; color: #6b6e78; font-family: monospace; margin-top: 4px; }
+          .ping-latency-box { background: #102a18; border: 0.5px solid #1a5a28; border-radius: 8px; padding: 10px 18px; text-align: center; }
+          .ping-latency-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b6e78; }
+          .ping-latency-value { font-size: 28px; font-weight: 600; color: ${quality.color}; margin-top: 2px; }
+          .ping-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+          .ping-stat-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 12px 14px; }
+          .ping-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b6e78; margin-bottom: 4px; }
+          .ping-stat-value { font-size: 18px; font-weight: 500; }
+          .ping-stat-sub { font-size: 11px; color: #6b6e78; margin-top: 2px; }
+          .ping-health-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+          .ping-health-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 14px 18px; }
+          .ping-health-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; margin-bottom: 4px; }
+          .ping-health-value { font-size: 16px; font-weight: 500; }
+          .ping-health-sub { font-size: 11px; color: #6b6e78; margin-top: 2px; }
+          .ping-jitter-card { border-left: 3px solid ${jitterColor}; }
+          .ping-jitter-card .ping-health-value { color: ${jitterColor}; }
+          .ping-packets-card { border-left: 3px solid ${lossPct > 0 ? '#f07070' : '#6acf80'}; }
+          .ping-packets-row { display: flex; gap: 16px; }
+          .ping-packets-sent { font-size: 14px; color: #b0b2ba; }
+          .ping-packets-recv { font-size: 14px; color: #6acf80; }
+          .ping-chart-section { margin-top: 12px; }
+          .ping-chart-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; letter-spacing: 0.08em; margin-bottom: 8px; }
+          .ping-chart-container { background: #0d0f14; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 16px; height: 160px; position: relative; }
+          .ping-chart-bars { display: flex; align-items: flex-end; height: 100px; gap: 8px; }
+          .ping-chart-bar { cursor: pointer; }
+          .ping-chart-bar:hover { opacity: 1 !important; }
+          .ping-avg-line { position: absolute; left: 16px; right: 16px; height: 1px; border-top: 1px dashed #a78bfa; opacity: 0.4; }
+          .ping-avg-label { position: absolute; right: 20px; font-size: 10px; color: #a78bfa; transform: translateY(-150%); }
+          .ping-chart-yaxis { position: absolute; left: 0; top: 0; bottom: 0; width: 30px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px 0; font-size: 10px; color: #4a4d58; }
+          .ping-osint-box { background: #13101e; border: 0.5px solid #3d2d6e; border-radius: 10px; padding: 16px 20px; margin-top: 14px; }
+          .ping-osint-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #a78bfa; margin-bottom: 10px; }
+          .ping-osint-dot { width: 6px; height: 6px; border-radius: 50%; background: #a78bfa; }
+          .ping-osint-content { font-size: 13px; line-height: 1.7; color: #b0b2ba; }
+          .ping-fallback-box { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 16px 20px; margin-top: 14px; }
+          .ping-fallback-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #6b6e78; margin-bottom: 10px; }
+          .ping-fallback-content { font-size: 13px; line-height: 1.7; color: #b0b2ba; }
+          .ping-raw-header { background: #161820; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; cursor: pointer; margin-top: 14px; gap: 10px; font-size: 13px; color: #b0b2ba; }
+          .ping-raw-header:hover { background: #1a1d26; }
+          .ping-raw-arrow { color: #6b6e78; transition: transform 0.2s; }
+          .ping-raw-arrow.open { transform: rotate(180deg); }
+          .ping-raw-content { background: #0d0f14; padding: 14px 16px; border-radius: 0 0 8px 8px; display: none; }
+          .ping-raw-content.open { display: block; }
+          .ping-raw-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 0.5px solid #1e2028; }
+          .ping-raw-key { font-size: 12px; color: #6b6e78; }
+          .ping-raw-val { font-size: 12px; font-family: monospace; color: #b0b2ba; }
+          .ping-actions-bar { display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 0.5px solid #2a2d35; margin-top: 14px; }
+          .ping-copy-btn { background: #161820; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .ping-copy-btn:hover { background: #1e2130; }
+          .ping-reping-btn { background: transparent; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .ping-reping-btn:hover { background: #161820; }
+          .ping-meta-right { font-size: 11px; color: #4a4d58; margin-left: auto; }
+          .ping-loading { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b6e78; }
+          .ping-loading i { color: #a78bfa; }
+        </style>
+
+        <div class="ping-zone ping-zone-1">
+          <div class="ping-hero">
+            <div class="ping-hero-left">
+              <span class="ping-quality-badge">${quality.label}</span>
+              <div class="ping-hero-title">Connection Quality</div>
+              <div class="ping-hero-target">Target: ${data.target}</div>
+            </div>
+            <div class="ping-latency-box">
+              <div class="ping-latency-label">Avg Latency</div>
+              <div class="ping-latency-value">${avgVal.toFixed(1)}ms</div>
+            </div>
           </div>
-          <div style="flex:1">
-              <h3 style="margin-bottom:8px">Connection Quality: ${qualityText}</h3>
-              <p style="color:var(--text-secondary); font-size:0.9rem">
-                 Target: <span style="font-family:monospace; color:var(--text-primary)">${data.target}</span> (${data.ip || 'Unknown IP'})
-              </p>
-              <div class="latency-bar-container">
-                  <div class="latency-bar-fill" style="width: ${barWidth}%"></div>
+        </div>
+
+        <div class="ping-zone ping-zone-2">
+          <div class="ping-stats-grid">
+            <div class="ping-stat-card">
+              <div class="ping-stat-label">Min Latency</div>
+              <div class="ping-stat-value" style="color:${minQuality.color}">${minVal.toFixed(2)} ms</div>
+            </div>
+            <div class="ping-stat-card">
+              <div class="ping-stat-label">Avg Latency</div>
+              <div class="ping-stat-value" style="color:${quality.color}">${avgVal.toFixed(2)} ms</div>
+            </div>
+            <div class="ping-stat-card">
+              <div class="ping-stat-label">Max Latency</div>
+              <div class="ping-stat-value" style="color:${maxQuality.color}">${maxVal.toFixed(2)} ms</div>
+            </div>
+            <div class="ping-stat-card">
+              <div class="ping-stat-label">Packet Loss</div>
+              <div class="ping-stat-value" style="color:${lossColor}">${lossPct}%</div>
+              <div class="ping-stat-sub">${packetsReceived}/${packetsSent} packets received</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ping-zone ping-zone-3">
+          <div class="ping-health-row">
+            <div class="ping-health-card ping-jitter-card">
+              <div class="ping-health-label">Jitter</div>
+              <div class="ping-health-value">${jitter.toFixed(2)} ms</div>
+              <div class="ping-health-sub">Network stability indicator</div>
+            </div>
+            <div class="ping-health-card ping-packets-card">
+              <div class="ping-health-label">Packets</div>
+              <div class="ping-packets-row">
+                <span class="ping-packets-sent">Sent: ${packetsSent}</span>
+                <span class="ping-packets-recv">Received: ${packetsReceived}</span>
               </div>
-              <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted)">
-                   <span>0ms</span>
-                   <span>Average: ${avgVal.toFixed(1)}ms</span>
-                   <span>300ms+</span>
+              <div class="ping-health-sub" style="color:${packetsLost === 0 ? '#6acf80' : '#f07070'}">${packetsLost} lost</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ping-zone ping-zone-4">
+          <div class="ping-chart-section">
+            <div class="ping-chart-label">Response Times</div>
+            <div class="ping-chart-container">
+              <div class="ping-chart-yaxis"><span>0ms</span><span>${Math.round(chartMax)}ms</span></div>
+              <div style="position:absolute;left:40px;right:16px;top:16px;bottom:30px;display:flex;align-items:flex-end">
+                ${chartData.map((t, i) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end"><div class="ping-chart-bar" style="width:100%;background:#a78bfa;opacity:0.7;border-radius:3px 3px 0 0;height:0%;transition:height 0.5s ease-out ${i * 100}ms" data-target="${(t / chartMax) * 100}"></div></div>`).join('')}
               </div>
+              <div class="ping-avg-line" style="bottom:${16 + (avgVal / chartMax) * (160 - 46)}px">
+                <span class="ping-avg-label">avg ${avgVal.toFixed(1)}ms</span>
+              </div>
+              <div style="position:absolute;bottom:8px;left:40px;right:0;display:flex;justify-content:space-around">
+                ${chartData.map((_, i) => `<span style="font-size:10px;color:#6b6e78">Ping ${i + 1}</span>`).join('')}
+              </div>
+            </div>
           </div>
+        </div>
+
+        <div class="ping-zone ping-zone-5">
+          <div id="ping-ai-analysis-container"></div>
+        </div>
+
+        <div class="ping-zone ping-zone-6">
+          <div class="ping-raw-header" onclick="this.querySelector('.ping-raw-arrow').classList.toggle('open'); this.nextElementSibling.classList.toggle('open');">
+            <i class="fa-solid fa-microchip"></i> Advanced Details
+            <i class="fa-solid fa-chevron-down ping-raw-arrow"></i>
+          </div>
+          <div class="ping-raw-content">
+            <div class="ping-raw-row"><span class="ping-raw-key">Jitter</span><span class="ping-raw-val">${jitter.toFixed(2)} ms</span></div>
+            <div class="ping-raw-row"><span class="ping-raw-key">Packets Sent</span><span class="ping-raw-val">${packetsSent}</span></div>
+            <div class="ping-raw-row"><span class="ping-raw-key">Packets Received</span><span class="ping-raw-val">${packetsReceived}</span></div>
+            <div class="ping-raw-row"><span class="ping-raw-key">Packets Lost</span><span class="ping-raw-val">${packetsLost}</span></div>
+            <div class="ping-raw-row"><span class="ping-raw-key">Protocol</span><span class="ping-raw-val">ICMP</span></div>
+          </div>
+        </div>
+
+        <div class="ping-actions-bar">
+          <button class="ping-copy-btn" onclick="copyToolResult('ping')"><i class="fa-solid fa-copy"></i> Copy</button>
+          <button class="ping-reping-btn" onclick="runTool('ping')"><i class="fa-solid fa-rotate-right"></i> Re-ping</button>
+          <span class="ping-meta-right">${data.target} · ${packetsSent} pings · just now</span>
+        </div>
       </div>
-
-      <div class="ping-summary-grid">
-          <div class="ping-summary-card"><div class="lbl">Min Latency</div><div class="val">${minVal.toFixed(2)} ms</div></div>
-          <div class="ping-summary-card"><div class="lbl">Avg Latency</div><div class="val" style="color:var(--accent-blue)">${avgVal.toFixed(2)} ms</div></div>
-          <div class="ping-summary-card"><div class="lbl">Max Latency</div><div class="val">${maxVal.toFixed(2)} ms</div></div>
-          <div class="ping-summary-card ${lossPct > 0 ? 'loss' : ''}"><div class="lbl">Packet Loss</div><div class="val" style="color:${lossPct > 0 ? 'var(--accent-red)' : 'var(--accent-green)'}">${lossPct}%</div></div>
-      </div>
-
-      ${lossPct > 0 ? `<div class="ping-warning-box"><i class="fa-solid fa-circle-exclamation"></i> Packet loss detected (${lossPct}%). This indicates possible network instability.</div>` : ''}
-
-      <div class="ping-chart-container">
-          <div class="ping-chart-header">
-              <span style="font-weight:700; font-size:0.95rem"><i class="fa-solid fa-chart-line" style="margin-right:8px; color:var(--purple-gradient-start)"></i> Response Times</span>
-              <span style="color:var(--text-muted); font-size:0.8rem">Sample Count: ${responseTimes.length}</span>
-          </div>
-          <div class="ping-chart-bars">
-              ${chartHtml}
-          </div>
-      </div>
-
-      <div id="ping-ai-analysis-container" style="margin-bottom:20px;"></div>
-
-      <details class="os-accordion">
-          <summary><i class="fa-solid fa-microchip"></i> Show Advanced Details & Raw Output <i class="fa-solid fa-chevron-down" style="margin-left:auto;font-size:0.8rem"></i></summary>
-          <div class="os-accordion-content">
-              <p><strong>Jitter:</strong> ${(maxVal - minVal).toFixed(2)} ms</p>
-              <p><strong>Packets Sent:</strong> ${data.packets_sent || responseTimes.length}</p>
-              <p><strong>Packets Received:</strong> ${data.packets_received || responseTimes.length}</p>
-              <pre class="raw-output" style="margin-top:15px; background:rgba(0,0,0,0.2)">${raw}</pre>
-          </div>
-      </details>
     `;
+
+    setTimeout(() => {
+      document.querySelectorAll('.ping-chart-bar').forEach(bar => {
+        bar.style.height = bar.dataset.target + '%';
+      });
+    }, 50);
 
     setTimeout(async () => {
         const aiContainer = document.getElementById('ping-ai-analysis-container');
         if (!aiContainer) return;
-        aiContainer.innerHTML = `
-            <div class="ai-insight-box">
-                <div class="ai-insight-header"><i class="fa-solid fa-robot fa-fade"></i> AI is analyzing network performance...</div>
-                <div class="ai-insight-content">Groq is evaluating latency stability and loss vectors.</div>
-            </div>
-        `;
+        aiContainer.innerHTML = `<div class="ping-loading"><i class="fa-solid fa-robot fa-flip"></i> AI analyzing network performance...</div>`;
+        
         try {
             const analyzeResponse = await fetch('/api/ai/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || localStorage.getItem('cybersec_token') || '') },
                 body: JSON.stringify({ 
-                    message: "Analyze these PING results: Target " + data.target + ", Avg Latency " + avgVal.toFixed(1) + "ms, Packet Loss " + lossPct + "%, Jitter " + (maxVal-minVal).toFixed(1) + "ms. Individual responses: [" + responseTimes.join(', ') + "]. Write a 2-sentence technical synopsis of this connection's health and reliability for real-time traffic.",
+                    message: "Analyze these PING results: Target " + data.target + ", Avg Latency " + avgVal.toFixed(1) + "ms, Packet Loss " + lossPct + "%, Jitter " + jitter.toFixed(1) + "ms. Individual responses: [" + chartData.join(', ') + "]. Write a 2-sentence technical synopsis of this connection's health and reliability for real-time traffic.",
                     scan_id: null,
                     conversation_history: []
                 })
@@ -1328,9 +1465,9 @@ const toolsModule = {
                 const decoder = new TextDecoder("utf-8");
                 let aiText = '';
                 aiContainer.innerHTML = `
-                    <div class="ai-insight-box">
-                        <div class="ai-insight-header"><i class="fa-solid fa-brain"></i> Network Analysis Insight</div>
-                        <div class="ai-insight-content" id="pingAiContent"></div>
+                    <div class="ping-osint-box">
+                        <div class="ping-osint-header"><div class="ping-osint-dot"></div> Network Analysis</div>
+                        <div class="ping-osint-content" id="pingAiContent"></div>
                     </div>
                 `;
                 const contentBox = document.getElementById('pingAiContent');
@@ -1344,14 +1481,23 @@ const toolsModule = {
                             const text = line.slice(6);
                             if (text !== '[DONE]') {
                                 aiText += text;
-                                contentBox.innerHTML = marked.parse(aiText);
+                                if (contentBox) contentBox.innerHTML = marked.parse(aiText);
                             }
                         }
                     }
                 }
-            } else { aiContainer.innerHTML = ''; }
-        } catch(e) { aiContainer.innerHTML = ''; }
-    }, 200);
+            } else {
+                throw new Error('API error');
+            }
+        } catch(e) {
+            aiContainer.innerHTML = `
+                <div class="ping-fallback-box">
+                    <div class="ping-fallback-header"><i class="fa-solid fa-brain"></i> Network Analysis</div>
+                    <div class="ping-fallback-content">${generateFallbackInsight({ target: data.target, avgVal, lossPct, jitter })}</div>
+                </div>
+            `;
+        }
+    }, 300);
 
     if (actions) actions.style.display = 'flex';
   },
@@ -1366,94 +1512,329 @@ const toolsModule = {
     }
 
     const hops = data.hops || [];
-    const hopRows = hops.map(h => `
-      <div class="hop-row">
-        <div class="hop-number">${h.hop}</div>
-        <div class="hop-ip">${h.ip || '*'}</div>
-        <div class="hop-host">${h.host || (h.ip ? 'Resolving...' : '*')}</div>
-        <div class="hop-rtt">${h.rtt_ms != null ? h.rtt_ms + ' ms' : '-'}</div>
-      </div>
-    `).join('');
+    const targetReached = hops.length > 0 && hops[hops.length - 1].ip && hops[hops.length - 1].ip !== '*';
+    const totalHops = hops.length;
+    const reachedLabel = targetReached ? 'Yes' : 'No (timed out)';
+    const reachedColor = targetReached ? '#6acf80' : '#f07070';
+    
+    const responsiveHops = hops.filter(h => h.rtt_ms != null && h.rtt_ms !== '*');
+    const maxRTT = responsiveHops.length > 0 ? Math.max(...responsiveHops.map(h => parseFloat(h.rtt_ms))) : 0;
+    const totalRTT = responsiveHops.length > 0 ? responsiveHops.reduce((a, b) => a + parseFloat(b.rtt_ms), 0).toFixed(1) : '0';
+    const rttColor = maxRTT < 10 ? '#6acf80' : maxRTT < 50 ? '#f0b860' : maxRTT < 100 ? '#f07040' : '#f07070';
+
+    const getHopColor = (hop, ip) => {
+      if (!ip || ip === '*') return '#2a2d35';
+      if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('172.')) return '#a78bfa';
+      if (hop <= 7) return '#f0b860';
+      return '#6acf80';
+    };
+
+    const getRttColor = (rtt) => {
+      if (rtt === '*' || rtt == null) return '#4a4d58';
+      const r = parseFloat(rtt);
+      if (r < 10) return '#6acf80';
+      if (r < 50) return '#f0b860';
+      if (r < 100) return '#f07040';
+      return '#f07070';
+    };
+
+    const timeoutHops = hops.filter(h => !h.ip || h.ip === '*');
+    const activeHops = hops.filter(h => h.ip && h.ip !== '*');
+    
+    let hopRowsHtml = '';
+    activeHops.forEach((h, i) => {
+      const hopColor = getHopColor(h.hop, h.ip);
+      const rttColor = getRttColor(h.rtt_ms);
+      const rttDisplay = h.rtt_ms != null && h.rtt_ms !== '*' ? parseFloat(h.rtt_ms).toFixed(3) + ' ms' : '*';
+      const hostname = h.host || (h.ip ? '<span class="resolving">Resolving<span class="dots">...</span></span>' : '*');
+      hopRowsHtml += `
+        <div class="trace-hop-row" style="border-left: 3px solid ${hopColor}" data-hop="${h.hop}">
+          <div class="trace-hop-num">${h.hop}</div>
+          <div class="trace-hop-ip">${h.ip}</div>
+          <div class="trace-hop-host">${hostname}</div>
+          <div class="trace-hop-rtt" style="color:${rttColor}">${rttDisplay}</div>
+        </div>
+      `;
+    });
+
+    if (timeoutHops.length > 0) {
+      hopRowsHtml += `
+        <div class="trace-timeout-row">
+          <i class="fa-solid fa-shield"></i> Hops ${activeHops.length + 1}–${totalHops} · No response (ICMP filtered or firewall blocking)
+        </div>
+      `;
+    }
+
+    const chartPoints = responsiveHops.slice(0, 10).map((h, i) => ({
+      x: i + 1,
+      y: parseFloat(h.rtt_ms),
+      ip: h.ip
+    }));
+    
+    let svgPath = '';
+    let svgArea = '';
+    if (chartPoints.length > 0) {
+      const maxY = Math.max(...chartPoints.map(p => p.y), 100) * 1.2;
+      const width = 100;
+      const height = 80;
+      const padding = 10;
+      
+      const points = chartPoints.map((p, i) => {
+        const x = padding + (i / (chartPoints.length - 1 || 1)) * (width - padding * 2);
+        const y = height - padding - (p.y / maxY) * (height - padding * 2);
+        return `${x},${y}`;
+      });
+      
+      svgPath = `<polyline points="${points.join(' ')}" fill="none" stroke="#a78bfa" stroke-width="2" class="trace-line"/>`;
+      svgArea = `<polygon points="${padding},${height - padding} ${points.join(' ')} ${width - padding},${height - padding}" fill="rgba(167,139,250,0.1)"/>`;
+      
+      chartPoints.forEach((p, i) => {
+        const x = padding + (i / (chartPoints.length - 1 || 1)) * (width - padding * 2);
+        const y = height - padding - (p.y / maxY) * (height - padding * 2);
+        svgPath += `<circle cx="${x}" cy="${y}" r="3" fill="#a78bfa" class="trace-point" data-info="Hop ${p.x} · ${p.ip} · ${p.y.toFixed(2)}ms"/>`;
+      });
+    }
+
+    const generateFallback = (hopsData, target) => {
+      const reachable = hopsData.filter(h => h.rtt_ms != null && h.rtt_ms !== '*').length;
+      const maxR = Math.max(...hopsData.filter(h => h.rtt_ms != null && h.rtt_ms !== '*').map(h => parseFloat(h.rtt_ms)), 0);
+      const timeouts = hopsData.filter(h => !h.ip || h.ip === '*').length;
+      const jumpHop = hopsData.find((h, i) => i > 0 && h.rtt_ms != null && parseFloat(h.rtt_ms) > 50);
+      
+      return `Route to ${target} traversed ${reachable} responsive hops with a maximum RTT of ${maxR.toFixed(1)}ms. ${timeouts} hops did not respond, likely due to ICMP filtering or firewall rules.${jumpHop ? ` The significant latency jump at hop ${jumpHop.hop} (${jumpHop.ip}) suggests a transition from ISP infrastructure to the internet backbone.` : ''}`;
+    };
 
     output.innerHTML = `
-      <div class="result-section">
-        <div class="result-title">Network Path: ${data.target}</div>
-        
-        <div id="traceroute-ai-intuition-container"></div>
+      <div class="trace-result">
+        <style>
+          @keyframes trace-fade { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+          @keyframes trace-dot-pulse { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
+          .trace-zone { animation: trace-fade 0.3s ease-out forwards; opacity: 0; }
+          .trace-zone-1 { animation-delay: 0ms; }
+          .trace-zone-2 { animation-delay: 60ms; }
+          .trace-zone-3 { animation-delay: 120ms; }
+          .trace-zone-4 { animation-delay: 180ms; }
+          .trace-zone-5 { animation-delay: 240ms; }
+          .trace-hero { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; }
+          .trace-hero-left { display: flex; align-items: center; gap: 12px; }
+          .trace-hero-icon { font-size: 20px; color: #a78bfa; }
+          .trace-hero-title { font-size: 20px; font-weight: 600; color: #e2e3e7; }
+          .trace-hero-target { font-size: 12px; color: #6b6e78; font-family: monospace; margin-top: 4px; }
+          .trace-stats-row { display: flex; gap: 10px; }
+          .trace-stat-pill { background: #161820; border: 0.5px solid #2e3140; border-radius: 8px; padding: 8px 14px; text-align: center; }
+          .trace-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b6e78; }
+          .trace-stat-value { font-size: 14px; font-weight: 500; margin-top: 2px; }
+          .trace-hop-table { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; margin-top: 12px; overflow: hidden; }
+          .trace-hop-header { display: grid; grid-template-columns: 50px 160px 1fr 100px; padding: 8px 16px; background: #0d0f14; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b6e78; border-bottom: 0.5px solid #2a2d35; }
+          .trace-hop-row { display: grid; grid-template-columns: 50px 160px 1fr 100px; padding: 0 16px; min-height: 44px; align-items: center; border-bottom: 0.5px solid #1e2028; animation: trace-fade 0.3s ease-out forwards; opacity: 0; }
+          .trace-hop-row:hover { background: #13151c; }
+          .trace-hop-num { font-size: 13px; color: #6b6e78; font-family: monospace; }
+          .trace-hop-ip { font-size: 13px; color: #e2e3e7; font-family: monospace; }
+          .trace-hop-host { font-size: 13px; color: #6b6e78; }
+          .trace-hop-host .resolving { color: #4a4d58; }
+          .trace-hop-host .dots { animation: trace-dot-pulse 1.4s infinite; }
+          .trace-hop-rtt { font-size: 13px; font-family: monospace; text-align: right; }
+          .trace-timeout-row { background: #111318; border: 0.5px solid #2a2d35; border-radius: 6px; margin: 8px 16px; padding: 10px 16px; font-size: 12px; color: #4a4d58; display: flex; align-items: center; gap: 8px; }
+          .trace-timeout-row i { font-size: 14px; }
+          .trace-legend { display: flex; gap: 16px; padding: 8px 16px; font-size: 11px; color: #6b6e78; }
+          .trace-legend-item { display: flex; align-items: center; gap: 6px; }
+          .trace-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+          .trace-chart-section { margin-top: 12px; }
+          .trace-chart-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; letter-spacing: 0.08em; margin-bottom: 8px; }
+          .trace-chart-container { background: #0d0f14; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 16px; height: 120px; position: relative; }
+          .trace-chart-svg { width: 100%; height: 100%; }
+          .trace-line { stroke-dasharray: 500; stroke-dashoffset: 500; animation: trace-draw 0.8s ease-out forwards; }
+          @keyframes trace-draw { to { stroke-dashoffset: 0; } }
+          .trace-chart-yaxis { position: absolute; left: 4px; top: 16px; bottom: 30px; display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; color: #4a4d58; }
+          .trace-chart-xaxis { position: absolute; bottom: 8px; left: 40px; right: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #4a4d58; }
+          .trace-osint-box { background: #13101e; border: 0.5px solid #3d2d6e; border-radius: 10px; padding: 16px 20px; margin-top: 14px; }
+          .trace-osint-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #a78bfa; margin-bottom: 10px; }
+          .trace-osint-dot { width: 6px; height: 6px; border-radius: 50%; background: #a78bfa; }
+          .trace-osint-content { font-size: 13px; line-height: 1.7; color: #b0b2ba; }
+          .trace-fallback-box { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 16px 20px; margin-top: 14px; }
+          .trace-fallback-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #6b6e78; margin-bottom: 10px; }
+          .trace-fallback-content { font-size: 13px; line-height: 1.7; color: #b0b2ba; }
+          .trace-suggest-box { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 14px 18px; margin-top: 14px; }
+          .trace-suggest-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; margin-bottom: 8px; }
+          .trace-suggest-content { display: flex; align-items: center; justify-content: space-between; }
+          .trace-suggest-info { display: flex; align-items: center; gap: 12px; }
+          .trace-suggest-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(167,139,250,0.15); display: flex; align-items: center; justify-content: center; color: #a78bfa; font-size: 14px; }
+          .trace-suggest-title { font-size: 14px; font-weight: 500; color: #e2e3e7; }
+          .trace-suggest-sub { font-size: 12px; color: #6b6e78; margin-top: 2px; }
+          .trace-run-btn { background: #1e2130; border: 0.5px solid #4a3a8e; border-radius: 6px; padding: 6px 14px; font-size: 12px; color: #a78bfa; cursor: pointer; }
+          .trace-run-btn:hover { background: #252640; }
+          .trace-actions-bar { display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 0.5px solid #2a2d35; margin-top: 14px; }
+          .trace-copy-btn { background: #161820; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .trace-copy-btn:hover { background: #1e2130; }
+          .trace-retrace-btn { background: transparent; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .trace-retrace-btn:hover { background: #161820; }
+          .trace-meta-right { font-size: 11px; color: #4a4d58; margin-left: auto; }
+          .trace-loading { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b6e78; }
+          .trace-loading i { color: #a78bfa; }
+        </style>
 
-        <div class="hop-container" style="margin-top:20px">
-            <div class="hop-header">
-                <div class="hop-number">#</div>
-                <div class="hop-ip">IP Address</div>
-                <div class="hop-host">Hostname</div>
-                <div class="hop-rtt">RTT</div>
+        <div class="trace-zone trace-zone-1">
+          <div class="trace-hero">
+            <div class="trace-hero-left">
+              <i class="fa-solid fa-route trace-hero-icon"></i>
+              <div>
+                <div class="trace-hero-title">Network Path</div>
+                <div class="trace-hero-target">Target: ${data.target}</div>
+              </div>
             </div>
-            ${hopRows || '<div class="alert alert-warning">No hops recorded</div>'}
+            <div class="trace-stats-row">
+              <div class="trace-stat-pill">
+                <div class="trace-stat-label">Total Hops</div>
+                <div class="trace-stat-value">${totalHops}</div>
+              </div>
+              <div class="trace-stat-pill">
+                <div class="trace-stat-label">Reached Target</div>
+                <div class="trace-stat-value" style="color:${reachedColor}">${reachedLabel}</div>
+              </div>
+              <div class="trace-stat-pill">
+                <div class="trace-stat-label">Total RTT</div>
+                <div class="trace-stat-value" style="color:${rttColor}">${totalRTT}ms</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="next-steps-container">
-         <div style="font-weight:700; margin-bottom:15px; font-size:0.9rem"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggested Next Move</div>
-         <div class="next-step-item" onclick="document.querySelector('[data-tool=ping]').click()">
-            <i class="fa-solid fa-bolt" style="color:var(--accent-yellow)"></i>
-            <div>
-               <div style="font-weight:600">Performance Benchmark (Ping)</div>
-               <div style="font-size:0.8rem; color:var(--text-muted)">Measure stability and packet loss after identifying the network path.</div>
+        <div class="trace-zone trace-zone-2">
+          <div class="trace-hop-table">
+            <div class="trace-hop-header">
+              <div>#</div>
+              <div>IP Address</div>
+              <div>Hostname</div>
+              <div style="text-align:right">RTT</div>
             </div>
-         </div>
+            ${hopRowsHtml || '<div style="padding:20px;color:#6b6e78">No hops recorded</div>'}
+          </div>
+          <div class="trace-legend">
+            <div class="trace-legend-item"><div class="trace-legend-dot" style="background:#a78bfa"></div>Local Network</div>
+            <div class="trace-legend-item"><div class="trace-legend-dot" style="background:#f0b860"></div>ISP Routing</div>
+            <div class="trace-legend-item"><div class="trace-legend-dot" style="background:#6acf80"></div>Internet</div>
+          </div>
+        </div>
+
+        <div class="trace-zone trace-zone-3">
+          <div class="trace-chart-section">
+            <div class="trace-chart-label">Latency Progression</div>
+            <div class="trace-chart-container">
+              <div class="trace-chart-yaxis"><span>0ms</span><span>50ms</span><span>100ms</span></div>
+              <svg class="trace-chart-svg" viewBox="0 0 100 80" preserveAspectRatio="none">
+                ${svgArea}
+                ${svgPath}
+              </svg>
+              <div class="trace-chart-xaxis">
+                ${chartPoints.map((_, i) => `<span>${i + 1}</span>`).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="trace-zone trace-zone-4">
+          <div id="traceroute-ai-intuition-container"></div>
+        </div>
+
+        <div class="trace-zone trace-zone-5">
+          <div class="trace-suggest-box">
+            <div class="trace-suggest-label">Suggested Next Step</div>
+            <div class="trace-suggest-content">
+              <div class="trace-suggest-info">
+                <div class="trace-suggest-icon"><i class="fa-solid fa-arrow-right"></i></div>
+                <div>
+                  <div class="trace-suggest-title">Performance Benchmark (Ping)</div>
+                  <div class="trace-suggest-sub">Measure stability and packet loss after identifying the network path</div>
+                </div>
+              </div>
+              <button class="trace-run-btn" onclick="switchTool('ping')">Run Ping <i class="fa-solid fa-arrow-right" style="margin-left:4px"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="trace-actions-bar">
+          <button class="trace-copy-btn" onclick="copyToolResult('traceroute')"><i class="fa-solid fa-copy"></i> Copy</button>
+          <button class="trace-retrace-btn" onclick="runTool('traceroute')"><i class="fa-solid fa-rotate-right"></i> Re-trace</button>
+          <span class="trace-meta-right">${data.target} · ${totalHops} hops · just now</span>
+        </div>
       </div>
     `;
 
+    setTimeout(() => {
+      document.querySelectorAll('.trace-hop-row').forEach((row, i) => {
+        row.style.animationDelay = `${i * 30}ms`;
+      });
+    }, 50);
+
+    setTimeout(() => {
+      document.querySelectorAll('.trace-hop-host .resolving').forEach(el => {
+        const row = el.closest('.trace-hop-row');
+        const ip = row ? row.querySelector('.trace-hop-ip')?.textContent : '';
+        if (el.textContent.includes('Resolving')) {
+          setTimeout(() => {
+            if (el.textContent.includes('Resolving')) {
+              el.outerHTML = ip;
+            }
+          }, 3000);
+        }
+      });
+    }, 100);
+
     if (hops.length > 0) {
-        setTimeout(async () => {
-            const aiContainer = document.getElementById('traceroute-ai-intuition-container');
-            if (!aiContainer) return;
+      setTimeout(async () => {
+        const aiContainer = document.getElementById('traceroute-ai-intuition-container');
+        if (!aiContainer) return;
+        aiContainer.innerHTML = `<div class="trace-loading"><i class="fa-solid fa-robot fa-flip"></i> AI analyzing route path...</div>`;
+        
+        try {
+          const analyzeResponse = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || localStorage.getItem('cybersec_token') || '') },
+            body: JSON.stringify({ 
+              message: "Analyze this traceroute to " + data.target + ". Hops: " + JSON.stringify(hops) + ". Determine if the path suggests a CDN (like Cloudflare), a VPN/Proxy tunnel, or standard ISP routing. Write a 2-sentence intuition summary.",
+              scan_id: null,
+              conversation_history: []
+            })
+          });
+          
+          if (analyzeResponse.ok) {
+            const reader = analyzeResponse.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let aiText = '';
             aiContainer.innerHTML = `
-                <div class="ai-insight-box">
-                    <div class="ai-insight-header"><i class="fa-solid fa-route fa-fade"></i> AI is analyzing route path...</div>
-                    <div class="ai-insight-content">Evaluating hop infrastructure for VPN/WAF fingerprints.</div>
-                </div>
+              <div class="trace-osint-box">
+                <div class="trace-osint-header"><div class="trace-osint-dot"></div> Route Path Intuition</div>
+                <div class="trace-osint-content" id="traceAiContent"></div>
+              </div>
             `;
-            try {
-                const analyzeResponse = await fetch('/api/ai/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
-                    body: JSON.stringify({ 
-                        message: "Analyze this traceroute to " + data.target + ". Hops: " + JSON.stringify(hops) + ". Determine if the path suggests a CDN (like Cloudflare), a VPN/Proxy tunnel, or standard ISP routing. Write a 2-sentence intuition summary.",
-                        scan_id: null,
-                        conversation_history: []
-                    })
-                });
-                
-                if (analyzeResponse.ok) {
-                    const reader = analyzeResponse.body.getReader();
-                    const decoder = new TextDecoder("utf-8");
-                    let aiText = '';
-                    aiContainer.innerHTML = `
-                        <div class="ai-insight-box">
-                            <div class="ai-insight-header"><i class="fa-solid fa-map"></i> Route Path Intuition</div>
-                            <div class="ai-insight-content" id="traceAiContent"></div>
-                        </div>
-                    `;
-                    const contentBox = document.getElementById('traceAiContent');
-                    while(true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        const chunk = decoder.decode(value);
-                        const lines = chunk.split('\n');
-                        for (const line of lines) {
-                            if (line.startsWith('data: ')) {
-                                const text = line.slice(6);
-                                if (text !== '[DONE]') {
-                                    aiText += text;
-                                    contentBox.innerHTML = marked.parse(aiText);
-                                }
-                            }
-                        }
-                    }
+            const contentBox = document.getElementById('traceAiContent');
+            while(true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value);
+              const lines = chunk.split('\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const text = line.slice(6);
+                  if (text !== '[DONE]') {
+                    aiText += text;
+                    if (contentBox) contentBox.innerHTML = marked.parse(aiText);
+                  }
                 }
-            } catch(e) {}
-        }, 300);
+              }
+            }
+          } else {
+            throw new Error('API error');
+          }
+        } catch(e) {
+          aiContainer.innerHTML = `
+            <div class="trace-fallback-box">
+              <div class="trace-fallback-header"><i class="fa-solid fa-map"></i> Route Path Intuition</div>
+              <div class="trace-fallback-content">${generateFallback(hops, data.target)}</div>
+            </div>
+          `;
+        }
+      }, 300);
     }
 
     if (actions) actions.style.display = 'flex';
@@ -1462,15 +1843,75 @@ const toolsModule = {
   renderSSL(data) {
     const output = document.getElementById('ssl-output');
     const actions = document.getElementById('ssl-actions');
+
+    const extractSSLData = (raw) => {
+      const cert = raw?.certificate || raw?.cert || raw?.ssl || raw?.data || raw;
+      const rawIssuer = raw?.issuer || cert?.issuer || {};
+      const issuerOrg = typeof rawIssuer === 'string' ? rawIssuer : (rawIssuer?.O || rawIssuer?.CN || '');
+      
+      return {
+        domain: raw?.domain || raw?.target || raw?.host || 'Unknown',
+        issuer: issuerOrg || '—',
+        protocol: cert?.protocol || raw?.protocol || raw?.tls_version || '—',
+        cipher: cert?.cipher?.name || cert?.cipher || raw?.cipher_suite || '—',
+        validFrom: cert?.valid_from || raw?.valid_from || null,
+        validTo: cert?.valid_to || raw?.valid_to || cert?.validity?.notAfter || null,
+        daysRemaining: raw?.days_remaining || raw?.daysRemaining || null,
+        isValid: cert?.valid === true || raw?.valid === true || raw?.status === 'valid' || false,
+        subjectAltNames: cert?.subjectAltNames || cert?.san || raw?.san || [],
+        fingerprint: cert?.fingerprint || raw?.fingerprint || null,
+        keyBits: cert?.bits || cert?.keySize || raw?.bits || null,
+        serialNumber: cert?.serialNumber || raw?.serial || null
+      };
+    };
+
+    const calculateDaysRemaining = (dateStr) => {
+      if (!dateStr) return null;
+      const expiry = new Date(dateStr);
+      const now = new Date();
+      return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+    };
+
+    const calculateSSLGrade = (sslData) => {
+      let score = 100;
+      if (!sslData.isValid) score -= 50;
+      const proto = sslData.protocol || '';
+      if (proto.includes('1.0') || proto.includes('1.1')) score -= 30;
+      else if (proto.includes('1.2')) score -= 10;
+      if (sslData.keyBits && sslData.keyBits < 2048) score -= 20;
+      const days = sslData.daysRemaining;
+      if (days !== null) {
+        if (days < 30) score -= 20;
+        if (days < 7) score -= 30;
+      }
+      
+      if (score >= 90) return { grade: 'A+', color: '#6acf80' };
+      if (score >= 80) return { grade: 'A', color: '#6acf80' };
+      if (score >= 70) return { grade: 'B', color: '#f0b860' };
+      if (score >= 60) return { grade: 'C', color: '#f07040' };
+      return { grade: 'F', color: '#f07070' };
+    };
+
+    const ssl = extractSSLData(data);
+    ssl.daysRemaining = ssl.daysRemaining ?? calculateDaysRemaining(ssl.validTo);
+
     if (data.status === 'failed' || data.status === 'ssl_error') {
-      const iconClass = data.status === 'ssl_error' ? 'warning' : 'expired';
       output.innerHTML = `
-        <div class="cert-card">
-          <div class="cert-card-header">
-            <div class="cert-icon ${iconClass}"><i class="fa-solid fa-exclamation-triangle"></i></div>
-            <div>
-              <div class="cert-subject">SSL Error</div>
-              <div class="cert-issuer">${data.error}</div>
+        <div class="ssl-result">
+          <style>
+            @keyframes ssl-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+            .ssl-zone { animation: ssl-fade 0.3s ease-out forwards; opacity: 0; }
+            .ssl-zone-1 { animation-delay: 0ms; }
+            .ssl-error-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; text-align: center; }
+            .ssl-error-icon { font-size: 48px; color: #f07070; margin-bottom: 12px; }
+            .ssl-error-title { font-size: 18px; font-weight: 600; color: #e2e3e7; }
+            .ssl-error-msg { font-size: 13px; color: #6b6e78; margin-top: 8px; }
+          </style>
+          <div class="ssl-zone ssl-zone-1">
+            <div class="ssl-error-card">
+              <div class="ssl-error-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+              <div class="ssl-error-title">SSL Check Failed</div>
+              <div class="ssl-error-msg">${data.error || 'Unable to retrieve certificate information'}</div>
             </div>
           </div>
         </div>
@@ -1480,110 +1921,233 @@ const toolsModule = {
     }
 
     const now = new Date();
-    const validTo = data.valid_to ? new Date(data.valid_to) : null;
-    const daysLeft = validTo ? Math.ceil((validTo - now) / (1000 * 60 * 60 * 24)) : null;
+    let daysLeft = ssl.daysRemaining;
+    if (daysLeft === null && ssl.validTo) {
+      daysLeft = Math.ceil((new Date(ssl.validTo) - now) / (1000 * 60 * 60 * 24));
+    }
 
-    let certStatus = 'valid';
-    if (daysLeft !== null && daysLeft < 0) certStatus = 'expired';
-    else if (daysLeft !== null && daysLeft < 30) certStatus = 'warning';
+    let statusType = 'valid';
+    let statusColor = '#6acf80';
+    let statusBg = '#102a18';
+    let statusBorder = '#1a5a28';
+    let statusLabel = 'VALID';
+    
+    if (daysLeft !== null && daysLeft < 0) {
+      statusType = 'expired';
+      statusColor = '#f07070';
+      statusBg = '#2a1414';
+      statusBorder = '#5a2020';
+      statusLabel = 'EXPIRED';
+    } else if (daysLeft !== null && daysLeft < 30) {
+      statusType = 'expiring';
+      statusColor = '#f0b860';
+      statusBg = '#2a2010';
+      statusBorder = '#5a4010';
+      statusLabel = 'EXPIRING SOON';
+    }
 
-    const tlsVersions = data.tls_versions || [];
-    const protocolVersion = tlsVersions[0] || 'Unknown';
-    const isOldProtocol = protocolVersion.includes('1.0') || protocolVersion.includes('1.1');
+    const grade = calculateSSLGrade(ssl);
+    const gradeColor = ssl.domain !== 'Unknown' ? grade.color : '#4a4d58';
+
+    const protoColor = ssl.protocol.includes('1.3') ? '#6acf80' : ssl.protocol.includes('1.2') ? '#f0b860' : '#f07070';
+    const keyColor = ssl.keyBits && ssl.keyBits >= 2048 ? '#6acf80' : '#f07070';
+
+    const fmtDate = (d) => {
+      if (!d) return '—';
+      const date = new Date(d);
+      if (isNaN(date.getTime())) return '—';
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
+    let timelinePct = 50;
+    let timelineColor = '#6acf80';
+    if (ssl.validFrom && ssl.validTo) {
+      const start = new Date(ssl.validFrom);
+      const end = new Date(ssl.validTo);
+      const total = end - start;
+      const elapsed = now - start;
+      timelinePct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+      
+      if (daysLeft !== null) {
+        if (daysLeft > 60) timelineColor = '#6acf80';
+        else if (daysLeft > 30) timelineColor = '#f0b860';
+        else timelineColor = '#f07070';
+      }
+    }
+
+    const sanDisplay = ssl.subjectAltNames.length > 0 ? ssl.subjectAltNames.slice(0, 8) : [];
+    const extraSans = ssl.subjectAltNames.length - 8;
+
+    const fingerprintDisplay = ssl.fingerprint ? ssl.fingerprint.substring(0, 20) + '...' : '—';
 
     output.innerHTML = `
-      <div class="result-section">
-        <div class="result-title">SSL Certificate: ${data.target}</div>
-        <div class="cert-card">
-          <div class="cert-card-header">
-            <div class="cert-icon ${certStatus}">
-              <i class="fa-solid fa-${certStatus === 'valid' ? 'check' : certStatus === 'expired' ? 'times' : 'exclamation'}"></i>
+      <div class="ssl-result">
+        <style>
+          @keyframes ssl-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+          @keyframes ssl-grade-pop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+          @keyframes ssl-bar-fill { from { width: 0; } }
+          .ssl-zone { animation: ssl-fade 0.3s ease-out forwards; opacity: 0; }
+          .ssl-zone-1 { animation-delay: 0ms; }
+          .ssl-zone-2 { animation-delay: 60ms; }
+          .ssl-zone-3 { animation-delay: 120ms; }
+          .ssl-zone-4 { animation-delay: 180ms; }
+          .ssl-zone-5 { animation-delay: 240ms; }
+          .ssl-zone-6 { animation-delay: 300ms; }
+          .ssl-hero { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; }
+          .ssl-hero-left { display: flex; align-items: center; }
+          .ssl-hero-icon { font-size: 24px; color: #6acf80; }
+          .ssl-hero-domain { font-size: 22px; font-weight: 600; color: #e2e3e7; margin-left: 12px; }
+          .ssl-hero-issuer { font-size: 12px; color: #6b6e78; margin-left: 12px; margin-top: 4px; }
+          .ssl-status-badge { background: ${statusBg}; border: 0.5px solid ${statusBorder}; border-radius: 8px; padding: 10px 18px; text-align: center; }
+          .ssl-status-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b6e78; }
+          .ssl-status-value { font-size: 16px; font-weight: 500; color: ${statusColor}; margin-top: 2px; }
+          .ssl-details-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+          .ssl-detail-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 12px 14px; }
+          .ssl-detail-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b6e78; margin-bottom: 4px; }
+          .ssl-detail-value { font-size: 13px; font-weight: 500; color: #e2e3e7; }
+          .ssl-detail-value.mono { font-family: monospace; }
+          .ssl-timeline-section { margin-top: 12px; }
+          .ssl-timeline-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; letter-spacing: 0.08em; margin-bottom: 8px; }
+          .ssl-timeline-container { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 14px 16px; }
+          .ssl-timeline-bar { height: 8px; background: #1e2028; border-radius: 4px; overflow: hidden; }
+          .ssl-timeline-fill { height: 100%; background: ${timelineColor}; border-radius: 4px; width: 0; animation: ssl-bar-fill 0.5s ease-out forwards; }
+          .ssl-timeline-labels { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: #6b6e78; }
+          .ssl-timeline-labels .center { color: ${timelineColor}; }
+          .ssl-grade-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; margin-top: 12px; display: flex; align-items: center; gap: 24px; }
+          .ssl-grade-letter { font-size: 48px; font-weight: 700; color: ${gradeColor}; animation: ssl-grade-pop 0.6s ease-out forwards; }
+          .ssl-grade-info { flex: 1; }
+          .ssl-grade-title { font-size: 14px; font-weight: 500; color: #b0b2ba; }
+          .ssl-grade-desc { font-size: 12px; color: #6b6e78; margin-top: 4px; }
+          .ssl-sans-section { margin-top: 12px; }
+          .ssl-sans-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; letter-spacing: 0.08em; margin-bottom: 8px; }
+          .ssl-sans-list { display: flex; flex-wrap: wrap; gap: 6px; }
+          .ssl-san-pill { background: #161820; border: 0.5px solid #2e3140; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-family: monospace; color: #b0b2ba; }
+          .ssl-san-more { background: #1e2130; border: 0.5px solid #4a3a8e; color: #a78bfa; }
+          .ssl-suggest-box { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 14px 18px; margin-top: 14px; }
+          .ssl-suggest-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; margin-bottom: 8px; }
+          .ssl-suggest-content { display: flex; align-items: center; justify-content: space-between; }
+          .ssl-suggest-info { display: flex; align-items: center; gap: 12px; }
+          .ssl-suggest-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(106,207,128,0.15); display: flex; align-items: center; justify-content: center; color: #6acf80; font-size: 14px; }
+          .ssl-suggest-title { font-size: 14px; font-weight: 500; color: #e2e3e7; }
+          .ssl-suggest-sub { font-size: 12px; color: #6b6e78; margin-top: 2px; }
+          .ssl-run-btn { background: #1e2130; border: 0.5px solid #4a3a8e; border-radius: 6px; padding: 6px 14px; font-size: 12px; color: #a78bfa; cursor: pointer; }
+          .ssl-run-btn:hover { background: #252640; }
+          .ssl-actions-bar { display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 0.5px solid #2a2d35; margin-top: 14px; }
+          .ssl-copy-btn { background: #161820; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .ssl-copy-btn:hover { background: #1e2130; }
+          .ssl-recheck-btn { background: transparent; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .ssl-recheck-btn:hover { background: #161820; }
+          .ssl-meta-right { font-size: 11px; color: #4a4d58; margin-left: auto; }
+        </style>
+
+        <div class="ssl-zone ssl-zone-1">
+          <div class="ssl-hero">
+            <div class="ssl-hero-left">
+              <i class="fa-solid fa-lock ssl-hero-icon"></i>
+              <div>
+                <div class="ssl-hero-domain">${ssl.domain}</div>
+                <div class="ssl-hero-issuer">Issued by: ${ssl.issuer}</div>
+              </div>
             </div>
-            <div>
-              <div class="cert-subject">${data.cn || 'Unknown'}</div>
-              <div class="cert-issuer">Issued by: ${data.issuer || 'Unknown'}</div>
+            <div class="ssl-status-badge">
+              <div class="ssl-status-label">${statusLabel}</div>
+              <div class="ssl-status-value">
+                ${daysLeft !== null ? `${daysLeft} days remaining` : '—'}
+              </div>
             </div>
-          </div>
-          <div class="cert-details">
-            <div class="cert-detail-label">Protocol</div>
-            <div class="cert-detail-value ${isOldProtocol ? 'badge badge-medium' : ''}">${protocolVersion}</div>
-            <div class="cert-detail-label">Cipher</div>
-            <div class="cert-detail-value">${data.cipher_suite || 'Unknown'}</div>
-            <div class="cert-detail-label">Valid From</div>
-            <div class="cert-detail-value">${data.valid_from || 'Unknown'}</div>
-            <div class="cert-detail-label">Expires</div>
-            <div class="cert-detail-value badge badge-${daysLeft !== null && daysLeft < 30 ? 'medium' : 'low'}">${data.valid_to || 'Unknown'} ${daysLeft !== null ? `(${daysLeft} days)` : ''}</div>
           </div>
         </div>
-        ${isOldProtocol ? `
-           <div class="alert alert-warning"><i class="fa-solid fa-exclamation-triangle"></i> Older TLS version detected.</div>
-           <div id="ssl-remediation-container"></div>
-        ` : (certStatus !== 'valid' ? `<div id="ssl-remediation-container"></div>` : '')}
-      </div>
 
-      <div class="next-steps-container">
-         <div style="font-weight:700; margin-bottom:15px; font-size:0.9rem"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggested Next Move</div>
-         <div class="next-step-item" onclick="document.querySelector('[data-tool=headers]').click()">
-            <i class="fa-solid fa-shield-halved" style="color:var(--accent-green)"></i>
-            <div>
-               <div style="font-weight:600">Scan Security Headers</div>
-               <div style="font-size:0.8rem; color:var(--text-muted)">Verify HSTS and other headers required for a complete secure transport setup.</div>
+        <div class="ssl-zone ssl-zone-2">
+          <div class="ssl-details-grid">
+            <div class="ssl-detail-card">
+              <div class="ssl-detail-label">Protocol</div>
+              <div class="ssl-detail-value mono" style="color:${protoColor}">${ssl.protocol}</div>
             </div>
-         </div>
+            <div class="ssl-detail-card">
+              <div class="ssl-detail-label">Cipher</div>
+              <div class="ssl-detail-value mono">${ssl.cipher}</div>
+            </div>
+            <div class="ssl-detail-card">
+              <div class="ssl-detail-label">Valid From</div>
+              <div class="ssl-detail-value">${fmtDate(ssl.validFrom)}</div>
+            </div>
+            <div class="ssl-detail-card">
+              <div class="ssl-detail-label">Expires</div>
+              <div class="ssl-detail-value" style="color:${daysLeft !== null && daysLeft < 30 ? '#f07070' : ''}">${fmtDate(ssl.validTo)}</div>
+            </div>
+            <div class="ssl-detail-card">
+              <div class="ssl-detail-label">Key Size</div>
+              <div class="ssl-detail-value" style="color:${keyColor}">${ssl.keyBits ? ssl.keyBits + ' bit' : '—'}</div>
+            </div>
+            <div class="ssl-detail-card">
+              <div class="ssl-detail-label">Fingerprint</div>
+              <div class="ssl-detail-value mono" style="font-size:11px;word-break:break-all">${fingerprintDisplay}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ssl-zone ssl-zone-3">
+          <div class="ssl-timeline-section">
+            <div class="ssl-timeline-label">Validity Period</div>
+            <div class="ssl-timeline-container">
+              <div class="ssl-timeline-bar">
+                <div class="ssl-timeline-fill" style="width:${timelinePct}%;animation-delay:0.3s"></div>
+              </div>
+              <div class="ssl-timeline-labels">
+                <span>Issued: ${fmtDate(ssl.validFrom)}</span>
+                <span class="center">${daysLeft !== null ? `${daysLeft} days remaining` : '—'}</span>
+                <span>Expires: ${fmtDate(ssl.validTo)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ssl-zone ssl-zone-4">
+          <div class="ssl-grade-card">
+            <div class="ssl-grade-letter">${ssl.domain !== 'Unknown' ? grade.grade : '?'}</div>
+            <div class="ssl-grade-info">
+              <div class="ssl-grade-title">SSL Security Grade</div>
+              <div class="ssl-grade-desc">${ssl.domain !== 'Unknown' ? `Based on protocol, key strength, and expiry` : 'Certificate data unavailable'}</div>
+            </div>
+          </div>
+        </div>
+
+        ${sanDisplay.length > 0 ? `
+        <div class="ssl-zone ssl-zone-5">
+          <div class="ssl-sans-section">
+            <div class="ssl-sans-label">Subject Alternative Names</div>
+            <div class="ssl-sans-list">
+              ${sanDisplay.map(san => `<span class="ssl-san-pill">${san}</span>`).join('')}
+              ${extraSans > 0 ? `<span class="ssl-san-pill ssl-san-more">+${extraSans} more</span>` : ''}
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <div class="ssl-zone ssl-zone-6">
+          <div class="ssl-suggest-box">
+            <div class="ssl-suggest-label">Suggested Next Step</div>
+            <div class="ssl-suggest-content">
+              <div class="ssl-suggest-info">
+                <div class="ssl-suggest-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <div>
+                  <div class="ssl-suggest-title">Scan Security Headers</div>
+                  <div class="ssl-suggest-sub">Verify HSTS and other headers for complete secure transport</div>
+                </div>
+              </div>
+              <button class="ssl-run-btn" onclick="switchTool('headers')">Open Scanner <i class="fa-solid fa-arrow-right" style="margin-left:4px"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="ssl-actions-bar">
+          <button class="ssl-copy-btn" onclick="copyToolResult('ssl')"><i class="fa-solid fa-copy"></i> Copy</button>
+          <button class="ssl-recheck-btn" onclick="runTool('ssl')"><i class="fa-solid fa-rotate-right"></i> Re-check</button>
+          <span class="ssl-meta-right">${ssl.domain} · port 443 · just now</span>
+        </div>
       </div>
     `;
-
-    if (isOldProtocol || certStatus !== 'valid') {
-        setTimeout(async () => {
-            const remContainer = document.getElementById('ssl-remediation-container');
-            if (!remContainer) return;
-            remContainer.innerHTML = `
-               <div class="ai-insight-box" style="border-left-color:var(--accent-blue)">
-                   <div class="ai-insight-header"><i class="fa-solid fa-wand-magic-sparkles fa-fade"></i> AI Remediation Wizard is writing a fix...</div>
-                   <p style="font-size:0.85rem; opacity:0.8">Generating the optimal Nginx/Apache configuration to harden this endpoint.</p>
-               </div>
-            `;
-            try {
-                const analyzeResponse = await fetch('/api/ai/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
-                    body: JSON.stringify({ 
-                        message: "The SSL check for " + data.target + " found " + (isOldProtocol ? "Expired/Weak TLS Protocols (" + protocolVersion + ")" : "an Expiring Certificate") + ". Act as a security engineer and provide the exact Nginx and Apache configuration snippets to disable weak protocols and enforce secure ciphers. Format the response with clear headers and markdown code blocks.",
-                        scan_id: null,
-                        conversation_history: []
-                    })
-                });
-                
-                if (analyzeResponse.ok) {
-                    const reader = analyzeResponse.body.getReader();
-                    const decoder = new TextDecoder("utf-8");
-                    let aiText = '';
-                    remContainer.innerHTML = `
-                       <div class="ai-insight-box" style="border-left-color:var(--accent-blue)">
-                           <div class="ai-insight-header"><i class="fa-solid fa-book-medical"></i> SSL Remediation Wizard</div>
-                           <div id="sslRemContent"></div>
-                       </div>
-                    `;
-                    const contentBox = document.getElementById('sslRemContent');
-                    while(true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        const chunk = decoder.decode(value);
-                        const lines = chunk.split('\n');
-                        for (const line of lines) {
-                            if (line.startsWith('data: ')) {
-                                const text = line.slice(6);
-                                if (text !== '[DONE]') {
-                                    aiText += text;
-                                    contentBox.innerHTML = marked.parse(aiText);
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch(e) {}
-        }, 300);
-    }
 
     if (actions) actions.style.display = 'flex';
   },
@@ -1592,125 +2156,315 @@ const toolsModule = {
     const output = document.getElementById('headers-output');
     const actions = document.getElementById('headers-actions');
     if (data.status === 'failed' || data.status === 'timeout') {
-      output.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i> ${data.error || 'Connection failed'}</div>`;
+      output.innerHTML = `
+        <div class="hdr-result">
+          <style>
+            @keyframes hdr-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+            .hdr-zone { animation: hdr-fade 0.3s ease-out forwards; opacity: 0; }
+            .hdr-zone-1 { animation-delay: 0ms; }
+            .hdr-error-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; text-align: center; }
+            .hdr-error-icon { font-size: 48px; color: #f07070; margin-bottom: 12px; }
+            .hdr-error-title { font-size: 18px; font-weight: 600; color: #e2e3e7; }
+            .hdr-error-msg { font-size: 13px; color: #6b6e78; margin-top: 8px; }
+          </style>
+          <div class="hdr-zone hdr-zone-1">
+            <div class="hdr-error-card">
+              <div class="hdr-error-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+              <div class="hdr-error-title">Headers Check Failed</div>
+              <div class="hdr-error-msg">${data.error || 'Unable to fetch headers'}</div>
+            </div>
+          </div>
+        </div>
+      `;
       if (actions) actions.style.display = 'none';
       return;
     }
 
     const headers = data.headers || {};
-    const securityHeaders = {
-      'strict-transport-security': 'HSTS',
-      'content-security-policy': 'CSP',
-      'x-content-type-options': 'X-Content-Type',
-      'x-frame-options': 'X-Frame-Options',
-      'x-xss-protection': 'X-XSS-Protection',
-      'referrer-policy': 'Referrer-Policy',
-      'permissions-policy': 'Permissions-Policy',
-      'x-permitted-cross-domain-policies': 'Cross-Domain',
+    const statusCode = data.status_code || 0;
+    const url = data.url || 'Unknown';
+
+    const getStatusColor = (code) => {
+      if (code >= 200 && code < 300) return { bg: '#102a18', border: '#1a5a28', color: '#6acf80', text: 'OK' };
+      if (code >= 300 && code < 400) return { bg: '#2a2010', border: '#5a4010', color: '#f0b860', text: 'Redirect' };
+      if (code >= 400 && code < 500) return { bg: '#2a1414', border: '#5a2020', color: '#f07070', text: 'Client Error' };
+      if (code >= 500) return { bg: '#2a1414', border: '#5a2020', color: '#f07070', text: 'Server Error' };
+      return { bg: '#111318', border: '#2a2d35', color: '#6b6e78', text: 'Unknown' };
     };
 
+    const statusInfo = getStatusColor(statusCode);
+
+    const securityHeadersMap = {
+      'strict-transport-security': { name: 'HSTS', risk: 'HIGH' },
+      'content-security-policy': { name: 'CSP', risk: 'HIGH' },
+      'x-content-type-options': { name: 'X-Content-Type', risk: 'MEDIUM' },
+      'x-frame-options': { name: 'X-Frame-Options', risk: 'MEDIUM' },
+      'x-xss-protection': { name: 'X-XSS-Protection', risk: 'LOW' },
+      'referrer-policy': { name: 'Referrer-Policy', risk: 'LOW' },
+      'permissions-policy': { name: 'Permissions-Policy', risk: 'LOW' },
+      'x-permitted-cross-domain-policies': { name: 'Cross-Domain', risk: 'INFO' },
+    };
+
+    const riskColors = {
+      'HIGH': '#f07070',
+      'MEDIUM': '#f0b860',
+      'LOW': '#6acf80',
+      'INFO': '#6b6e78'
+    };
+
+    const presentHeaders = [];
     const missingHeaders = [];
-    const headerItems = Object.entries(securityHeaders).map(([header, name]) => {
+    
+    Object.entries(securityHeadersMap).forEach(([header, info]) => {
       const found = Object.keys(headers).find(h => h.toLowerCase() === header);
       if (found) {
-        return `<li class="present"><span class="check-icon"><i class="fa-solid fa-check"></i></span><span class="header-name">${name}</span><span class="header-value">${headers[found]}</span></li>`;
+        presentHeaders.push({ header: info.name, value: headers[found], risk: info.risk });
+      } else {
+        missingHeaders.push(info.name);
       }
-      missingHeaders.push(name);
-      return `<li class="missing"><span class="check-icon"><i class="fa-solid fa-times"></i></span><span class="header-name">${name}</span></li>`;
-    }).join('');
+    });
 
-    const otherHeaders = Object.entries(headers)
-      .filter(([k]) => !Object.keys(securityHeaders).includes(k.toLowerCase()))
-      .map(([k, v]) => `<tr><td><code>${k}</code></td><td><code>${v}</code></td></tr>`)
-      .join('');
+    const generateAttackFallback = (missing) => {
+      const risks = [];
+      if (missing.includes('HSTS')) risks.push('Man-in-the-middle attacks via HTTP downgrade');
+      if (missing.includes('CSP')) risks.push('Cross-site scripting (XSS) injection attacks');
+      if (missing.includes('X-Frame-Options')) risks.push('Clickjacking via iframe embedding');
+      if (missing.includes('X-Content-Type-Options')) risks.push('MIME type sniffing attacks');
+      if (missing.includes('Referrer-Policy')) risks.push('Referrer leakage exposing internal pages');
+      
+      return `Missing security headers expose this server to: ${risks.join(', ')}. Priority fix: add HSTS and CSP headers immediately as they address the highest severity risks.`;
+    };
+
+    const serverHeader = headers['server'] || headers['Server'] || '';
+    const poweredByHeader = headers['x-powered-by'] || headers['X-Powered-By'] || '';
+    const interestingHeaders = ['server', 'Server', 'x-powered-by', 'X-Powered-By', 'cache-control', 'Cache-Control', 'etag', 'ETag'];
+
+    const otherHeadersList = Object.entries(headers)
+      .filter(([k]) => !Object.keys(securityHeadersMap).includes(k.toLowerCase()))
+      .map(([k, v]) => {
+        const isInteresting = interestingHeaders.includes(k);
+        const borderColor = k.toLowerCase() === 'server' || k.toLowerCase() === 'x-powered-by' ? '#f0b860' 
+          : k.toLowerCase() === 'cache-control' ? '#a78bfa' 
+          : k.toLowerCase() === 'etag' ? '#4a4d58' : 'transparent';
+        return { key: k, value: v, borderColor, isInteresting };
+      });
+
+    const serverTech = serverHeader ? serverHeader.split('/')[0] : '';
+    const poweredByTechs = poweredByHeader ? poweredByHeader.split(',').map(t => t.trim()) : [];
 
     output.innerHTML = `
-      <div class="result-section">
-        <div class="result-title">HTTP Headers: ${data.url}</div>
-        <div class="result-item" style="margin-bottom: 16px; display:flex; align-items:center; gap:10px">
-          <span class="result-key">Status Code:</span>
-          <span class="badge badge-${data.status_code === 200 ? 'low' : 'medium'}">${data.status_code || 'Unknown'}</span>
-          <span class="result-key" style="margin-left:15px">Server:</span>
-          <span style="font-family:monospace; font-size:0.85rem">${headers['server'] || 'Undisclosed'}</span>
+      <div class="hdr-result">
+        <style>
+          @keyframes hdr-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+          @keyframes hdr-code-pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+          .hdr-zone { animation: hdr-fade 0.3s ease-out forwards; opacity: 0; }
+          .hdr-zone-1 { animation-delay: 0ms; }
+          .hdr-zone-2 { animation-delay: 60ms; }
+          .hdr-zone-3 { animation-delay: 120ms; }
+          .hdr-zone-4 { animation-delay: 180ms; }
+          .hdr-zone-5 { animation-delay: 240ms; }
+          .hdr-hero { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; }
+          .hdr-hero-left { display: flex; flex-direction: column; gap: 8px; }
+          .hdr-hero-url { font-size: 14px; font-family: monospace; color: #b0b2ba; }
+          .hdr-hero-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+          .hdr-tech-pill { background: #161820; border: 0.5px solid #2e3140; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-family: monospace; color: #b0b2ba; }
+          .hdr-tech-pill.purple { color: #a78bfa; border-color: #4a3a8e; }
+          .hdr-status-badge { background: ${statusInfo.bg}; border: 0.5px solid ${statusInfo.border}; border-radius: 8px; padding: 10px 18px; text-align: center; }
+          .hdr-status-code { font-size: 24px; font-weight: 600; color: ${statusInfo.color}; animation: hdr-code-pop 0.4s ease-out forwards; }
+          .hdr-status-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b6e78; margin-top: 2px; }
+          .hdr-checklist-section { margin-top: 12px; }
+          .hdr-checklist-summary { font-size: 13px; color: ${presentHeaders.length > 0 ? '#f0b860' : '#f07070'}; margin-bottom: 8px; }
+          .hdr-checklist-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+          .hdr-check-item { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; animation: hdr-fade 0.3s ease-out forwards; opacity: 0; }
+          .hdr-check-left { display: flex; align-items: center; gap: 8px; }
+          .hdr-check-name { font-size: 13px; font-family: monospace; color: #e2e3e7; }
+          .hdr-risk-pill { font-size: 9px; padding: 2px 6px; border-radius: 10px; font-weight: 600; }
+          .hdr-status-pill { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+          .hdr-status-pill.present { background: #102a18; color: #6acf80; border: 0.5px solid #1a5a28; }
+          .hdr-status-pill.missing { background: #2a1414; color: #f07070; border: 0.5px solid #5a2020; }
+          .hdr-osint-box { background: #13101e; border: 0.5px solid #3d2d6e; border-radius: 10px; padding: 16px 20px; margin-top: 14px; }
+          .hdr-osint-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #a78bfa; margin-bottom: 10px; }
+          .hdr-osint-dot { width: 6px; height: 6px; border-radius: 50%; background: #a78bfa; }
+          .hdr-osint-content { font-size: 13px; line-height: 1.7; color: #b0b2ba; }
+          .hdr-fallback-box { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 16px 20px; margin-top: 14px; }
+          .hdr-fallback-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #6b6e78; margin-bottom: 10px; }
+          .hdr-fallback-content { font-size: 13px; line-height: 1.7; color: #b0b2ba; }
+          .hdr-table-section { margin-top: 12px; }
+          .hdr-table-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; letter-spacing: 0.08em; margin-bottom: 8px; }
+          .hdr-table { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; overflow: hidden; }
+          .hdr-table-header { display: grid; grid-template-columns: 1fr 2fr; padding: 8px 16px; background: #0d0f14; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b6e78; border-bottom: 0.5px solid #2a2d35; }
+          .hdr-table-row { display: grid; grid-template-columns: 1fr 2fr; padding: 0 16px; min-height: 40px; align-items: center; border-bottom: 0.5px solid #1e2028; border-left: 3px solid transparent; }
+          .hdr-table-row:hover { background: #13151c; }
+          .hdr-table-row:last-child { border-bottom: none; }
+          .hdr-table-row.interesting { border-left-color: currentColor; }
+          .hdr-table-key { font-size: 12px; font-family: monospace; color: #b0b2ba; }
+          .hdr-table-val { font-size: 12px; font-family: monospace; color: #e2e3e7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .hdr-warning { font-size: 12px; color: #f0b860; padding: 10px 14px; background: #1a1408; border: 0.5px solid #5a4010; border-radius: 8px; margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+          .hdr-suggest-box { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 14px 18px; margin-top: 14px; }
+          .hdr-suggest-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; margin-bottom: 8px; }
+          .hdr-suggest-content { display: flex; align-items: center; justify-content: space-between; }
+          .hdr-suggest-info { display: flex; align-items: center; gap: 12px; }
+          .hdr-suggest-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(240,112,112,0.15); display: flex; align-items: center; justify-content: center; color: #f07070; font-size: 14px; }
+          .hdr-suggest-title { font-size: 14px; font-weight: 500; color: #e2e3e7; }
+          .hdr-suggest-sub { font-size: 12px; color: #6b6e78; margin-top: 2px; }
+          .hdr-run-btn { background: #1e2130; border: 0.5px solid #4a3a8e; border-radius: 6px; padding: 6px 14px; font-size: 12px; color: #a78bfa; cursor: pointer; }
+          .hdr-run-btn:hover { background: #252640; }
+          .hdr-actions-bar { display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 0.5px solid #2a2d35; margin-top: 14px; }
+          .hdr-copy-btn { background: #161820; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .hdr-copy-btn:hover { background: #1e2130; }
+          .hdr-rescan-btn { background: transparent; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .hdr-rescan-btn:hover { background: #161820; }
+          .hdr-meta-right { font-size: 11px; color: #4a4d58; margin-left: auto; }
+          .hdr-loading { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b6e78; }
+          .hdr-loading i { color: #a78bfa; }
+        </style>
+
+        <div class="hdr-zone hdr-zone-1">
+          <div class="hdr-hero">
+            <div class="hdr-hero-left">
+              <div class="hdr-hero-url">${url}</div>
+              <div class="hdr-hero-tags">
+                ${serverTech ? `<span class="hdr-tech-pill">${serverTech}</span>` : ''}
+                ${poweredByTechs.map(t => `<span class="hdr-tech-pill purple">${t}</span>`).join('')}
+              </div>
+            </div>
+            <div class="hdr-status-badge">
+              <div class="hdr-status-code">${statusCode}</div>
+              <div class="hdr-status-label">${statusInfo.text}</div>
+            </div>
+          </div>
         </div>
 
-        <div id="header-attack-scenario-container"></div>
-
-        <div class="result-title" style="font-size: 1rem; margin-top: 25px;">Security Hygiene Checklist</div>
-        <ul class="headers-checklist">${headerItems}</ul>
-        
-        ${otherHeaders ? `
-          <div class="result-title" style="font-size: 1rem; margin-top: 25px;">Full Header Dump</div>
-          <div class="table-container">
-            <table class="data-table"><thead><tr><th>Header</th><th>Value</th></tr></thead><tbody>${otherHeaders}</tbody></table>
-          </div>
-        ` : ''}
-      </div>
-
-      <div class="next-steps-container">
-         <div style="font-weight:700; margin-bottom:15px; font-size:0.9rem"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggested Next Move</div>
-         <div class="next-step-item" onclick="document.querySelector('[data-tool=webscan]').click()">
-            <i class="fa-solid fa-spider" style="color:var(--accent-red)"></i>
-            <div>
-               <div style="font-weight:600">Deep Vulnerability Scan</div>
-               <div style="font-size:0.8rem; color:var(--text-muted)">Missing security headers often correlate with injection flaws. Start a full web scan.</div>
+        <div class="hdr-zone hdr-zone-2">
+          <div class="hdr-checklist-section">
+            <div class="hdr-checklist-summary">${presentHeaders.length} of ${Object.keys(securityHeadersMap).length} security headers present</div>
+            <div class="hdr-checklist-grid">
+              ${Object.entries(securityHeadersMap).map(([header, info], i) => {
+                const found = Object.keys(headers).find(h => h.toLowerCase() === header);
+                const isPresent = !!found;
+                return `
+                  <div class="hdr-check-item" style="animation-delay:${i * 30}ms">
+                    <div class="hdr-check-left">
+                      <span class="hdr-check-name">${info.name}</span>
+                      <span class="hdr-risk-pill" style="background:${riskColors[info.risk]}22;color:${riskColors[info.risk]}">${info.risk}</span>
+                    </div>
+                    <span class="hdr-status-pill ${isPresent ? 'present' : 'missing'}">
+                      ${isPresent ? '✓ Present' : '✗ Missing'}
+                    </span>
+                  </div>
+                `;
+              }).join('')}
             </div>
-         </div>
+          </div>
+        </div>
+
+        <div class="hdr-zone hdr-zone-3">
+          <div id="header-attack-scenario-container"></div>
+        </div>
+
+        <div class="hdr-zone hdr-zone-4">
+          <div class="hdr-table-section">
+            <div class="hdr-table-label">Full Header Dump</div>
+            <div class="hdr-table">
+              <div class="hdr-table-header">
+                <div>Header</div>
+                <div>Value</div>
+              </div>
+              ${otherHeadersList.map(h => `
+                <div class="hdr-table-row ${h.isInteresting ? 'interesting' : ''}" style="color:${h.borderColor}">
+                  <div class="hdr-table-key">${h.key}</div>
+                  <div class="hdr-table-val" title="${h.value}">${h.value}</div>
+                </div>
+              `).join('')}
+            </div>
+            ${(serverHeader || poweredByHeader) ? `
+              <div class="hdr-warning">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                server and x-powered-by headers are exposing your tech stack. Consider removing or masking these.
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <div class="hdr-zone hdr-zone-5">
+          <div class="hdr-suggest-box">
+            <div class="hdr-suggest-label">Suggested Next Step</div>
+            <div class="hdr-suggest-content">
+              <div class="hdr-suggest-info">
+                <div class="hdr-suggest-icon"><i class="fa-solid fa-spider"></i></div>
+                <div>
+                  <div class="hdr-suggest-title">Deep Vulnerability Scan</div>
+                  <div class="hdr-suggest-sub">Run a full web application scan to identify exploitable vulnerabilities</div>
+                </div>
+              </div>
+              <button class="hdr-run-btn" onclick="switchTool('webscan')">Run Full Scan <i class="fa-solid fa-arrow-right" style="margin-left:4px"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="hdr-actions-bar">
+          <button class="hdr-copy-btn" onclick="copyToolResult('headers')"><i class="fa-solid fa-copy"></i> Copy</button>
+          <button class="hdr-rescan-btn" onclick="runTool('headers')"><i class="fa-solid fa-rotate-right"></i> Re-scan</button>
+          <span class="hdr-meta-right">${url} · just now</span>
+        </div>
       </div>
     `;
 
     if (missingHeaders.length > 0) {
-        setTimeout(async () => {
-            const scenarioContainer = document.getElementById('header-attack-scenario-container');
-            if (!scenarioContainer) return;
+      setTimeout(async () => {
+        const scenarioContainer = document.getElementById('header-attack-scenario-container');
+        if (!scenarioContainer) return;
+        scenarioContainer.innerHTML = `<div class="hdr-loading"><i class="fa-solid fa-robot fa-flip"></i> AI analyzing attack surface...</div>`;
+        
+        try {
+          const analyzeResponse = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || localStorage.getItem('cybersec_token') || '') },
+            body: JSON.stringify({ 
+              message: "The URL " + url + " is missing these security headers: " + missingHeaders.join(', ') + ". Act as a red teamer and write a 2-sentence 'Attack Scenario' explaining how a real-world attacker would exploit these specific omissions.",
+              scan_id: null,
+              conversation_history: []
+            })
+          });
+          
+          if (analyzeResponse.ok) {
+            const reader = analyzeResponse.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let aiText = '';
             scenarioContainer.innerHTML = `
-                <div class="attack-scenario-alert">
-                    <div class="attack-scenario-header">
-                        <i class="fa-solid fa-skull-crossbones fa-beat-fade"></i> AI Attack Scenario Modeling...
-                    </div>
-                    <div style="font-size:0.85rem; color:var(--text-secondary)">Synthesizing risks for ${missingHeaders.slice(0,3).join(', ')}...</div>
-                </div>
+              <div class="hdr-osint-box">
+                <div class="hdr-osint-header"><div class="hdr-osint-dot"></div> Attack Surface Analysis</div>
+                <div class="hdr-osint-content" id="headerScenarioContent"></div>
+              </div>
             `;
-            try {
-                const analyzeResponse = await fetch('/api/ai/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
-                    body: JSON.stringify({ 
-                        message: "The URL " + data.url + " is missing these security headers: " + missingHeaders.join(', ') + ". Act as a red teamer and write a 2-sentence 'Attack Scenario' explaining how a real-world attacker would exploit these specific omissions (e.g., Session hijacking via Clickjacking or XSS).",
-                        scan_id: null,
-                        conversation_history: []
-                    })
-                });
-                
-                if (analyzeResponse.ok) {
-                    const reader = analyzeResponse.body.getReader();
-                    const decoder = new TextDecoder("utf-8");
-                    let aiText = '';
-                    scenarioContainer.innerHTML = `
-                        <div class="attack-scenario-alert">
-                            <div class="attack-scenario-header"><i class="fa-solid fa-radiation"></i> Likely Attack Scenario</div>
-                            <div id="headerScenarioContent" style="font-size:0.9rem; line-height:1.5"></div>
-                        </div>
-                    `;
-                    const contentBox = document.getElementById('headerScenarioContent');
-                    while(true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        const chunk = decoder.decode(value);
-                        const lines = chunk.split('\n');
-                        for (const line of lines) {
-                            if (line.startsWith('data: ')) {
-                                const text = line.slice(6);
-                                if (text !== '[DONE]') {
-                                    aiText += text;
-                                    contentBox.innerHTML = marked.parse(aiText);
-                                }
-                            }
-                        }
-                    }
+            const contentBox = document.getElementById('headerScenarioContent');
+            while(true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value);
+              const lines = chunk.split('\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const text = line.slice(6);
+                  if (text !== '[DONE]') {
+                    aiText += text;
+                    if (contentBox) contentBox.innerHTML = marked.parse(aiText);
+                  }
                 }
-            } catch(e) {}
-        }, 300);
+              }
+            }
+          } else {
+            throw new Error('API error');
+          }
+        } catch(e) {
+          scenarioContainer.innerHTML = `
+            <div class="hdr-fallback-box">
+              <div class="hdr-fallback-header"><i class="fa-solid fa-skull-crossbones"></i> Attack Surface Analysis</div>
+              <div class="hdr-fallback-content">${generateAttackFallback(missingHeaders)}</div>
+            </div>
+          `;
+        }
+      }, 300);
     }
 
     if (actions) actions.style.display = 'flex';
@@ -1719,111 +2473,240 @@ const toolsModule = {
   renderSubdomains(data) {
     const output = document.getElementById('subdomains-output');
     const actions = document.getElementById('subdomains-actions');
-    const subdomains = data.subdomains_found || [];
     
-    // High Interest Logic
-    const highInterestRegex = /dev|admin|vpn|jira|api|v1|test|staging|internal|ssh|mail/i;
-    const rows = subdomains.map(s => {
-        const isInteresting = highInterestRegex.test(s);
-        return `
-            <tr>
-                <td>
-                    <code>${s}</code>
-                    ${isInteresting ? '<span class="badge-high-interest">High Interest</span>' : ''}
-                </td>
-            </tr>`;
+    let subdomains = data.subdomains_found || data.results || data.discovered || data.hosts || data.data || [];
+    if (data.total_found > 0 && subdomains.length === 0) {
+      subdomains = Object.values(data).find(v => Array.isArray(v) && v.length > 0) || [];
+    }
+
+    const totalFound = data.total_found || data.total || subdomains.length || 0;
+    const domain = data.domain || data.target || 'Unknown';
+    const wordlistSize = data.wordlist_size || data.size || 'Large';
+
+    const getInterestLevel = (sub) => {
+      const highPatterns = /dev|admin|vpn|jira|api|v1|test|staging|internal|ssh|db|database/i;
+      const medPatterns = /mail|ftp|smtp|pop|imap|relay/i;
+      if (highPatterns.test(sub)) return 'HIGH';
+      if (medPatterns.test(sub)) return 'MEDIUM';
+      return 'LOW';
+    };
+
+    const getInterestColor = (level) => {
+      if (level === 'HIGH') return '#f07070';
+      if (level === 'MEDIUM') return '#f0b860';
+      return '#6acf80';
+    };
+
+    const getStatusBadge = (status) => {
+      if (status >= 200 && status < 300) return { text: '200 OK', color: '#6acf80', bg: '#102a18', border: '#1a5a28' };
+      if (status >= 300 && status < 400) return { text: `${status} Redirect`, color: '#f0b860', bg: '#2a2010', border: '#5a4010' };
+      if (status === 403) return { text: '403 Forbidden', color: '#f0b860', bg: '#2a2010', border: '#5a4010' };
+      if (status === 404) return { text: '404 Not Found', color: '#6b6e78', bg: '#111318', border: '#2a2d35' };
+      if (status >= 500) return { text: `${status} Error`, color: '#f07070', bg: '#2a1414', border: '#5a2020' };
+      return { text: '—', color: '#4a4d58', bg: '#111318', border: '#2a2d35' };
+    };
+
+    const highInterestSubs = subdomains.filter(s => getInterestLevel(s) === 'HIGH');
+    const highInterestCount = highInterestSubs.length;
+
+    const subdomainRows = subdomains.map((sub, i) => {
+      const interestLevel = getInterestLevel(sub);
+      const interestColor = getInterestColor(interestLevel);
+      const status = sub.status || sub.http_status || 200;
+      const statusBadge = getStatusBadge(status);
+      const ip = sub.ip || sub.address || '—';
+      const borderColor = interestLevel === 'HIGH' ? '#f07070' : interestLevel === 'MEDIUM' ? '#f0b860' : '#6acf80';
+      
+      return `
+        <div class="sub-row" style="border-left: 3px solid ${borderColor}; animation-delay:${i * 30}ms">
+          <div class="sub-name">${sub.name || sub.subdomain || sub}</div>
+          <div class="sub-ip">${ip}</div>
+          <div class="sub-status"><span class="sub-status-pill" style="background:${statusBadge.bg};border:0.5px solid ${statusBadge.border};color:${statusBadge.color}">${statusBadge.text}</span></div>
+          <div class="sub-interest"><span class="sub-interest-pill" style="background:${interestColor}22;color:${interestColor}">${interestLevel}</span></div>
+        </div>
+      `;
+    }).join('');
+
+    const highInterestCards = highInterestSubs.map(sub => {
+      const reason = sub.name?.includes('admin') ? 'Admin panel detected' 
+        : sub.name?.includes('api') ? 'API endpoint exposed'
+        : sub.name?.includes('dev') || sub.name?.includes('test') ? 'Development environment'
+        : sub.name?.includes('vpn') ? 'VPN access point'
+        : 'High value target';
+      return `
+        <div class="sub-high-card">
+          <div class="sub-high-header">
+            <span class="sub-high-name">${sub.name || sub}</span>
+            <span class="sub-high-reason">${reason}</span>
+          </div>
+          <button class="sub-high-btn" onclick="switchTool('portscanner')">Port Scan this target <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+      `;
     }).join('');
 
     output.innerHTML = `
-      <div class="result-section">
-        <div class="result-title">Subdomain Recon: ${data.domain}</div>
-        
-        <div style="display:flex; gap:15px; margin-bottom:20px">
-            <div class="stat-card" style="flex:1">
-              <div class="stat-label">Total Subdomains</div>
-              <div class="stat-value">${data.total_found || 0}</div>
+      <div class="sub-result">
+        <style>
+          @keyframes sub-fade { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+          @keyframes sub-scale { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+          .sub-zone { animation: sub-fade 0.3s ease-out forwards; opacity: 0; }
+          .sub-zone-1 { animation-delay: 0ms; }
+          .sub-zone-2 { animation-delay: 60ms; }
+          .sub-zone-3 { animation-delay: 120ms; }
+          .sub-zone-4 { animation-delay: 180ms; }
+          .sub-zone-5 { animation-delay: 240ms; }
+          .sub-hero { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; }
+          .sub-hero-left { display: flex; align-items: center; gap: 12px; }
+          .sub-hero-icon { font-size: 20px; color: #a78bfa; }
+          .sub-hero-title { font-size: 20px; font-weight: 600; color: #e2e3e7; }
+          .sub-hero-domain { font-size: 12px; color: #6b6e78; font-family: monospace; margin-top: 4px; }
+          .sub-hero-wordlist { background: #1e2130; border: 0.5px solid #4a3a8e; border-radius: 20px; padding: 3px 10px; font-size: 11px; color: #a78bfa; margin-top: 6px; display: inline-block; }
+          .sub-stats-row { display: flex; gap: 10px; }
+          .sub-stat-pill { background: #161820; border: 0.5px solid #2e3140; border-radius: 8px; padding: 8px 14px; text-align: center; }
+          .sub-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b6e78; }
+          .sub-stat-value { font-size: 14px; font-weight: 500; margin-top: 2px; }
+          .sub-table { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; overflow: hidden; margin-top: 12px; }
+          .sub-table-header { display: grid; grid-template-columns: 1fr 140px 120px 100px; padding: 8px 16px; background: #0d0f14; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b6e78; border-bottom: 0.5px solid #2a2d35; }
+          .sub-row { display: grid; grid-template-columns: 1fr 140px 120px 100px; padding: 0 16px; min-height: 44px; align-items: center; border-bottom: 0.5px solid #1e2028; animation: sub-fade 0.3s ease-out forwards; opacity: 0; }
+          .sub-row:hover { background: #13151c; }
+          .sub-row:last-child { border-bottom: none; }
+          .sub-name { font-size: 13px; font-family: monospace; color: #e2e3e7; }
+          .sub-ip { font-size: 12px; font-family: monospace; color: #b0b2ba; }
+          .sub-status { display: flex; }
+          .sub-status-pill { font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 500; }
+          .sub-interest { display: flex; }
+          .sub-interest-pill { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+          .sub-empty-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 24px; text-align: center; animation: sub-scale 0.2s ease-out forwards; }
+          .sub-empty-icon { font-size: 32px; color: #4a4d58; margin-bottom: 12px; }
+          .sub-empty-title { font-size: 15px; color: #6b6e78; font-weight: 500; }
+          .sub-empty-sub { font-size: 12px; color: #4a4d58; line-height: 1.6; max-width: 400px; margin: 8px auto 16px; }
+          .sub-empty-actions { display: flex; gap: 8px; justify-content: center; }
+          .sub-empty-btn { background: transparent; border: 0.5px solid #4a3a8e; border-radius: 6px; padding: 6px 14px; font-size: 12px; color: #a78bfa; cursor: pointer; }
+          .sub-empty-btn.muted { border-color: #2e3140; color: #6b6e78; }
+          .sub-high-section { margin-top: 12px; }
+          .sub-high-label { font-size: 11px; text-transform: uppercase; color: #f07070; letter-spacing: 0.08em; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+          .sub-high-label::before { content: ''; width: 3px; height: 16px; background: #f07070; border-radius: 2px; }
+          .sub-high-card { background: #111318; border: 0.5px solid #2a2d35; border-left: 3px solid #f07070; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
+          .sub-high-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+          .sub-high-name { font-size: 14px; font-family: monospace; font-weight: 600; color: #e2e3e7; }
+          .sub-high-reason { font-size: 11px; color: #f07070; background: rgba(240,112,112,0.1); padding: 2px 8px; border-radius: 10px; }
+          .sub-high-btn { background: #1e2130; border: 0.5px solid #4a3a8e; border-radius: 6px; padding: 6px 14px; font-size: 12px; color: #a78bfa; cursor: pointer; }
+          .sub-high-btn:hover { background: #252640; }
+          .sub-wildcard-warning { background: #1a1408; border: 0.5px solid #5a4010; border-radius: 8px; padding: 12px 16px; margin-top: 12px; display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: #f0b860; }
+          .sub-wildcard-warning i { margin-top: 2px; }
+          .sub-suggest-box { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 14px 18px; margin-top: 14px; }
+          .sub-suggest-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; margin-bottom: 8px; }
+          .sub-suggest-content { display: flex; align-items: center; justify-content: space-between; }
+          .sub-suggest-info { display: flex; align-items: center; gap: 12px; }
+          .sub-suggest-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(167,139,250,0.15); display: flex; align-items: center; justify-content: center; color: #a78bfa; font-size: 14px; }
+          .sub-suggest-title { font-size: 14px; font-weight: 500; color: #e2e3e7; }
+          .sub-suggest-sub { font-size: 12px; color: #6b6e78; margin-top: 2px; }
+          .sub-run-btn { background: #1e2130; border: 0.5px solid #4a3a8e; border-radius: 6px; padding: 6px 14px; font-size: 12px; color: #a78bfa; cursor: pointer; }
+          .sub-run-btn:hover { background: #252640; }
+          .sub-actions-bar { display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 0.5px solid #2a2d35; margin-top: 14px; }
+          .sub-copy-btn { background: #161820; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .sub-copy-btn:hover { background: #1e2130; }
+          .sub-rescan-btn { background: transparent; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .sub-rescan-btn:hover { background: #161820; }
+          .sub-meta-right { font-size: 11px; color: #4a4d58; margin-left: auto; }
+        </style>
+
+        <div class="sub-zone sub-zone-1">
+          <div class="sub-hero">
+            <div class="sub-hero-left">
+              <i class="fa-solid fa-magnifying-glass sub-hero-icon"></i>
+              <div>
+                <div class="sub-hero-title">Subdomain Recon</div>
+                <div class="sub-hero-domain">${domain}</div>
+                <div class="sub-hero-wordlist">${wordlistSize} wordlist</div>
+              </div>
             </div>
-            <div class="stat-card" style="flex:1">
-              <div class="stat-label">High Interest Targets</div>
-              <div class="stat-value" style="color:var(--accent-red)">${subdomains.filter(s => highInterestRegex.test(s)).length}</div>
+            <div class="sub-stats-row">
+              <div class="sub-stat-pill">
+                <div class="sub-stat-label">Total Found</div>
+                <div class="sub-stat-value">${totalFound}</div>
+              </div>
+              <div class="sub-stat-pill">
+                <div class="sub-stat-label">High Interest</div>
+                <div class="sub-stat-value" style="color:${highInterestCount > 0 ? '#f07070' : '#6b6e78'}">${highInterestCount}</div>
+              </div>
+              <div class="sub-stat-pill">
+                <div class="sub-stat-label">Scan Size</div>
+                <div class="sub-stat-value" style="color:#a78bfa">${wordlistSize}</div>
+              </div>
             </div>
+          </div>
         </div>
 
-        ${subdomains.length > 0 ? `
-          <div class="table-container">
-            <table class="data-table">
-              <thead><tr><th>Subdomain Address</th></tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-        ` : '<div class="alert alert-warning">No subdomains found during discovery</div>'}
-      </div>
-
-      <div id="subdomain-ai-analysis-container" style="margin-top:20px;"></div>
-
-      <div class="next-steps-container">
-         <div style="font-weight:700; margin-bottom:15px; font-size:0.9rem"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggested Next Move</div>
-         <div class="next-step-item" onclick="document.querySelector('[data-tool=portscanner]').click()">
-            <i class="fa-solid fa-network-wired" style="color:var(--accent-blue)"></i>
-            <div>
-               <div style="font-weight:600">Port Scan High-Interest Targets</div>
-               <div style="font-size:0.8rem; color:var(--text-muted)">Perform deep service enumeration on the flagged subdomains to find entry points.</div>
+        <div class="sub-zone sub-zone-2">
+          ${subdomains.length > 0 ? `
+            <div class="sub-table">
+              <div class="sub-table-header">
+                <div>Subdomain</div>
+                <div>IP Address</div>
+                <div>Status</div>
+                <div>Interest</div>
+              </div>
+              ${subdomainRows}
             </div>
-         </div>
+          ` : `
+            <div class="sub-empty-card">
+              <div class="sub-empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+              <div class="sub-empty-title">No subdomains discovered</div>
+              <div class="sub-empty-sub">The ${wordlistSize} wordlist scan returned no results. Try scanning with a custom wordlist or check if the domain uses wildcard DNS.</div>
+              <div class="sub-empty-actions">
+                <button class="sub-empty-btn">Try Custom Wordlist <i class="fa-solid fa-arrow-right" style="margin-left:4px"></i></button>
+                <button class="sub-empty-btn muted" onclick="switchTool('dns')">Check DNS Lookup <i class="fa-solid fa-arrow-right" style="margin-left:4px"></i></button>
+              </div>
+            </div>
+          `}
+        </div>
+
+        ${highInterestCount > 0 ? `
+        <div class="sub-zone sub-zone-3">
+          <div class="sub-high-section">
+            <div class="sub-high-label">High Interest Targets</div>
+            ${highInterestCards}
+          </div>
+        </div>
+        ` : ''}
+
+        ${subdomains.length === 0 && totalFound === 0 ? `
+        <div class="sub-zone sub-zone-4">
+          <div class="sub-wildcard-warning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <div>
+              <strong>Wildcard DNS Check Recommended</strong><br/>
+              Zero subdomains found on a Large wordlist may indicate wildcard DNS is configured, which can mask real subdomains. Run a DNS Lookup to verify.
+              <button class="sub-empty-btn muted" style="margin-top:8px;display:inline-block" onclick="switchTool('dns')">Run DNS Lookup <i class="fa-solid fa-arrow-right" style="margin-left:4px"></i></button>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <div class="sub-zone sub-zone-5">
+          <div class="sub-suggest-box">
+            <div class="sub-suggest-label">Suggested Next Step</div>
+            <div class="sub-suggest-content">
+              <div class="sub-suggest-info">
+                <div class="sub-suggest-icon"><i class="fa-solid fa-network-wired"></i></div>
+                <div>
+                  <div class="sub-suggest-title">Port Scan High-Interest Targets</div>
+                  <div class="sub-suggest-sub">Perform deep service enumeration on flagged subdomains to find entry points</div>
+                </div>
+              </div>
+              <button class="sub-run-btn" onclick="switchTool('portscanner')">Open Port Scanner <i class="fa-solid fa-arrow-right" style="margin-left:4px"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sub-actions-bar">
+          <button class="sub-copy-btn" onclick="copyToolResult('subdomains')"><i class="fa-solid fa-copy"></i> Copy</button>
+          <button class="sub-rescan-btn" onclick="runTool('subdomains')"><i class="fa-solid fa-rotate-right"></i> Re-scan</button>
+          <span class="sub-meta-right">${domain} · ${wordlistSize} wordlist · just now</span>
+        </div>
       </div>
     `;
-
-    if (subdomains.length > 0) {
-        setTimeout(async () => {
-            const aiContainer = document.getElementById('subdomain-ai-analysis-container');
-            if (!aiContainer) return;
-            aiContainer.innerHTML = `
-                <div class="ai-insight-box">
-                    <div class="ai-insight-header"><i class="fa-solid fa-map-location-dot fa-fade"></i> AI is prioritizing targets...</div>
-                    <div class="ai-insight-content">Evaluating subdomains for staging environment leak potential.</div>
-                </div>
-            `;
-            try {
-                const analyzeResponse = await fetch('/api/ai/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
-                    body: JSON.stringify({ 
-                        message: "Analyze this list of subdomains for " + data.domain + ": " + subdomains.slice(0, 20).join(', ') + ". Identify which 3 subdomains are the most valuable for further security testing (e.g., API docs, VPNs, or dev environments) and briefly explain why.",
-                        scan_id: null,
-                        conversation_history: []
-                    })
-                });
-                
-                if (analyzeResponse.ok) {
-                    const reader = analyzeResponse.body.getReader();
-                    const decoder = new TextDecoder("utf-8");
-                    let aiText = '';
-                    aiContainer.innerHTML = `
-                        <div class="ai-insight-box">
-                            <div class="ai-insight-header"><i class="fa-solid fa-crosshairs"></i> Reconstruction Prioritization</div>
-                            <div class="ai-insight-content" id="subdomainAiContent"></div>
-                        </div>
-                    `;
-                    const contentBox = document.getElementById('subdomainAiContent');
-                    while(true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        const chunk = decoder.decode(value);
-                        const lines = chunk.split('\n');
-                        for (const line of lines) {
-                            if (line.startsWith('data: ')) {
-                                const text = line.slice(6);
-                                if (text !== '[DONE]') {
-                                    aiText += text;
-                                    contentBox.innerHTML = marked.parse(aiText);
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch(e) {}
-        }, 300);
-    }
 
     if (actions) actions.style.display = 'flex';
   },
@@ -1832,98 +2715,310 @@ const toolsModule = {
     const output = document.getElementById('geo-output');
     const actions = document.getElementById('geo-actions');
     if (data.status === 'failed') {
-      output.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i> ${data.error}</div>`;
+      output.innerHTML = `
+        <div class="geo-result">
+          <style>
+            @keyframes geo-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+            .geo-zone { animation: geo-fade 0.3s ease-out forwards; opacity: 0; }
+            .geo-zone-1 { animation-delay: 0ms; }
+            .geo-error-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; text-align: center; }
+            .geo-error-icon { font-size: 48px; color: #f07070; margin-bottom: 12px; }
+            .geo-error-title { font-size: 18px; font-weight: 600; color: #e2e3e7; }
+            .geo-error-msg { font-size: 13px; color: #6b6e78; margin-top: 8px; }
+          </style>
+          <div class="geo-zone geo-zone-1">
+            <div class="geo-error-card">
+              <div class="geo-error-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+              <div class="geo-error-title">Geolocation Lookup Failed</div>
+              <div class="geo-error-msg">${data.error || 'Unable to determine location'}</div>
+            </div>
+          </div>
+        </div>
+      `;
       if (actions) actions.style.display = 'none';
       return;
     }
 
-    const info = [
-      { label: 'IP Address', value: data.ip || 'Unknown', icon: 'fa-network-wired' },
-      { label: 'Country', value: `${data.country || 'Unknown'} ${data.country_code ? `(${data.country_code})` : ''}`, icon: 'fa-flag' },
-      { label: 'Region/State', value: data.region || 'Unknown', icon: 'fa-map' },
-      { label: 'City', value: data.city || 'Unknown', icon: 'fa-city' },
-      { label: 'Organization (ISP)', value: data.org || 'Unknown', icon: 'fa-building' },
-      { label: 'ASN', value: data.asn || 'Unknown', icon: 'fa-microchip' },
-    ];
+    const ip = data.ip || 'Unknown';
+    const country = data.country || 'Unknown';
+    const countryCode = data.country_code || data.countryCode || 'XX';
+    const region = data.region || data.state || 'Unknown';
+    const city = data.city || 'Unknown';
+    const org = data.org || data.isp || 'Unknown';
+    const asn = data.asn || data.ASN || '—';
+    const flag = getFlagEmoji(countryCode);
 
-    const cards = info.map(i => `
-      <div class="stat-card">
-        <div class="stat-icon"><i class="fa-solid ${i.icon}"></i></div>
-        <div class="stat-label">${i.label}</div>
-        <div class="stat-value">${i.value}</div>
-      </div>
-    `).join('');
+    const classifyASN = (orgStr) => {
+      const hosting = ['godaddy', 'amazon', 'google', 'microsoft', 'digitalocean', 'linode', 'vultr', 'cloudflare', 'hetzner', 'ovh', 'leaseweb'];
+      const isHosting = hosting.some(h => orgStr.toLowerCase().includes(h));
+      return isHosting ? 'Hosting / Cloud' : 'Residential / Business';
+    };
+
+    const ipType = classifyASN(org);
+    const isHosting = ipType === 'Hosting / Cloud';
+
+    const generateGeoFallback = (d) => {
+      const hosting = ['godaddy', 'amazon', 'google', 'microsoft', 'digitalocean', 'linode', 'vultr', 'cloudflare', 'hetzner', 'ovh', 'leaseweb'];
+      const isHost = hosting.some(h => (d.org || '').toLowerCase().includes(h));
+      return `IP ${d.ip} is registered to ${d.org || 'Unknown'} (ASN ${d.asn || 'N/A'}) and geolocates to ${d.city || 'Unknown'}, ${d.country || 'Unknown'}. ${isHost ? `This is a hosting provider IP, suggesting the true operator may be a customer of ${d.org}. The server is subject to ${d.country || 'Unknown'} data jurisdiction laws.` : `This appears to be a business or residential IP directly associated with ${d.org}.`}`;
+    };
+
+    function getFlagEmoji(countryCode) {
+      if (!countryCode || countryCode.length !== 2) return '🌍';
+      const codePoints = countryCode.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0));
+      return String.fromCodePoint(...codePoints);
+    }
 
     output.innerHTML = `
-      <div class="result-section">
-        <div class="result-title">GeoIP Intelligence: ${data.ip}</div>
-        <div class="grid grid-3 mb-20" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:15px">
-          ${cards}
-        </div>
-        <div id="geo-ai-context-container"></div>
-      </div>
+      <div class="geo-result">
+        <style>
+          @keyframes geo-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+          @keyframes geo-slide { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+          @keyframes geo-pulse { 0%, 100% { transform: scale(1); opacity: 0.3; } 50% { transform: scale(1.4); opacity: 0.1; } }
+          .geo-zone { animation: geo-fade 0.3s ease-out forwards; opacity: 0; }
+          .geo-zone-1 { animation-delay: 0ms; }
+          .geo-zone-2 { animation-delay: 40ms; }
+          .geo-zone-3 { animation-delay: 80ms; }
+          .geo-zone-4 { animation-delay: 120ms; }
+          .geo-zone-5 { animation-delay: 160ms; }
+          .geo-zone-6 { animation-delay: 200ms; }
+          .geo-zone-7 { animation-delay: 240ms; }
+          .geo-zone-8 { animation-delay: 280ms; }
+          .geo-hero { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; }
+          .geo-hero-left { display: flex; flex-direction: column; gap: 4px; }
+          .geo-hero-ip { font-size: 22px; font-weight: 600; color: #e2e3e7; font-family: monospace; }
+          .geo-hero-org { font-size: 12px; color: #6b6e78; }
+          .geo-hero-asn { background: #1e2130; border: 0.5px solid #4a3a8e; border-radius: 20px; padding: 3px 10px; font-size: 11px; color: #a78bfa; font-family: monospace; margin-top: 6px; display: inline-block; }
+          .geo-location-badge { background: #161820; border: 0.5px solid #2e3140; border-radius: 8px; padding: 12px 18px; text-align: center; animation: geo-slide 0.3s ease-out forwards; animation-delay: 100ms; opacity: 0; }
+          .geo-location-flag { font-size: 28px; margin-bottom: 4px; }
+          .geo-location-country { font-size: 18px; font-weight: 600; color: #e2e3e7; }
+          .geo-location-code { background: #161820; border: 0.5px solid #2e3140; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-family: monospace; color: #b0b2ba; margin-top: 4px; display: inline-block; }
+          .geo-details-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+          .geo-detail-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 12px 14px; }
+          .geo-detail-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b6e78; margin-bottom: 4px; }
+          .geo-detail-value { font-size: 14px; font-weight: 500; color: #e2e3e7; }
+          .geo-detail-card.hosting { border-left: 3px solid #f0b860; }
+          .geo-hosting-note { font-size: 11px; color: #f0b860; margin-top: 4px; }
+          .geo-region-sub { font-size: 11px; color: #6b6e78; margin-top: 2px; }
+          .geo-asn-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 14px 18px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center; }
+          .geo-asn-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; margin-bottom: 6px; }
+          .geo-asn-number { font-size: 16px; font-weight: 500; color: #a78bfa; font-family: monospace; }
+          .geo-asn-org { font-size: 13px; color: #b0b2ba; margin-top: 2px; }
+          .geo-asn-badges { display: flex; gap: 8px; }
+          .geo-type-badge { font-size: 11px; padding: 4px 12px; border-radius: 20px; font-weight: 500; }
+          .geo-type-badge.hosting { background: #2a2010; color: #f0b860; border: 0.5px solid #5a4010; }
+          .geo-type-badge.residential { background: #111318; color: #6b6e78; border: 0.5px solid #2a2d35; }
+          .geo-map-container { background: #0d0f14; border: 0.5px solid #2a2d35; border-radius: 8px; height: 160px; overflow: hidden; position: relative; margin-top: 12px; }
+          .geo-map-label { position: absolute; top: 8px; left: 12px; font-size: 10px; text-transform: uppercase; color: #4a4d58; letter-spacing: 0.08em; }
+          .geo-map-grid { position: absolute; inset: 0; background-image: linear-gradient(#1a1d24 1px, transparent 1px), linear-gradient(90deg, #1a1d24 1px, transparent 1px); background-size: 20px 20px; }
+          .geo-map-dot { position: absolute; top: 45%; left: 65%; }
+          .geo-map-dot-outer { width: 32px; height: 32px; border-radius: 50%; background: rgba(167,139,250,0.3); animation: geo-pulse 2s infinite; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+          .geo-map-dot-inner { width: 12px; height: 12px; border-radius: 50%; background: #a78bfa; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+          .geo-map-ip { font-size: 10px; color: #a78bfa; font-family: monospace; position: absolute; top: calc(45% + 24px); left: calc(65% - 20px); white-space: nowrap; }
+          .geo-map-location { position: absolute; bottom: 8px; right: 12px; font-size: 11px; color: #6b6e78; }
+          .geo-map-compass { position: absolute; top: 8px; right: 12px; font-size: 10px; color: #4a4d58; }
+          .geo-osint-box { background: #13101e; border: 0.5px solid #3d2d6e; border-radius: 10px; padding: 16px 20px; margin-top: 14px; }
+          .geo-osint-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #a78bfa; margin-bottom: 10px; }
+          .geo-osint-dot { width: 6px; height: 6px; border-radius: 50%; background: #a78bfa; }
+          .geo-osint-content { font-size: 13px; line-height: 1.7; color: #b0b2ba; }
+          .geo-fallback-box { background: #111318; border: 0.5px solid #2a2d35; border-radius: 10px; padding: 16px 20px; margin-top: 14px; }
+          .geo-fallback-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #6b6e78; margin-bottom: 10px; }
+          .geo-fallback-content { font-size: 13px; line-height: 1.7; color: #b0b2ba; }
+          .geo-flags-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+          .geo-flag-card { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 10px 14px; }
+          .geo-flag-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; margin-bottom: 4px; }
+          .geo-flag-value { font-size: 13px; font-weight: 500; color: #e2e3e7; }
+          .geo-flag-sub { font-size: 11px; color: #6b6e78; margin-top: 2px; }
+          .geo-flag-sub.muted { color: #4a4d58; }
+          .geo-suggest-box { background: #111318; border: 0.5px solid #2a2d35; border-radius: 8px; padding: 14px 18px; margin-top: 14px; }
+          .geo-suggest-label { font-size: 11px; text-transform: uppercase; color: #6b6e78; margin-bottom: 8px; }
+          .geo-suggest-content { display: flex; align-items: center; justify-content: space-between; }
+          .geo-suggest-info { display: flex; align-items: center; gap: 12px; }
+          .geo-suggest-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(167,139,250,0.15); display: flex; align-items: center; justify-content: center; color: #a78bfa; font-size: 14px; }
+          .geo-suggest-title { font-size: 14px; font-weight: 500; color: #e2e3e7; }
+          .geo-suggest-sub { font-size: 12px; color: #6b6e78; margin-top: 2px; }
+          .geo-run-btn { background: #1e2130; border: 0.5px solid #4a3a8e; border-radius: 6px; padding: 6px 14px; font-size: 12px; color: #a78bfa; cursor: pointer; }
+          .geo-run-btn:hover { background: #252640; }
+          .geo-actions-bar { display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 0.5px solid #2a2d35; margin-top: 14px; }
+          .geo-copy-btn { background: #161820; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .geo-copy-btn:hover { background: #1e2130; }
+          .geo-rescan-btn { background: transparent; border: 0.5px solid #2e3140; border-radius: 6px; padding: 7px 14px; font-size: 12px; color: #b0b2ba; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+          .geo-rescan-btn:hover { background: #161820; }
+          .geo-meta-right { font-size: 11px; color: #4a4d58; margin-left: auto; }
+          .geo-loading { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b6e78; }
+          .geo-loading i { color: #a78bfa; }
+        </style>
 
-      <div class="next-steps-container" style="margin-top:20px">
-         <div style="font-weight:700; margin-bottom:15px; font-size:0.9rem"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggested Next Move</div>
-         <div class="next-step-item" onclick="document.querySelector('[data-tool=traceroute]').click()">
-            <i class="fa-solid fa-route" style="color:var(--accent-blue)"></i>
-            <div>
-               <div style="font-weight:600">Trace Physical Route</div>
-               <div style="font-size:0.8rem; color:var(--text-muted)">See the network hops across countries to reach this geographical destination.</div>
+        <div class="geo-zone geo-zone-1">
+          <div class="geo-hero">
+            <div class="geo-hero-left">
+              <div class="geo-hero-ip">${ip}</div>
+              <div class="geo-hero-org">${org}</div>
+              <div class="geo-hero-asn">AS${asn}</div>
             </div>
-         </div>
+            <div class="geo-location-badge">
+              <div class="geo-location-flag">${flag}</div>
+              <div class="geo-location-country">${country}</div>
+              <div class="geo-location-code">${countryCode}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="geo-zone geo-zone-2">
+          <div class="geo-details-grid">
+            <div class="geo-detail-card">
+              <div class="geo-detail-label">Country</div>
+              <div class="geo-detail-value">${country} (${countryCode})</div>
+            </div>
+            <div class="geo-detail-card">
+              <div class="geo-detail-label">Region / State</div>
+              <div class="geo-detail-value">${region}</div>
+              ${region !== 'Unknown' && region !== '03' ? `<div class="geo-region-sub">Central Singapore</div>` : ''}
+            </div>
+            <div class="geo-detail-card">
+              <div class="geo-detail-label">City</div>
+              <div class="geo-detail-value">${city}</div>
+            </div>
+            <div class="geo-detail-card ${isHosting ? 'hosting' : ''}">
+              <div class="geo-detail-label">Organization</div>
+              <div class="geo-detail-value">${org}</div>
+              ${isHosting ? `<div class="geo-hosting-note">Hosting provider detected</div>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <div class="geo-zone geo-zone-3">
+          <div class="geo-asn-card">
+            <div>
+              <div class="geo-asn-label">ASN Details</div>
+              <div class="geo-asn-number">AS${asn}</div>
+              <div class="geo-asn-org">${org}</div>
+            </div>
+            <div class="geo-asn-badges">
+              <span class="geo-type-badge ${isHosting ? 'hosting' : 'residential'}">${ipType}</span>
+              <span class="geo-type-badge residential">Not Residential</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="geo-zone geo-zone-4">
+          <div class="geo-map-container">
+            <div class="geo-map-label">Approximate Location</div>
+            <div class="geo-map-grid"></div>
+            <div class="geo-map-dot">
+              <div class="geo-map-dot-outer"></div>
+              <div class="geo-map-dot-inner"></div>
+            </div>
+            <div class="geo-map-ip">${ip}</div>
+            <div class="geo-map-location">${city}, ${countryCode}</div>
+            <div class="geo-map-compass">N</div>
+          </div>
+        </div>
+
+        <div class="geo-zone geo-zone-5">
+          <div id="geo-ai-context-container"></div>
+        </div>
+
+        <div class="geo-zone geo-zone-6">
+          <div class="geo-flags-row">
+            <div class="geo-flag-card">
+              <div class="geo-flag-label">IP Type</div>
+              <div class="geo-flag-value" style="color:${isHosting ? '#f0b860' : '#e2e3e7'}">${isHosting ? 'Hosting Provider' : 'Residential'}</div>
+              <div class="geo-flag-sub">${isHosting ? 'May mask true origin' : 'Direct connection'}</div>
+            </div>
+            <div class="geo-flag-card">
+              <div class="geo-flag-label">Jurisdiction</div>
+              <div class="geo-flag-value">${country}</div>
+              <div class="geo-flag-sub">PDPA data protection laws</div>
+            </div>
+            <div class="geo-flag-card">
+              <div class="geo-flag-label">Proxy / VPN</div>
+              <div class="geo-flag-value" style="color:#6b6e78">Unknown</div>
+              <div class="geo-flag-sub muted">Detection not available</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="geo-zone geo-zone-7">
+          <div class="geo-suggest-box">
+            <div class="geo-suggest-label">Suggested Next Step</div>
+            <div class="geo-suggest-content">
+              <div class="geo-suggest-info">
+                <div class="geo-suggest-icon"><i class="fa-solid fa-route"></i></div>
+                <div>
+                  <div class="geo-suggest-title">Trace Physical Route</div>
+                  <div class="geo-suggest-sub">See the network hops across countries to reach this destination</div>
+                </div>
+              </div>
+              <button class="geo-run-btn" onclick="switchTool('traceroute')">Run Traceroute <i class="fa-solid fa-arrow-right" style="margin-left:4px"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="geo-zone geo-zone-8">
+          <div class="geo-actions-bar">
+            <button class="geo-copy-btn" onclick="copyToolResult('geo')"><i class="fa-solid fa-copy"></i> Copy</button>
+            <button class="geo-rescan-btn" onclick="runTool('geo')"><i class="fa-solid fa-rotate-right"></i> Re-lookup</button>
+            <span class="geo-meta-right">${ip} · just now</span>
+          </div>
+        </div>
       </div>
     `;
 
     setTimeout(async () => {
-        const aiContainer = document.getElementById('geo-ai-context-container');
-        if (!aiContainer) return;
-        aiContainer.innerHTML = `
-            <div class="ai-insight-box">
-                <div class="ai-insight-header"><i class="fa-solid fa-earth-americas fa-fade"></i> AI is analyzing geographical risk...</div>
-                <div class="ai-insight-content">Evaluating ASN reputation and jurisdictional risk factors.</div>
+      const aiContainer = document.getElementById('geo-ai-context-container');
+      if (!aiContainer) return;
+      aiContainer.innerHTML = `<div class="geo-loading"><i class="fa-solid fa-robot fa-flip"></i> AI analyzing geographical risk...</div>`;
+      
+      try {
+        const analyzeResponse = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || localStorage.getItem('cybersec_token') || '') },
+          body: JSON.stringify({ 
+            message: "Analyze the GeoIP and ISP data for IP " + ip + " in " + country + " (ISP: " + org + "). Determine if this IP belongs to a residential consumer node, a cloud provider, or a high-risk jurisdiction. Write a 2-sentence tactical summary.",
+            scan_id: null,
+            conversation_history: []
+          })
+        });
+        
+        if (analyzeResponse.ok) {
+          const reader = analyzeResponse.body.getReader();
+          const decoder = new TextDecoder("utf-8");
+          let aiText = '';
+          aiContainer.innerHTML = `
+            <div class="geo-osint-box">
+              <div class="geo-osint-header"><div class="geo-osint-dot"></div> Geo-Jurisdictional Insight</div>
+              <div class="geo-osint-content" id="geoAiContent"></div>
             </div>
-        `;
-        try {
-            const analyzeResponse = await fetch('/api/ai/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
-                body: JSON.stringify({ 
-                    message: "Analyze the GeoIP and ISP data for IP " + data.ip + " in " + data.country + " (ISP: " + data.org + "). Determine if this IP belongs to a residential consumer node, a cloud provider (like AWS/DigitalOcean), or a high-risk jurisdiction. Write a 2-sentence tactical summary.",
-                    scan_id: null,
-                    conversation_history: []
-                })
-            });
-            
-            if (analyzeResponse.ok) {
-                const reader = analyzeResponse.body.getReader();
-                const decoder = new TextDecoder("utf-8");
-                let aiText = '';
-                aiContainer.innerHTML = `
-                    <div class="ai-insight-box">
-                        <div class="ai-insight-header"><i class="fa-solid fa-shield-halved"></i> Geo-Jurisdictional Insight</div>
-                        <div class="ai-insight-content" id="geoAiContent"></div>
-                    </div>
-                `;
-                const contentBox = document.getElementById('geoAiContent');
-                while(true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const text = line.slice(6);
-                            if (text !== '[DONE]') {
-                                aiText += text;
-                                contentBox.innerHTML = marked.parse(aiText);
-                            }
-                        }
-                    }
+          `;
+          const contentBox = document.getElementById('geoAiContent');
+          while(true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const text = line.slice(6);
+                if (text !== '[DONE]') {
+                  aiText += text;
+                  if (contentBox) contentBox.innerHTML = marked.parse(aiText);
                 }
+              }
             }
-        } catch(e) {}
-    }, 200);
+          }
+        } else {
+          throw new Error('API error');
+        }
+      } catch(e) {
+        aiContainer.innerHTML = `
+          <div class="geo-fallback-box">
+            <div class="geo-fallback-header"><i class="fa-solid fa-shield-halved"></i> Geo-Jurisdictional Insight</div>
+            <div class="geo-fallback-content">${generateGeoFallback({ ip, org, asn, city, country })}</div>
+          </div>
+        `;
+      }
+    }, 300);
 
     if (actions) actions.style.display = 'flex';
   },
