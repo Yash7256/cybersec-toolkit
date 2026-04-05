@@ -1,0 +1,39 @@
+:root {
+  color-scheme: dark;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #0b0c14;
+  color: #e5e7eb;
+}
+
+body, #root {
+  margin: 0;
+  min-height: 100vh;
+  background: #0b0c14;
+}
+
+a { color: inherit; }
+
+.card {
+  background: #141625;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.btn {
+  background: linear-gradient(135deg, #8b7feb, #7b6fdb);
+  border: none;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: white;
+}
