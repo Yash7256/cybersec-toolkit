@@ -1,35 +1,26 @@
+"""
+User pydantic schemas.
+"""
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from uuid import UUID
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
-
-from pydantic import BaseModel, EmailStr, Field
-
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=100)
+    password: str = Field(min_length=8, max_length=128)
 
-
-class UserRead(BaseModel):
+class UserOut(BaseModel):
     id: UUID
-    email: str
+    email: EmailStr
     is_active: bool
-    is_superuser: bool
     created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    password: Optional[str] = Field(default=None, min_length=8, max_length=100)
-    is_active: Optional[bool] = None
-
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-
 class TokenData(BaseModel):
-    user_id: Optional[str] = None
+    user_id: Optional[UUID] = None

@@ -1,317 +1,160 @@
-from typing import Any, Dict, Optional
-from uuid import UUID
-
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from groq import RateLimitError, APIError
-from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from pydantic import BaseModel, Field
+from uuid import UUID
+from typing import Any
+import json
 
-from cybersec.api.deps import DBSession, OptionalUser
-from cybersec.core.ai import (
-    GroqAIClient,
-    ContextBuilder,
-    SCAN_ANALYST_PROMPT,
-    SSL_ANALYST_PROMPT,
-    DNS_ANALYST_PROMPT,
-    HTTP_HEADERS_ANALYST_PROMPT,
-    SUBDOMAIN_ANALYST_PROMPT,
-    GENERIC_TOOL_ANALYST_PROMPT,
-    CHAT_PROMPT,
-)
 from cybersec.database.models import Scan, ScanResult, ToolResult
+from cybersec.api.deps import get_db, get_optional_user
+from cybersec.core.ai.groq_client import groq_client
+from cybersec.core.ai.context_builder import build_scan_context
+from cybersec.core.ai.prompts import SCAN_ANALYST_PROMPT
+from cybersec.config import settings
 
-router = APIRouter(prefix="/ai", tags=["ai"])
+from cybersec.core.ai.prompts import SCAN_ANALYST_PROMPT
+from cybersec.core.ai.context_builder import build_scan_context, build_tool_context, select_system_prompt
+from cybersec.core.ai.groq_client import groq_client
+from cybersec.core.ai.groq_key_manager import groq_key_manager
 
+router = APIRouter()
 
-class ChatRequest(BaseModel):
-    message: str
-    scan_id: Optional[str] = None
-    tool_name: Optional[str] = None
-    tool_result_id: Optional[str] = None
-    conversation_history: list[Dict[str, str]] = []
+class AIChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    scan_id: UUID | None = None
+    tool_result_id: UUID | None = None
+    tool_result_ids: list[UUID] | None = None
+    conversation_history: list[dict[str, str]] = []
 
+class AIAnalyzeRequest(BaseModel):
+    scan_id: UUID
 
-async def fetch_scan_context(
-    scan_id: str,
-    db: AsyncSession,
-) -> tuple[Dict[str, Any], str]:
-    try:
-        scan_uuid = UUID(scan_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid scan ID format",
-        )
-
-    result = await db.execute(select(Scan).where(Scan.id == scan_uuid))
-    scan = result.scalar_one_or_none()
-
-    if not scan:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scan not found",
-        )
-
-    scan_dict = {
-        "id": str(scan.id),
-        "target": scan.target,
-        "scan_type": scan.scan_type,
-        "status": scan.status,
-        "created_at": scan.created_at.isoformat() if scan.created_at else None,
-        "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
-        "scan_duration": None,
-    }
-
-    if scan.started_at and scan.completed_at:
-        duration = (scan.completed_at - scan.started_at).total_seconds()
-        scan_dict["scan_duration"] = duration
-
-    results_result = await db.execute(
-        select(ScanResult).where(ScanResult.scan_id == scan_uuid)
-    )
-    results = results_result.scalars().all()
-
-    results_list = []
-    for r in results:
-        results_list.append(
-            {
-                "id": str(r.id),
-                "port": r.port,
-                "protocol": r.protocol,
-                "state": r.state,
-                "service": r.service,
-                "version": r.version,
-                "banner": r.banner,
-                "cves": r.cves,
-                "risk_score": 0.0,
-            }
-        )
-
-    context_builder = ContextBuilder()
-    context = context_builder.build_scan_context(scan_dict, results_list)
-
-    return scan_dict, context
-
-
-async def fetch_tool_context(
-    tool_result_id: str,
-    db: AsyncSession,
-) -> tuple[str, str, str]:
-    try:
-        result_uuid = UUID(tool_result_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid tool result ID format",
-        )
-
-    result = await db.execute(select(ToolResult).where(ToolResult.id == result_uuid))
-    tool_result = result.scalar_one_or_none()
-
-    if not tool_result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tool result not found",
-        )
-
-    context_builder = ContextBuilder()
-    context = context_builder.build_tool_context(
-        tool_result.tool_name,
-        tool_result.result_data or {},
-    )
-
-    return tool_result.tool_name, context
-
+def _check_groq_keys():
+    if not groq_key_manager.keys:
+        raise HTTPException(status_code=503, detail="AI features require at least one GROQ_API_KEY to be configured")
 
 @router.post("/chat")
 async def chat(
-    request: ChatRequest,
-    db: DBSession,
-    current_user: OptionalUser,
-) -> StreamingResponse:
-    from cybersec.config import get_settings
+    body: AIChatRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_optional_user)
+):
+    _check_groq_keys()
 
-    settings = get_settings()
+    context = ""
+    tool_name = None
+    contexts: list[str] = []
 
-    if not settings.groq.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI features not configured. Set GROQ_API_KEY in .env",
+    if body.scan_id:
+        scan = await db.get(Scan, body.scan_id)
+        if not scan:
+            raise HTTPException(status_code=404, detail="Scan not found")
+            
+        results = await db.execute(
+            select(ScanResult).where(ScanResult.scan_id == body.scan_id)
         )
+        contexts.append(build_scan_context(scan, list(results.scalars().all())))
 
-    scan_context = ""
-    tool_context = ""
-    system_prompt = CHAT_PROMPT
+    if body.tool_result_id:
+        tool_result = await db.get(ToolResult, body.tool_result_id)
+        if not tool_result:
+            raise HTTPException(status_code=404, detail="Tool result not found")
+        tool_name = tool_result.tool_name
+        contexts.append(build_tool_context(tool_name, tool_result.result_data))
 
-    if request.scan_id:
-        try:
-            _, scan_context = await fetch_scan_context(request.scan_id, db)
-            system_prompt = SCAN_ANALYST_PROMPT
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to fetch scan data: {str(e)}",
-            )
+    if body.tool_result_ids:
+        rows = (await db.execute(select(ToolResult).where(ToolResult.id.in_(body.tool_result_ids)))).scalars().all()
+        if not rows:
+            raise HTTPException(status_code=404, detail="Tool results not found")
+        for tr in rows:
+            contexts.append(build_tool_context(tr.tool_name, tr.result_data))
+        tool_name = "multiple_tools"
 
-    if request.tool_result_id:
-        try:
-            tool_name, tool_context = await fetch_tool_context(
-                request.tool_result_id, db
-            )
-            if tool_name == "ssl":
-                system_prompt = SSL_ANALYST_PROMPT
-            elif tool_name == "dns":
-                system_prompt = DNS_ANALYST_PROMPT
-            elif tool_name == "http_headers":
-                system_prompt = HTTP_HEADERS_ANALYST_PROMPT
-            elif tool_name == "subdomain":
-                system_prompt = SUBDOMAIN_ANALYST_PROMPT
-            else:
-                system_prompt = GENERIC_TOOL_ANALYST_PROMPT
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to fetch tool result: {str(e)}",
-            )
+    context = "\n\n".join(contexts)
 
-    if scan_context and tool_context:
-        combined_context = f"{scan_context}\n\n{tool_context}"
-    elif scan_context:
-        combined_context = scan_context
-    elif tool_context:
-        combined_context = tool_context
-    else:
-        combined_context = ""
+    system_prompt = select_system_prompt(tool_name, has_scan=bool(body.scan_id))
 
-    conversation_history = request.conversation_history or []
-    _ = combined_context
-    current_message = request.message
+    messages = list(body.conversation_history)
+    user_content = body.message
+    if context:
+        user_content = f"{context}\n\nUser question: {body.message}"
+    messages.append({"role": "user", "content": user_content})
 
     async def generate():
-        try:
-            client = GroqAIClient()
-
-            messages = []
-            for msg in conversation_history:
-                messages.append(
-                    {
-                        "role": msg.get("role", "user"),
-                        "content": msg.get("content", ""),
-                    }
-                )
-            messages.append({"role": "user", "content": current_message})
-
-            def on_token(token: str) -> None:
-                pass
-
-            async for token in client.stream_chat(messages, system_prompt, on_token):
+        async for token in groq_client.stream_chat(messages, system_prompt):
+            if token is not None:
                 yield f"data: {token}\n\n"
-
-            yield "data: [DONE]\n\n"
-
-        except RateLimitError:
-            yield "data: Error: Rate limit exceeded. Please wait and try again.\n\n"
-            yield "data: [DONE]\n\n"
-        except APIError as e:
-            yield f"data: Error: AI service error - {str(e)}\n\n"
-            yield "data: [DONE]\n\n"
-        except ValueError as e:
-            yield f"data: Error: {str(e)}\n\n"
-            yield "data: [DONE]\n\n"
-        except Exception as e:
-            yield f"data: Error: Unexpected error - {str(e)}\n\n"
-            yield "data: [DONE]\n\n"
+        yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
     )
 
-
 @router.post("/analyze")
-async def analyze_scan(
-    scan_id: str,
-    db: DBSession,
-    current_user: OptionalUser,
-) -> Dict[str, Any]:
-    from cybersec.config import get_settings
+async def analyze(
+    body: AIAnalyzeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_optional_user)
+):
+    _check_groq_keys()
 
-    settings = get_settings()
-
-    if not settings.groq.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI features not configured. Set GROQ_API_KEY in .env",
-        )
-
-    scan_dict, context = await fetch_scan_context(scan_id, db)
-
-    client = GroqAIClient()
-
+    scan = await db.get(Scan, body.scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+        
+    results = await db.execute(
+        select(ScanResult).where(ScanResult.scan_id == body.scan_id)
+    )
+    context = build_scan_context(scan, list(results.scalars().all()))
+    
     messages = [
-        {
-            "role": "user",
-            "content": f"Analyse this scan data and provide security insights:\n\n{context}",
-        }
+        {"role": "user", "content": f"{context}\n\nPlease provide a comprehensive security analysis. You MUST output ONLY valid JSON matching the exact schema requested in system instructions. Do not include markdown blocks or any conversational text. Just raw JSON."}
     ]
-
+    
     try:
-        response = await client.chat(
-            messages=messages,
-            system_prompt=SCAN_ANALYST_PROMPT,
-        )
-
-        return {
-            "analysis": response,
-            "model": settings.groq.model,
-            "scan_id": scan_id,
-        }
-
-    except RateLimitError:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Rate limit exceeded. Please wait and try again.",
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
+        analysis = await groq_client.chat(
+            messages, 
+            SCAN_ANALYST_PROMPT, 
+            response_format={"type": "json_object"}
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI analysis failed: {str(e)}",
-        )
-
+        print(f"[AI] AI analysis failed: {e}, falling back to rule-based analysis")
+        # Fallback to rule-based analysis
+        scan_data = {
+            "target": scan.target,
+            "open_ports": [
+                {
+                    "port": r.port,
+                    "service": {"name": r.service_name or "unknown"}
+                } for r in results.scalars().all()
+            ]
+        }
+        analysis = groq_client._rule_engine.analyze_scan(scan_data)
+        analysis = json.dumps(analysis)  # Convert dict to JSON string
+    
+    return {"scan_id": str(body.scan_id), "analysis": analysis}
 
 @router.get("/models")
-async def list_models(
-    current_user: OptionalUser,
-) -> Dict[str, Any]:
-    from cybersec.config import get_settings
-
-    settings = get_settings()
-
-    if not settings.groq.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Groq API key not configured",
-        )
-
-    available_models = [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768",
-        "gemma2-9b-it",
-    ]
-
+async def get_models():
+    _check_groq_keys()
+        
     return {
-        "current_model": settings.groq.model,
-        "available_models": available_models,
+        "models": [
+            {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B", "default": True},
+            {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B Instant", "default": False},
+            {"id": "mixtral-8x7b-32768", "name": "Mixtral 8x7B", "default": False}
+        ]
     }
+
+@router.get("/groq-status")
+async def get_groq_status():
+    if not settings.APP_DEBUG:
+        return {"error": "Dev only endpoint"}
+    return groq_key_manager.get_status()

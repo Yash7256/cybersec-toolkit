@@ -1,325 +1,139 @@
-import logging
+import json
+from cybersec.database.models import Scan, ScanResult
+from cybersec.core.ai.prompts import (
+    SCAN_ANALYST_PROMPT,
+    SSL_ANALYST_PROMPT,
+    DNS_ANALYST_PROMPT,
+    HTTP_HEADERS_ANALYST_PROMPT,
+    SUBDOMAIN_ANALYST_PROMPT,
+    GENERIC_TOOL_ANALYST_PROMPT,
+    CHAT_PROMPT
+)
 
-logger = logging.getLogger(__name__)
+def format_duration(seconds: float) -> str:
+    if seconds < 60:
+        return f"{seconds:.2f} seconds"
+    m, s = divmod(seconds, 60)
+    return f"{int(m)}m {int(s)}s"
 
+def build_scan_context(scan: Scan, results: list[ScanResult]) -> str:
+    duration_str = ""
+    if hasattr(scan, 'started_at') and hasattr(scan, 'completed_at') and scan.started_at and scan.completed_at:
+        seconds = (scan.completed_at - scan.started_at).total_seconds()
+        duration_str = f"Duration: {format_duration(seconds)}\n"
+        
+    context = (
+        "=== SCAN CONTEXT ===\n"
+        f"Target: {getattr(scan, 'target', 'Unknown')}\n"
+        f"Status: {getattr(scan, 'status', 'Unknown')}\n"
+        f"Scan Type: {getattr(scan, 'scan_type', 'Unknown')}\n"
+        f"Port Range: {getattr(scan, 'port_range', 'Unknown')}\n"
+        f"{duration_str}"
+        f"Started: {getattr(scan, 'started_at', 'Unknown')}\n\n"
+        f"OPEN PORTS ({len(results)} found):\n"
+    )
+    
+    ports_to_show = results[:20]
+    for r in ports_to_show:
+        banner = getattr(r, 'banner', '')
+        banner_text = (banner[:100] + "...") if banner and len(banner) > 100 else banner
+        
+        context += f"Port {getattr(r, 'port', 'Unknown')}/{getattr(r, 'protocol', 'Unknown')} - {getattr(r, 'service', 'Unknown')} {getattr(r, 'version', 'Unknown')}\n"
+        context += "  State: open\n"
+        if banner_text:
+            context += f"  Banner: {banner_text}\n"
+            
+        cves = getattr(r, 'cves', []) or []
+        if callable(getattr(cves, "get", None)):
+            cves = getattr(r, 'cves', [])
+            if not isinstance(cves, list):
+                cves = [cves] if cves else []
+            
+        if cves:
+            context += f"  CVEs ({len(cves)}):\n"
+            for cve in cves:
+                cve_id = cve.get('id', 'UNKNOWN')
+                score = cve.get('cvss_score', 'N/A')
+                severity = cve.get('severity', 'UNKNOWN')
+                desc = cve.get('description', '')
+                desc_clipped = desc[:80] + "..." if len(desc) > 80 else desc
+                context += f"    - {cve_id} (CVSS: {score}, {severity}): {desc_clipped}\n"
+        
+        # Adding Risk Score and MITRE as instructed "Risk Score: {risk_score} ({risk_level})\n  MITRE: {techniques}"
+        risk_score = "N/A"
+        risk_level = "N/A"
+        techniques = "N/A"
+        context += f"  Risk Score: {risk_score} ({risk_level})\n"
+        context += f"  MITRE: {techniques}\n\n"
+        
+    if len(results) > 20:
+        context += f"... and {len(results) - 20} more open ports\n"
+        
+    return context
 
-class ContextBuilder:
-    def build_scan_context(self, scan: dict, results: list[dict]) -> str:
-        if not scan:
-            return ""
-
-        target = scan.get("target", "Unknown")
-        scan_type = scan.get("scan_type", "Unknown")
-        status = scan.get("status", "Unknown")
-        timestamp = scan.get("created_at", "Unknown")
-
-        duration = scan.get("scan_duration")
-        duration_str = f"{duration:.2f}s" if duration else "N/A"
-
-        open_ports = [r for r in results if r.get("state") == "open"]
-        open_count = len(open_ports)
-
-        lines = [
-            "=== SCAN ANALYSIS CONTEXT ===",
-            f"TARGET: {target}",
-            f"SCAN TYPE: {scan_type}",
-            f"STATUS: {status}",
-            f"SCAN DATE: {timestamp}",
-            f"DURATION: {duration_str}",
-            "",
-            f"OPEN PORTS ({open_count}):",
-        ]
-
-        if open_ports:
-            lines.append(f"{'PORT':<8} {'PROTOCOL':<10} {'SERVICE':<18} {'VERSION':<20} {'RISK':<8} {'TOP CVE'}")
-            lines.append("-" * 100)
-
-            os_hints = set()
-            critical_count = 0
-            high_cve_count = 0
-
-            for port in open_ports:
-                port_num = port.get("port", "")
-                protocol = port.get("protocol", "")
-                service = port.get("service", "unknown")
-                version = port.get("version") or ""
-                cves = port.get("cves") or []
-                risk_score = port.get("risk_score", 0.0)
-
-                top_cve = ""
-                if cves:
-                    sorted_cves = sorted(cves, key=lambda x: x.get("cvss_score", 0) if isinstance(x, dict) else 0, reverse=True)
-                    if sorted_cves:
-                        top_cve = sorted_cves[0].get("id", "") if isinstance(sorted_cves[0], dict) else ""
-                        for cve in sorted_cves:
-                            if isinstance(cve, dict):
-                                score = cve.get("cvss_score", 0)
-                                if score >= 7.0:
-                                    high_cve_count += 1
-                                    if score >= 9.0:
-                                        critical_count += 1
-
-                version_truncated = version[:18] if version else ""
-                service_truncated = service[:16] if service else "unknown"
-                lines.append(
-                    f"{port_num:<8} {protocol:<10} {service_truncated:<18} {version_truncated:<20} {risk_score:<8.2f} {top_cve}"
-                )
-
-            if open_ports and any(p.get("os_hint") for p in open_ports):
-                os_hints = {p.get("os_hint") for p in open_ports if p.get("os_hint")}
-                lines.append("")
-                lines.append(f"OS HINTS: {', '.join(os_hints)}")
-
-            lines.append("")
-            lines.append("SUMMARY:")
-
-            if critical_count > 0:
-                lines.append(f"- {critical_count} critical-risk ports found (CVSS >= 9.0)")
-            if high_cve_count > 0:
-                lines.append(f"- {high_cve_count} CVEs with CVSS >= 7.0")
-
-            risk_categories = {"critical": 0, "high": 0, "medium": 0, "low": 0}
-            for port in open_ports:
-                risk = port.get("risk_score", 0)
-                if risk >= 0.8:
-                    risk_categories["critical"] += 1
-                elif risk >= 0.6:
-                    risk_categories["high"] += 1
-                elif risk >= 0.3:
-                    risk_categories["medium"] += 1
-                else:
-                    risk_categories["low"] += 1
-
-            lines.append(f"- Risk distribution: {risk_categories['critical']} critical, "
-                        f"{risk_categories['high']} high, {risk_categories['medium']} medium, "
-                        f"{risk_categories['low']} low")
+def build_tool_context(tool_name: str, result_data: dict) -> str:
+    target = result_data.get('target', result_data.get('host', 'unknown'))
+    context = (
+        "=== TOOL RESULT CONTEXT ===\n"
+        f"Tool: {tool_name.upper()}\n"
+        f"Target: {target}\n\n"
+    )
+    
+    if tool_name == 'dns':
+        records = result_data.get('records', [])
+        for r in records:
+            context += f"{r.get('type')}: {r.get('value')} (TTL: {r.get('ttl')})\n"
+    elif tool_name == 'ssl':
+        cert = result_data.get('cert') or {}
+        context += f"Subject: {cert.get('subject')}\n"
+        context += f"Expires: {cert.get('valid_until')} ({cert.get('days_remaining')} days remaining)\n"
+        context += f"Cipher Suite: {result_data.get('cipher_suite')}\n"
+        context += f"TLS Version: {result_data.get('tls_version')}\n"
+    elif tool_name == 'http_headers':
+        sa = result_data.get('security_analysis', [])
+        for s in sa:
+            status = 'Present' if s.get('present') else 'Missing'
+            context += f"{s.get('header')}: {status} (Severity: {s.get('severity')})\n"
+    elif tool_name == 'subdomain':
+        found = result_data.get('found', [])
+        context += f"Found {result_data.get('total_found', 0)} subdomains.\n"
+        for s in found:
+            context += f" - {s.get('subdomain')} ({s.get('ip')})\n"
+    elif tool_name == 'whois':
+        context += f"Registrar: {result_data.get('registrar')}\n"
+        context += f"Dates - Created: {result_data.get('creation_date')}, Expiration: {result_data.get('expiration_date')}\n"
+        ns = result_data.get('name_servers', [])
+        context += f"Nameservers: {', '.join(ns)}\n"
+    elif tool_name in ('ping', 'traceroute'):
+        if tool_name == 'ping':
+            context += f"Packets Sent/Received: {result_data.get('packets_sent')}/{result_data.get('packets_received')}\n"
+            context += f"Loss: {result_data.get('packet_loss_pct')}%\n"
+            context += f"Min/Avg/Max RTT: {result_data.get('min_ms')}/{result_data.get('avg_ms')}/{result_data.get('max_ms')}\n"
         else:
-            lines.append("No open ports found.")
+            hops = result_data.get('hops', [])
+            context += f"Total Hops: {result_data.get('total_hops')}\n"
+            for h in hops:
+                context += f"{h.get('hop')}: {h.get('ip')} - {h.get('rtt_ms')}ms\n"
+    elif tool_name == 'geoip':
+        context += f"Location: {result_data.get('city')}, {result_data.get('country')}\n"
+        context += f"ISP: {result_data.get('isp')}\n"
+        context += f"ASN: {result_data.get('asn')}\n"
+    else:
+        context += json.dumps(result_data, indent=2)[:2000]
+        
+    return context
 
-        lines.append("=" * 50)
-        return "\n".join(lines)
-
-    def build_tool_context(self, tool_name: str, result: dict) -> str:
-        if not result:
-            return ""
-
-        lines = [
-            f"=== {tool_name.upper()} TOOL RESULT CONTEXT ===",
-            f"Tool: {tool_name}",
-            f"Target: {result.get('target', 'Unknown')}",
-            "",
-        ]
-
-        if tool_name == "ssl":
-            lines.extend(self._build_ssl_context(result))
-        elif tool_name == "http_headers":
-            lines.extend(self._build_http_headers_context(result))
-        elif tool_name == "dns":
-            lines.extend(self._build_dns_context(result))
-        elif tool_name == "subdomain":
-            lines.extend(self._build_subdomain_context(result))
-        elif tool_name == "whois":
-            lines.extend(self._build_whois_context(result))
-        elif tool_name == "geoip":
-            lines.extend(self._build_geoip_context(result))
-        else:
-            lines.extend(self._build_generic_tool_context(result))
-
-        lines.append("=" * 50)
-        return "\n".join(lines)
-
-    def _build_ssl_context(self, result: dict) -> list[str]:
-        lines = []
-        status = result.get("status", "unknown")
-
-        if status == "failed":
-            lines.append(f"ERROR: {result.get('error', 'Unknown error')}")
-            return lines
-
-        lines.append("SSL/TLS Configuration:")
-
-        protocol = result.get("protocol_version")
-        if protocol:
-            lines.append(f"  Protocol: {protocol}")
-            if protocol in ("TLSv1", "TLSv1.1"):
-                lines.append("  WARNING: Deprecated TLS version detected")
-
-        cipher = result.get("cipher")
-        if cipher:
-            lines.append(f"  Cipher: {cipher}")
-
-        subject = result.get("subject", "")
-        issuer = result.get("issuer", "")
-        lines.append(f"  Subject: {subject}")
-        lines.append(f"  Issuer: {issuer}")
-
-        not_before = result.get("not_before")
-        not_after = result.get("not_after")
-        if not_before:
-            lines.append(f"  Valid From: {not_before}")
-        if not_after:
-            lines.append(f"  Valid Until: {not_after}")
-
-        if subject == issuer:
-            lines.append("  WARNING: Self-signed certificate detected")
-
-        return lines
-
-    def _build_http_headers_context(self, result: dict) -> list[str]:
-        lines = []
-        status = result.get("status", "unknown")
-
-        if status in ("failed", "timeout"):
-            lines.append(f"ERROR: {result.get('error', 'Connection failed')}")
-            return lines
-
-        lines.append(f"URL: {result.get('url', 'N/A')}")
-        lines.append(f"Status Code: {result.get('status_code', 'N/A')}")
-        lines.append("")
-
-        headers = result.get("headers", {})
-        if not headers:
-            lines.append("No headers received")
-            return lines
-
-        security_headers = {
-            "strict-transport-security": "HSTS",
-            "content-security-policy": "CSP",
-            "x-content-type-options": "X-Content-Type-Options",
-            "x-frame-options": "X-Frame-Options",
-            "x-xss-protection": "X-XSS-Protection",
-            "referrer-policy": "Referrer-Policy",
-            "permissions-policy": "Permissions-Policy",
-        }
-
-        lines.append("Security Headers:")
-
-        missing_security = []
-        for header, name in security_headers.items():
-            if header.lower() in [h.lower() for h in headers.keys()]:
-                lines.append(f"  [OK] {name}: Present")
-            else:
-                missing_security.append(name)
-                lines.append(f"  [MISSING] {name}")
-
-        if missing_security:
-            lines.append("")
-            lines.append("Missing security headers should be added to improve security posture.")
-
-        return lines
-
-    def _build_dns_context(self, result: dict) -> list[str]:
-        lines = []
-        status = result.get("status", "unknown")
-
-        if status == "failed":
-            lines.append(f"ERROR: {result.get('error', 'DNS lookup failed')}")
-            return lines
-
-        record_type = result.get("record_type", "A")
-        lines.append(f"Record Type: {record_type}")
-
-        records = result.get("records", [])
-        if records:
-            lines.append(f"Records ({len(records)}):")
-            for record in records[:10]:
-                lines.append(f"  - {record}")
-            if len(records) > 10:
-                lines.append(f"  ... and {len(records) - 10} more")
-        else:
-            lines.append("No records found")
-
-        return lines
-
-    def _build_subdomain_context(self, result: dict) -> list[str]:
-        lines = []
-
-        domain = result.get("domain", "Unknown")
-        total_found = result.get("total_found", 0)
-        subdomains = result.get("subdomains_found", [])
-
-        lines.append(f"Domain: {domain}")
-        lines.append(f"Total Subdomains Found: {total_found}")
-
-        if subdomains:
-            lines.append("")
-            lines.append("Discovered Subdomains:")
-            for sub in subdomains[:20]:
-                lines.append(f"  - {sub}")
-            if len(subdomains) > 20:
-                lines.append(f"  ... and {len(subdomains) - 20} more")
-        else:
-            lines.append("No subdomains discovered")
-
-        return lines
-
-    def _build_whois_context(self, result: dict) -> list[str]:
-        lines = []
-        status = result.get("status", "unknown")
-
-        if status == "failed":
-            lines.append(f"ERROR: {result.get('error', 'WHOIS lookup failed')}")
-            return lines
-
-        domain_name = result.get("domain_name")
-        if domain_name:
-            lines.append(f"Domain Name: {domain_name}")
-
-        registrar = result.get("registrar")
-        if registrar:
-            lines.append(f"Registrar: {registrar}")
-
-        creation = result.get("creation_date")
-        expiration = result.get("expiration_date")
-        if creation:
-            lines.append(f"Created: {creation}")
-        if expiration:
-            lines.append(f"Expires: {expiration}")
-
-        name_servers = result.get("name_servers")
-        if name_servers:
-            ns_list = name_servers if isinstance(name_servers, list) else [name_servers]
-            lines.append(f"Name Servers: {', '.join(ns_list[:3])}")
-
-        return lines
-
-    def _build_geoip_context(self, result: dict) -> list[str]:
-        lines = []
-        status = result.get("status", "unknown")
-
-        if status == "failed":
-            lines.append(f"ERROR: {result.get('error', 'GeoIP lookup failed')}")
-            return lines
-
-        ip = result.get("ip", result.get("target", "Unknown"))
-        lines.append(f"IP Address: {ip}")
-
-        location_parts = [
-            result.get("city"),
-            result.get("region"),
-            result.get("country"),
-        ]
-        location = ", ".join(filter(None, location_parts))
-        if location:
-            lines.append(f"Location: {location}")
-
-        isp = result.get("isp")
-        if isp:
-            lines.append(f"ISP: {isp}")
-
-        org = result.get("org")
-        if org:
-            lines.append(f"Organization: {org}")
-
-        return lines
-
-    def _build_generic_tool_context(self, result: dict) -> list[str]:
-        lines = []
-        lines.append("Tool Result Data:")
-        lines.append(f"  Status: {result.get('status', 'unknown')}")
-
-        for key, value in result.items():
-            if key not in ("target", "status") and value:
-                lines.append(f"  {key}: {value}")
-
-        return lines
+def select_system_prompt(tool_name: str | None, has_scan: bool) -> str:
+    if has_scan:
+        return SCAN_ANALYST_PROMPT
+    if tool_name == "ssl":
+        return SSL_ANALYST_PROMPT
+    if tool_name == "dns":
+        return DNS_ANALYST_PROMPT
+    if tool_name == "http_headers":
+        return HTTP_HEADERS_ANALYST_PROMPT
+    if tool_name == "subdomain":
+        return SUBDOMAIN_ANALYST_PROMPT
+    if tool_name is not None:
+        return GENERIC_TOOL_ANALYST_PROMPT
+    return CHAT_PROMPT

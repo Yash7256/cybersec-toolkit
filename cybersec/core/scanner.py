@@ -1,377 +1,382 @@
+"""
+Async port scanner with Adaptive Concurrency (AIMD).
+Supports multiple scan modes: connect, syn, udp, stealth_*, zombie, full
+"""
 import asyncio
-import logging
+import errno
 import socket
 import time
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable
+from dataclasses import dataclass, field
+from typing import Optional, List, Callable, Awaitable, Dict, Any
 
+from cybersec.core.utils import resolve_target, parse_ports, resolve_target_ipv6
+from cybersec.core.service_detect import ServiceDetector, ServiceInfo
 from cybersec.core.cve_lookup import CVELookup, CVEEntry
-from cybersec.core.os_fingerprint import OSFingerprinter
-from cybersec.core.port_analyzer import PortAnalyzer
-from cybersec.core.service_detect import ServiceDetector
-from cybersec.core.utils import parse_ports, resolve_target
-
-logger = logging.getLogger(__name__)
-
+from cybersec.core.port_analyzer import PortAnalyzer, PortRisk
+from cybersec.core.os_fingerprint import OSFingerprinter, OSFingerprint
 
 @dataclass
 class PortResult:
     port: int
     protocol: str
     state: str
-    service: str
-    version: str | None
-    banner: str
-    os_hint: str | None
-    cves: list[CVEEntry] = field(default_factory=list)
-    risk_score: float = 0.0
-
+    service: Optional[ServiceInfo] = None
+    os_fingerprint: Optional[OSFingerprint] = None
+    cves: List[CVEEntry] = field(default_factory=list)
+    risk: Optional[PortRisk] = None
+    banner: Optional[str] = None
+    latency_ms: Optional[float] = None
+    tls_info: Optional[Any] = None
+    syn_ack_data: Optional[Dict[str, Any]] = None
 
 @dataclass
 class ScanReport:
     target: str
     ip: str
-    ports_scanned: int
-    open_ports: list[PortResult]
+    total_ports_scanned: int
+    open_ports: List[PortResult]
+    os_fingerprint: Optional[OSFingerprint]
     scan_duration: float
-    timestamp: datetime
-    scan_type: str = "tcp"
+    started_at: datetime
+    completed_at: datetime
+    avg_latency_ms: Optional[float] = None
+    peak_concurrency: int = 0
+    scan_mode: str = "connect"
+    is_ipv6: bool = False
+
+
+class AdaptiveConcurrencyController:
+    """
+    AIMD (Additive Increase, Multiplicative Decrease) concurrency controller.
+    Monitors success rates across sliding windows of 50 attempts.
+    Reduces concurrency by 50% when success <70%, increases when >90%.
+    """
+    def __init__(self, min_workers: int = 50, max_workers: int = 500, initial_workers: int = 100):
+        self.current = initial_workers
+        self.min = min_workers
+        self.max = max_workers
+        self.peak = initial_workers
+        self._window_size = 50
+        self._attempts = []
+        self._lock = asyncio.Lock()
+
+    async def on_attempt(self, success: bool):
+        async with self._lock:
+            self._attempts.append(success)
+            if len(self._attempts) > self._window_size:
+                self._attempts.pop(0)
+            
+            if len(self._attempts) >= self._window_size:
+                success_rate = sum(self._attempts) / len(self._attempts)
+                if success_rate < 0.7:
+                    # Reduce by 50%
+                    self.current = max(self.min, self.current // 2)
+                elif success_rate > 0.9:
+                    # Increase
+                    if self.current < self.max:
+                        self.current = min(self.max, self.current + 1)
+                    if self.current > self.peak:
+                        self.peak = self.current
+
+    def get_semaphore(self) -> asyncio.Semaphore:
+        return asyncio.Semaphore(self.current)
+
+    @property
+    def semaphore_value(self) -> int:
+        return self.current
 
 
 class AsyncPortScanner:
-    def __init__(self) -> None:
+    def __init__(self, timeout: float = 3.0):
+        self.timeout = timeout
         self.service_detector = ServiceDetector()
         self.cve_lookup = CVELookup()
         self.port_analyzer = PortAnalyzer()
         self.os_fingerprinter = OSFingerprinter()
+        self._syn_scanner = None
+        self._udp_scanner = None
+        self._stealth_scanner = None
+        self._zombie_scanner = None
+        self._tls_fingerprinter = None
+
+    def _get_syn_scanner(self):
+        if self._syn_scanner is None:
+            try:
+                from cybersec.core.syn_scan import SYNScanner
+                self._syn_scanner = SYNScanner(timeout=self.timeout)
+            except (ImportError, PermissionError):
+                self._syn_scanner = None
+        return self._syn_scanner
+
+    def _get_udp_scanner(self):
+        if self._udp_scanner is None:
+            try:
+                from cybersec.core.udp_scan import UDPScanner
+                self._udp_scanner = UDPScanner(timeout=self.timeout)
+            except (ImportError, PermissionError):
+                self._udp_scanner = None
+        return self._udp_scanner
+
+    def _get_stealth_scanner(self):
+        if self._stealth_scanner is None:
+            try:
+                from cybersec.core.stealth import StealthScanner
+                self._stealth_scanner = StealthScanner(timeout=self.timeout)
+            except (ImportError, PermissionError):
+                self._stealth_scanner = None
+        return self._stealth_scanner
+
+    def _get_zombie_scanner(self, zombie_ip: str):
+        try:
+            from cybersec.core.zombie_scan import ZombieScanner
+            return ZombieScanner(zombie_ip=zombie_ip, timeout=self.timeout)
+        except (ImportError, PermissionError):
+            return None
+
+    def _get_tls_fingerprinter(self):
+        if self._tls_fingerprinter is None:
+            try:
+                from cybersec.core.tls_fingerprint import TLSFingerprinter
+                self._tls_fingerprinter = TLSFingerprinter(timeout=self.timeout)
+            except ImportError:
+                self._tls_fingerprinter = None
+        return self._tls_fingerprinter
+
+    def _is_ipv6(self, target: str) -> bool:
+        try:
+            socket.inet_pton(socket.AF_INET6, target)
+            return True
+        except socket.error:
+            return False
+
+    async def _scan_port(
+        self,
+        ip: str,
+        port: int,
+        semaphore: asyncio.Semaphore,
+        controller: AdaptiveConcurrencyController
+    ) -> PortResult:
+        async with semaphore:
+            t_start = time.monotonic()
+            state = "closed"
+            latency_ms = None
+            try:
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection(ip, port), timeout=self.timeout
+                )
+                latency_ms = (time.monotonic() - t_start) * 1000
+                writer.close()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+                state = "open"
+                await controller.on_attempt(True)
+
+            except asyncio.TimeoutError:
+                state = "filtered"
+                await controller.on_attempt(False)
+            except ConnectionRefusedError:
+                state = "closed"
+                await controller.on_attempt(True)
+            except OSError as e:
+                if e.errno in (errno.EHOSTUNREACH, 113):
+                    state = "unreachable"
+                elif e.errno in (errno.ECONNREFUSED, 111):
+                    state = "closed"
+                else:
+                    state = "error"
+                    await controller.on_attempt(False)
+            except Exception:
+                state = "error"
+                await controller.on_attempt(False)
+
+            return PortResult(port=port, protocol="tcp", state=state, cves=[], latency_ms=latency_ms)
+
+    async def _process_open_ports(
+        self,
+        ip: str,
+        open_ports_results: List[PortResult],
+        banners: List[str],
+        valid_ports: List[int],
+        latencies: List[float],
+        scan_callback: Optional[Callable[[PortResult], Awaitable[None]]] = None,
+        run_tls: bool = False
+    ):
+        for port_res in open_ports_results:
+            service_info = await self.service_detector.detect(ip, port_res.port, timeout=self.timeout)
+            port_res.service = service_info
+            if service_info and service_info.banner:
+                port_res.banner = service_info.banner
+                banners.append(service_info.banner)
+            else:
+                port_res.banner = None
+
+            if run_tls and port_res.port in [443, 8443]:
+                tls_fp = self._get_tls_fingerprinter()
+                if tls_fp:
+                    try:
+                        tls_info = await tls_fp.get_tls_info(ip, port_res.port)
+                        port_res.tls_info = tls_info
+                    except Exception:
+                        pass
+
+            cves = self.cve_lookup.lookup(service_info.name, service_info.version)
+            port_res.cves = cves
+
+            risk = self.port_analyzer.analyze(port_res.port, cves)
+            port_res.risk = risk
+
+            valid_ports.append(port_res.port)
+
+            if scan_callback:
+                try:
+                    await scan_callback(port_res)
+                except Exception:
+                    pass
 
     async def scan(
         self,
         target: str,
-        ports: str = "common",
-        protocol: str = "tcp",
-        timeout: float = 1.0,
-        concurrency: int = 500,
-        on_progress: Callable | None = None,
+        port_range: str = "common",
+        scan_callback: Optional[Callable[[PortResult], Awaitable[None]]] = None,
+        resolved_ip: Optional[str] = None,
+        scan_mode: str = "connect",
+        zombie_ip: Optional[str] = None
     ) -> ScanReport:
-        start_time = time.monotonic()
+        ports = parse_ports(port_range)
+        is_ipv6 = self._is_ipv6(target)
+        
+        ip = resolved_ip
+        if not ip:
+            try:
+                ip = resolve_target(target)
+            except Exception:
+                try:
+                    ip = resolve_target_ipv6(target)
+                    is_ipv6 = True
+                except Exception:
+                    raise ValueError(f"Could not resolve target: {target}")
 
-        try:
-            resolved_ip = resolve_target(target)
-        except ValueError as e:
-            logger.error(f"Failed to resolve target '{target}': {e}")
-            raise
+        started_at = datetime.now(timezone.utc)
+        open_ports_results: List[PortResult] = []
+        banners: List[str] = []
+        valid_ports: List[int] = []
+        latencies: List[float] = []
 
-        port_list = parse_ports(ports)
-        ports_scanned = len(port_list)
+        if scan_mode == "syn":
+            syn_scanner = self._get_syn_scanner()
+            if syn_scanner and syn_scanner.is_available():
+                syn_results = await syn_scanner.scan(ip, ports)
+                for syn_res in syn_results:
+                    if syn_res.state == "open":
+                        port_result = PortResult(
+                            port=syn_res.port,
+                            protocol="tcp",
+                            state="open",
+                            syn_ack_data={
+                                "ttl": syn_res.ttl,
+                                "window_size": syn_res.window_size,
+                                "tcp_options": syn_res.tcp_options,
+                                "ip_id": syn_res.ip_id,
+                                "df_flag": syn_res.df_flag
+                            }
+                        )
+                        open_ports_results.append(port_result)
+                        if syn_res.latency_ms:
+                            latencies.append(syn_res.latency_ms)
+            else:
+                scan_mode = "connect"
 
-        logger.info(f"Starting scan on {target} ({resolved_ip}), ports: {ports}, protocol: {protocol}")
+        elif scan_mode == "udp":
+            udp_scanner = self._get_udp_scanner()
+            if udp_scanner and udp_scanner.is_available():
+                udp_results = await udp_scanner.scan(ip, ports)
+                for udp_res in udp_results:
+                    port_result = PortResult(
+                        port=udp_res.port,
+                        protocol="udp",
+                        state=udp_res.state,
+                        latency_ms=udp_res.latency_ms
+                    )
+                    open_ports_results.append(port_result)
+            else:
+                scan_mode = "connect"
 
-        open_ports: list[PortResult] = []
-        semaphore = asyncio.Semaphore(concurrency)
+        elif scan_mode in ["stealth_fin", "stealth_null", "stealth_xmas"]:
+            stealth_scanner = self._get_stealth_scanner()
+            scan_type = scan_mode.replace("stealth_", "")
+            if stealth_scanner and stealth_scanner.is_available():
+                stealth_results = await stealth_scanner.scan(ip, ports, scan_type=scan_type)
+                for stealth_res in stealth_results:
+                    if stealth_res.state in ["open", "open|filtered"]:
+                        port_result = PortResult(
+                            port=stealth_res.port,
+                            protocol="tcp",
+                            state=stealth_res.state
+                        )
+                        open_ports_results.append(port_result)
+            else:
+                scan_mode = "connect"
 
-        async def scan_port(port: int, proto: str) -> PortResult | None:
-            async with semaphore:
-                result = await self._scan_single_port(resolved_ip, port, proto, timeout)
-                if result and result.state == "open":
-                    if on_progress:
-                        on_progress(port, result.state, result.service)
-                    return result
-                elif on_progress:
-                    on_progress(port, result.state if result else "unknown", "")
-                return None
+        elif scan_mode == "zombie":
+            if not zombie_ip:
+                raise ValueError("zombie_ip required for zombie scan mode")
+            zombie_scanner = self._get_zombie_scanner(zombie_ip)
+            if zombie_scanner and zombie_scanner.is_available():
+                zombie_results = await zombie_scanner.scan(ip, ports)
+                for zombie_res in zombie_results:
+                    port_result = PortResult(
+                        port=zombie_res.target_port,
+                        protocol="tcp",
+                        state=zombie_res.state
+                    )
+                    open_ports_results.append(port_result)
+            else:
+                scan_mode = "connect"
 
-        tasks: list[asyncio.Task] = []
+        if scan_mode == "connect" or scan_mode == "full":
+            controller = AdaptiveConcurrencyController()
+            semaphore = controller.get_semaphore()
+            
+            tasks = [self._scan_port(ip, port, semaphore, controller) for port in ports]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        if protocol in ("tcp", "both"):
-            for port in port_list:
-                task = asyncio.create_task(scan_port(port, "tcp"))
-                tasks.append(task)
+            for res in results:
+                if isinstance(res, PortResult) and res.state == "open":
+                    open_ports_results.append(res)
+                    if res.latency_ms is not None:
+                        latencies.append(res.latency_ms)
 
-        if protocol in ("udp", "both") and "both" not in protocol:
-            for port in port_list:
-                task = asyncio.create_task(scan_port(port, "udp"))
-                tasks.append(task)
+        if open_ports_results:
+            await self._process_open_ports(
+                ip, open_ports_results, banners, valid_ports, latencies,
+                scan_callback, run_tls=(scan_mode == "full")
+            )
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        if scan_mode == "syn":
+            for port_res in open_ports_results:
+                if port_res.syn_ack_data:
+                    self.os_fingerprinter.probe_active(ip, port_res.port)
 
-        for result in results:
-            if isinstance(result, PortResult) and result is not None:
-                open_ports.append(result)
+        os_fingerprint = self.os_fingerprinter.fingerprint(banners, valid_ports, [p.service for p in open_ports_results])
 
-        scan_duration = time.monotonic() - start_time
-
-        open_ports.sort(key=lambda x: x.port)
-
-        logger.info(
-            f"Scan complete: {len(open_ports)} open ports found in {scan_duration:.2f}s"
-        )
+        completed_at = datetime.now(timezone.utc)
+        scan_duration = (completed_at - started_at).total_seconds()
+        avg_latency = sum(latencies) / len(latencies) if latencies else None
 
         return ScanReport(
             target=target,
-            ip=resolved_ip,
-            ports_scanned=ports_scanned,
-            open_ports=open_ports,
+            ip=ip,
+            total_ports_scanned=len(ports),
+            open_ports=open_ports_results,
+            os_fingerprint=os_fingerprint,
             scan_duration=scan_duration,
-            timestamp=datetime.now(timezone.utc),
-            scan_type=protocol,
+            started_at=started_at,
+            completed_at=completed_at,
+            avg_latency_ms=round(avg_latency, 2) if avg_latency else None,
+            peak_concurrency=controller.peak if scan_mode == "connect" else 0,
+            scan_mode=scan_mode,
+            is_ipv6=is_ipv6,
         )
-
-    async def _scan_single_port(
-        self, host: str, port: int, protocol: str = "tcp", timeout: float = 1.0
-    ) -> PortResult:
-        if protocol.lower() == "tcp":
-            return await self._scan_tcp(host, port, timeout)
-        else:
-            return await self._scan_udp(host, port, timeout)
-
-    async def _scan_tcp(self, host: str, port: int, timeout: float) -> PortResult:
-        try:
-            _, writer = await asyncio.wait_for(
-                asyncio.open_connection(host, port),
-                timeout=timeout,
-            )
-
-            service_info = await self.service_detector.detect(host, port, "tcp", timeout)
-
-            writer.close()
-            try:
-                await writer.wait_closed()
-            except OSError:
-                pass
-
-            cves = self.cve_lookup.lookup(service_info.name, service_info.version)
-            os_hint = self.os_fingerprinter.fingerprint(service_info.banner, port)
-            risk_score = self.port_analyzer.calculate_risk_score(
-                port, service_info.name, cves
-            )
-
-            return PortResult(
-                port=port,
-                protocol="tcp",
-                state="open",
-                service=service_info.name,
-                version=service_info.version,
-                banner=service_info.banner,
-                os_hint=os_hint,
-                cves=cves,
-                risk_score=risk_score,
-            )
-
-        except asyncio.TimeoutError:
-            return PortResult(
-                port=port,
-                protocol="tcp",
-                state="filtered",
-                service=self.port_analyzer.get_service_name(port),
-                version=None,
-                banner="",
-                os_hint=None,
-                cves=[],
-                risk_score=0.0,
-            )
-        except ConnectionRefusedError:
-            return PortResult(
-                port=port,
-                protocol="tcp",
-                state="closed",
-                service=self.port_analyzer.get_service_name(port),
-                version=None,
-                banner="",
-                os_hint=None,
-                cves=[],
-                risk_score=0.0,
-            )
-        except OSError as e:
-            if e.errno == 111:
-                return PortResult(
-                    port=port,
-                    protocol="tcp",
-                    state="closed",
-                    service=self.port_analyzer.get_service_name(port),
-                    version=None,
-                    banner="",
-                    os_hint=None,
-                    cves=[],
-                    risk_score=0.0,
-                )
-            elif e.errno == 113:
-                return PortResult(
-                    port=port,
-                    protocol="tcp",
-                    state="unreachable",
-                    service=self.port_analyzer.get_service_name(port),
-                    version=None,
-                    banner="",
-                    os_hint=None,
-                    cves=[],
-                    risk_score=0.0,
-                )
-            else:
-                logger.warning(
-                    f"Port {port}: {type(e).__name__}: {e}"
-                )
-                return PortResult(
-                    port=port,
-                    protocol="tcp",
-                    state="error",
-                    service=self.port_analyzer.get_service_name(port),
-                    version=None,
-                    banner="",
-                    os_hint=None,
-                    cves=[],
-                    risk_score=0.0,
-                )
-        except Exception as e:
-            logger.warning(f"Port {port}: {type(e).__name__}: {e}")
-            return PortResult(
-                port=port,
-                protocol="tcp",
-                state="error",
-                service=self.port_analyzer.get_service_name(port),
-                version=None,
-                banner="",
-                os_hint=None,
-                cves=[],
-                risk_score=0.0,
-            )
-
-    async def _scan_udp(self, host: str, port: int, timeout: float) -> PortResult:
-        loop = asyncio.get_event_loop()
-
-        def sync_udp_scan():
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                sock.settimeout(timeout)
-                sock.sendto(b"", (host, port))
-                data, _ = sock.recvfrom(1024)
-                sock.close()
-                return data
-            except socket.timeout:
-                sock.close()
-                return None
-            except ConnectionRefusedError:
-                sock.close()
-                return None
-            except OSError as e:
-                sock.close()
-                if e.errno in (111, 113):
-                    return None
-                raise
-
-        try:
-            response = await asyncio.wait_for(
-                loop.run_in_executor(None, sync_udp_scan),
-                timeout=timeout + 0.5,
-            )
-
-            if response is None:
-                return PortResult(
-                    port=port,
-                    protocol="udp",
-                    state="filtered",
-                    service=self.port_analyzer.get_service_name(port),
-                    version=None,
-                    banner="",
-                    os_hint=None,
-                    cves=[],
-                    risk_score=0.0,
-                )
-
-            service_info = await self.service_detector.detect(host, port, "udp", timeout)
-            decoded = response.decode("utf-8", errors="replace") if response else ""
-
-            cves = self.cve_lookup.lookup(service_info.name, service_info.version)
-            os_hint = self.os_fingerprinter.fingerprint(decoded, port)
-            risk_score = self.port_analyzer.calculate_risk_score(
-                port, service_info.name, cves
-            )
-
-            return PortResult(
-                port=port,
-                protocol="udp",
-                state="open",
-                service=service_info.name,
-                version=service_info.version,
-                banner=decoded[:500],
-                os_hint=os_hint,
-                cves=cves,
-                risk_score=risk_score,
-            )
-
-        except asyncio.TimeoutError:
-            return PortResult(
-                port=port,
-                protocol="udp",
-                state="filtered",
-                service=self.port_analyzer.get_service_name(port),
-                version=None,
-                banner="",
-                os_hint=None,
-                cves=[],
-                risk_score=0.0,
-            )
-        except ConnectionRefusedError:
-            return PortResult(
-                port=port,
-                protocol="udp",
-                state="closed",
-                service=self.port_analyzer.get_service_name(port),
-                version=None,
-                banner="",
-                os_hint=None,
-                cves=[],
-                risk_score=0.0,
-            )
-        except OSError as e:
-            if e.errno == 111:
-                return PortResult(
-                    port=port,
-                    protocol="udp",
-                    state="closed",
-                    service=self.port_analyzer.get_service_name(port),
-                    version=None,
-                    banner="",
-                    os_hint=None,
-                    cves=[],
-                    risk_score=0.0,
-                )
-            elif e.errno == 113:
-                return PortResult(
-                    port=port,
-                    protocol="udp",
-                    state="unreachable",
-                    service=self.port_analyzer.get_service_name(port),
-                    version=None,
-                    banner="",
-                    os_hint=None,
-                    cves=[],
-                    risk_score=0.0,
-                )
-            else:
-                logger.warning(f"Port {port}: {type(e).__name__}: {e}")
-                return PortResult(
-                    port=port,
-                    protocol="udp",
-                    state="error",
-                    service=self.port_analyzer.get_service_name(port),
-                    version=None,
-                    banner="",
-                    os_hint=None,
-                    cves=[],
-                    risk_score=0.0,
-                )
-        except Exception as e:
-            logger.warning(f"Port {port}: {type(e).__name__}: {e}")
-            return PortResult(
-                port=port,
-                protocol="udp",
-                state="error",
-                service=self.port_analyzer.get_service_name(port),
-                version=None,
-                banner="",
-                os_hint=None,
-                cves=[],
-                risk_score=0.0,
-            )

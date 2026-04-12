@@ -1,58 +1,46 @@
-from typing import Any, Optional
+"""
+Tool pydantic schemas.
+"""
+from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
+from typing import Any, Literal
+from datetime import datetime
 
-from pydantic import BaseModel, Field
+class DnsRequest(BaseModel):
+    target: str
+    record_type: str = "ALL"
+    
+class WhoisRequest(BaseModel):
+    target: str
+    
+class PingRequest(BaseModel):
+    target: str
+    count: int = Field(default=4, ge=1, le=100)
+    
+class TracerouteRequest(BaseModel):
+    target: str
+    max_hops: int = Field(default=30, ge=1, le=64)
+    
+class SslRequest(BaseModel):
+    host: str
+    port: int = 443
+    
+class HttpHeadersRequest(BaseModel):
+    target: str
+    path: str = "/"
+    
+class SubdomainRequest(BaseModel):
+    domain: str
+    wordlist: Literal["small", "medium", "large"] = "small"
+    
+class GeoipRequest(BaseModel):
+    target: str
 
-
-class ToolRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=255)
-    options: Optional[dict[str, Any]] = None
-
-
-class ToolResultRead(BaseModel):
+class ToolResultOut(BaseModel):
     id: UUID
     tool_name: str
     target: str
     result_data: dict[str, Any]
-    created_at: str
+    created_at: datetime
 
-
-class DNSRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=255)
-    record_type: str = Field(default="A", max_length=10)
-
-
-class WHOISRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=255)
-
-
-class SSLRequest(BaseModel):
-    host: str = Field(min_length=1, max_length=255, alias="host")
-    target: Optional[str] = None
-    port: int = Field(default=443, ge=1, le=65535)
-
-    model_config = {"populate_by_name": True}
-
-
-class HTTPHeadersRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=255)
-    path: str = Field(default="/")
-
-
-class TracerouteRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=255)
-    max_hops: int = Field(default=30, ge=1, le=64)
-
-
-class PingRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=255)
-    count: int = Field(default=4, ge=1, le=100)
-
-
-class SubdomainRequest(BaseModel):
-    domain: str = Field(min_length=1, max_length=255)
-    wordlist: Optional[str] = None
-
-
-class GeoIPRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=255)
+    model_config = ConfigDict(from_attributes=True)

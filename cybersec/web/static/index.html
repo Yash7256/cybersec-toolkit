@@ -6,6 +6,7 @@
     <title>CyberSec-CLI Web</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/layout.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         .hidden { display: none !important; }
@@ -42,19 +43,28 @@
             padding: 0 2.5rem;
         }
         
-        .logo {
+        .top-nav .logo {
             display: flex;
             align-items: center;
-            font-size: 1.1rem;
-            font-weight: 700;
-            letter-spacing: 0.15em;
-            color: white;
+            gap: 10px;
         }
         
-        .logo-image {
-            width: 48px;
-            height: 48px;
-            margin-right: 1rem;
+        .top-nav .logo-image {
+            width: 40px !important;
+            height: 40px !important;
+            max-width: 40px !important;
+            max-height: 40px !important;
+        }
+        
+        .top-nav .logo-text {
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, var(--purple-gradient-start), var(--purple-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
         .nav-menu {
@@ -294,13 +304,18 @@
             cursor: pointer;
             transition: all 0.3s ease;
         }
-        
+
         .port-item:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
             border-color: rgba(139, 127, 235, 0.3);
         }
-        
+
+        .port-item.open {
+            border-color: rgba(139, 127, 235, 0.45);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+
         .port-header {
             display: flex;
             justify-content: space-between;
@@ -313,7 +328,14 @@
         .port-info-main { display: flex; align-items: baseline; gap: 0.75rem; }
         .port-number { font-weight: 700; color: white; font-size: 1.1rem; }
         .port-service { font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
-        
+
+        .port-chevron {
+            color: var(--text-secondary);
+            transition: transform 0.2s ease;
+        }
+
+        .port-item.open .port-chevron { transform: rotate(90deg); color: white; }
+
         .port-risk {
             padding: 0.25rem 0.75rem;
             border-radius: 20px;
@@ -336,8 +358,45 @@
         .detail-item { display: flex; flex-direction: column; }
         .detail-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem; }
         .detail-value { color: white; font-size: 0.9rem; }
-        
+
         .status-open { color: #10B981 !important; font-weight: 600; }
+
+        .port-extra {
+            display: none;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            gap: 0.75rem;
+            flex-direction: column;
+        }
+
+        .port-extra .detail-row {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .port-extra .detail-row span:first-child {
+            color: var(--text-secondary);
+            min-width: 90px;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .port-extra pre {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 280px;
+            overflow: auto;
+        }
+
+        .port-item.open .port-extra { display: flex; }
         
         .results-section {
             background: rgba(255, 255, 255, 0.03);
@@ -825,20 +884,279 @@
                 right: 0;
             }
         }
+
+        .tool-nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .tool-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+        }
+
+        .tool-nav-btn.active {
+            background: rgba(139, 127, 235, 0.15);
+            border-color: rgba(139, 127, 235, 0.3);
+            color: white;
+        }
+
+        .tool-nav-btn i {
+            width: 20px;
+            text-align: center;
+        }
+
+        .tool-content {
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tool-output-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .tool-output-box .placeholder {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .tool-output-box .placeholder i {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            display: block;
+            color: var(--purple-gradient-start);
+            opacity: 0.5;
+        }
+
+        .tool-actions {
+            display: flex;
+            gap: 0.75rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tool-actions button {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .tool-actions button:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+        }
+
+        .tool-actions button i {
+            margin-right: 0.5rem;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .data-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.9rem;
+        }
+
+        .data-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-info { background: rgba(139, 127, 235, 0.2); color: #8B7FEB; }
+        .badge-low { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
+        .badge-medium { background: rgba(245, 158, 11, 0.2); color: #FBBF24; }
+        .badge-high { background: rgba(251, 146, 60, 0.2); color: #FB923C; }
+        .badge-critical { background: rgba(248, 113, 113, 0.2); color: #F87171; }
+        .badge-green { background: rgba(52, 211, 153, 0.2); color: #34D399; }
+
+        .btn-secondary {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+        }
+
+        /* Full scan status cards */
+        .fullscan-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+
+        .fullscan-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            min-height: 120px;
+        }
+
+        .fullscan-title {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .fullscan-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .fullscan-detail {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .status-pill {
+            padding: 0.2rem 0.7rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+        }
+
+        .status-pill.pending { color: var(--text-secondary); }
+        .status-pill.running { color: #F59E0B; border-color: rgba(245, 158, 11, 0.3); }
+        .status-pill.success { color: #10B981; border-color: rgba(16, 185, 129, 0.3); }
+        .status-pill.error { color: #EF4444; border-color: rgba(239, 68, 68, 0.3); }
+
+        .fullscan-log {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+            color: var(--text-secondary);
+        }
+
+        .webscan-log {
+            background: #0a0a0f;
+            border: 1px solid #1e1e28;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.82rem;
+            max-height: 250px;
+            overflow-y: auto;
+            color: #a0a0b0;
+            margin-bottom: 12px;
+        }
+        .webscan-log.hidden { display: none; }
+        .webscan-log-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1e1e28;
+            color: #a78bfa;
+            font-weight: 600;
+        }
+        .webscan-log-entry {
+            display: flex;
+            gap: 10px;
+            padding: 4px 0;
+            border-bottom: 1px solid #12121a;
+        }
+        .webscan-log-entry:last-child { border-bottom: none; }
+        .webscan-log-time { color: #4a4a58; min-width: 70px; }
+        .webscan-log-stage { color: #a78bfa; min-width: 140px; }
+        .webscan-log-msg { color: #b0b0c0; flex: 1; }
+        .webscan-log-entry.success .webscan-log-msg { color: #6acf80; }
+        .webscan-log-entry.warning .webscan-log-msg { color: #f0b860; }
+        .webscan-log-entry.error .webscan-log-msg { color: #f07070; }
+        .webscan-log-entry.running .webscan-log-stage { animation: pulse-text 1s infinite; }
+        @keyframes pulse-text { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
+    <!-- Marked library for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <header class="top-nav">
-        <div class="logo">
-            <img src="/static/logo.png" alt="CyberSec Logo" class="logo-image">
-          
-        </div>
+        <div class="logo" style="display:none;">
 
         <nav>
             <ul class="nav-menu">
-                <li><a href="#" id="navPortScanner" class="active" onclick="switchView('portScanner')">Port Scanner</a></li>
-                <li><a href="#" id="navOsFingerprint" onclick="switchView('osFingerprint')">OS Fingerprinting</a></li>
-                <li><a href="#" id="navWebAppScanner" onclick="switchView('webAppScanner')">Web App Scanner</a></li>
+                <li><a href="#" id="navTools" class="active" onclick="switchView('tools')">Network Tools</a></li>
+                <li><a href="#" id="navFullScan" onclick="switchView('fullScan')">Full Scan</a></li>
+                <li><a href="#" id="navAI" onclick="switchView('ai')">AI Assistant</a></li>
+                <li><a href="#" id="navHistory" onclick="switchView('history')">Scan History</a></li>
             </ul>
         </nav>
 
@@ -847,7 +1165,7 @@
 
     <div class="main-container">
         <!-- Port Scanner View -->
-        <div id="portScannerView" class="view-section active">
+        <div id="portScannerView" class="view-section" style="display:none;">
             <div class="control-panel">
                 <div class="input-group">
                     <label class="input-label">Target Host</label>
@@ -981,62 +1299,7 @@
                     </div>
 
                     <div id="osResultsContainer" class="results-container hidden">
-                        <div class="os-detection-info">
-                            <div class="info-card">
-                                <div class="card-header">
-                                    <i class="fa-solid fa-desktop"></i>
-                                    <h4>Operating System</h4>
-                                </div>
-                                <div class="card-content">
-                                    <div class="info-row">
-                                        <span class="info-label">OS Name:</span>
-                                        <span id="osName" class="info-value">-</span>
-                                    </div>
-                                    <div class="info-row">
-                                        <span class="info-label">Vendor:</span>
-                                        <span id="osVendor" class="info-value">-</span>
-                                    </div>
-                                    <div class="info-row">
-                                        <span class="info-label">Family:</span>
-                                        <span id="osFamily" class="info-value">-</span>
-                                    </div>
-                                    <div class="info-row">
-                                        <span class="info-label">Generation:</span>
-                                        <span id="osGen" class="info-value">-</span>
-                                    </div>
-                                    <div class="info-row">
-                                        <span class="info-label">Accuracy:</span>
-                                        <span id="osAccuracy" class="info-value">-</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="info-card">
-                                <div class="card-header">
-                                    <i class="fa-solid fa-network-wired"></i>
-                                    <h4>Network Information</h4>
-                                </div>
-                                <div class="card-content">
-                                    <div class="info-row">
-                                        <span class="info-label">Target IP:</span>
-                                        <span id="osTargetIp" class="info-value">-</span>
-                                    </div>
-                                    <div class="info-row">
-                                        <span class="info-label">Hostname:</span>
-                                        <span id="osHostname" class="info-value">-</span>
-                                    </div>
-                                    <div class="info-row">
-                                        <span class="info-label">Open Ports Found:</span>
-                                        <span id="osOpenPortsCount" class="info-value">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="osRawResults" class="raw-results">
-                            <h4>Raw Results</h4>
-                            <pre id="osRawData"></pre>
-                        </div>
+                        <!-- Dynamic OS Cards will be injected here -->
                     </div>
                 </div>
 
@@ -1069,8 +1332,141 @@
             </button>
         </div>
 
+        <!-- Full Scan View -->
+        <div id="fullScanView" class="view-section">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Target Host / Domain</label>
+                    <input type="text" id="fullTarget" class="control-input" placeholder="example.com or 192.168.1.1">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Target URL (optional)</label>
+                    <input type="text" id="fullUrl" class="control-input" placeholder="https://example.com">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Port Range</label>
+                    <select id="fullPortRange" class="form-select">
+                        <option value="common">Common Ports (1-1024)</option>
+                        <option value="top1000">Top 1000 Ports</option>
+                        <option value="1-1000">1-1000</option>
+                        <option value="1-5000">1-5000</option>
+                        <option value="1-10000">1-10000</option>
+                        <option value="all">All Ports (1-65535)</option>
+                    </select>
+                </div>
+                <button id="fullScanBtn" class="start-button" onclick="runFullScan()"><i class="fa-solid fa-bolt"></i> Run Full Scan</button>
+            </div>
+
+            <div class="control-panel-options">
+                <div class="option-toggle">
+                    <input type="checkbox" id="fullEnhanced" checked>
+                    <label for="fullEnhanced">Enhanced Service Detection</label>
+                </div>
+                <div class="option-toggle">
+                    <input type="checkbox" id="fullCrawl" checked>
+                    <label for="fullCrawl">Crawl links (web app)</label>
+                </div>
+                <div class="option-toggle">
+                    <input type="checkbox" id="fullPassive" checked>
+                    <label for="fullPassive">Passive mode (web app)</label>
+                </div>
+            </div>
+
+            <div class="results-window" id="fullScanWindow">
+                <div class="results-panel">
+                    <div class="fullscan-grid" id="fullscanGrid">
+                        <div class="fullscan-card" data-tool="port">
+                            <div class="fullscan-title"><i class="fa-solid fa-plug"></i> Port Scan</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-port" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-port" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="os">
+                            <div class="fullscan-title"><i class="fa-solid fa-desktop"></i> OS Fingerprint</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-os" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-os" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="webapp">
+                            <div class="fullscan-title"><i class="fa-solid fa-shield-halved"></i> Web App Check</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-webapp" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-webapp" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="headers">
+                            <div class="fullscan-title"><i class="fa-solid fa-heading"></i> HTTP Headers</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-headers" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-headers" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="ssl">
+                            <div class="fullscan-title"><i class="fa-solid fa-lock"></i> SSL Check</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-ssl" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-ssl" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="dns">
+                            <div class="fullscan-title"><i class="fa-solid fa-globe"></i> DNS</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-dns" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-dns" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="whois">
+                            <div class="fullscan-title"><i class="fa-solid fa-server"></i> WHOIS</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-whois" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-whois" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="ping">
+                            <div class="fullscan-title"><i class="fa-solid fa-bolt"></i> Ping</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-ping" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-ping" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="traceroute">
+                            <div class="fullscan-title"><i class="fa-solid fa-route"></i> Traceroute</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-traceroute" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-traceroute" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="subdomains">
+                            <div class="fullscan-title"><i class="fa-solid fa-search"></i> Subdomains</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-subdomains" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-subdomains" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="geo">
+                            <div class="fullscan-title"><i class="fa-solid fa-map-marker-alt"></i> GeoIP</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-geo" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-geo" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1.5rem;">
+                        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+                            <i class="fa-solid fa-terminal" style="color:var(--purple-gradient-start)"></i>
+                            <span style="font-weight:600;">Activity Log</span>
+                        </div>
+                        <div id="fullscanLog" class="fullscan-log">Ready. Click Run Full Scan to start.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Web App Scanner View -->
-        <div id="webAppScannerView" class="view-section">
+        <div id="webAppScannerView" class="view-section" style="display:none;">
             <div class="control-panel">
                 <div class="input-group">
                     <label class="input-label">Target URL</label>
@@ -1110,6 +1506,343 @@
                 </div>
             </div>
         </div>
+
+        <!-- Network Tools View -->
+        <div id="toolsView" class="view-section active">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Network Tools</label>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+                        Select a tool from the sidebar to run network diagnostics
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 2rem; flex: 1; height: calc(100vh - 250px);">
+                <!-- Tool Sidebar -->
+                <div style="width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <button class="tool-nav-btn active" data-tool="portscanner" onclick="selectTool('portscanner')">
+                        <i class="fa-solid fa-plug"></i> Port Scanner
+                    </button>
+                    <button class="tool-nav-btn" data-tool="osfp" onclick="selectTool('osfp')">
+                        <i class="fa-solid fa-desktop"></i> OS Fingerprinting
+                    </button>
+                    <button class="tool-nav-btn" data-tool="webscan" onclick="selectTool('webscan')">
+                        <i class="fa-solid fa-shield-halved"></i> Web App Scanner
+                    </button>
+                    <button class="tool-nav-btn" data-tool="dns" onclick="selectTool('dns')">
+                        <i class="fa-solid fa-globe"></i> DNS Lookup
+                    </button>
+                    <button class="tool-nav-btn" data-tool="whois" onclick="selectTool('whois')">
+                        <i class="fa-solid fa-server"></i> WHOIS
+                    </button>
+                    <button class="tool-nav-btn" data-tool="ping" onclick="selectTool('ping')">
+                        <i class="fa-solid fa-bolt"></i> Ping
+                    </button>
+                    <button class="tool-nav-btn" data-tool="traceroute" onclick="selectTool('traceroute')">
+                        <i class="fa-solid fa-route"></i> Traceroute
+                    </button>
+                    <button class="tool-nav-btn" data-tool="ssl" onclick="selectTool('ssl')">
+                        <i class="fa-solid fa-lock"></i> SSL Check
+                    </button>
+                    <button class="tool-nav-btn" data-tool="headers" onclick="selectTool('headers')">
+                        <i class="fa-solid fa-heading"></i> HTTP Headers
+                    </button>
+                    <button class="tool-nav-btn" data-tool="subdomains" onclick="selectTool('subdomains')">
+                        <i class="fa-solid fa-search"></i> Subdomains
+                    </button>
+                    <button class="tool-nav-btn" data-tool="geo" onclick="selectTool('geo')">
+                        <i class="fa-solid fa-map-marker-alt"></i> GeoIP
+                    </button>
+                    <li style="border-top:1px solid var(--border-color); margin-top:5px; padding-top:5px">
+                        <a onclick="switchView('executiveSummary')" style="color:var(--purple-gradient-start); font-weight:700; cursor:pointer">
+                            <i class="fa-solid fa-brain" style="margin-right:8px"></i>AI Executive Report
+                        </a>
+                    </li>
+                </div>
+
+                <!-- Tool Content -->
+                <div style="flex: 1; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 2rem; overflow-y: auto;">
+                    <!-- Port Scanner (inline) -->
+                    <div id="tool-portscanner" class="tool-content">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-plug" style="color: var(--purple-gradient-start)"></i> Port Scanner
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="portscanner-target" class="control-input" placeholder="example.com or 192.168.1.1" style="flex: 1; min-width: 220px;">
+                            <select id="portscanner-ports" class="form-select" style="width: 120px;">
+                                <option value="common">Common</option>
+                                <option value="top1000">Top 1000</option>
+                                <option value="1-1000">1-1000</option>
+                                <option value="1-5000">1-5000</option>
+                                <option value="all">All (1-65535)</option>
+                            </select>
+                            <select id="scanner-type" class="form-select" style="width: 130px;">
+                                <option value="port">Standard</option>
+                                <option value="full">Full (+TLS)</option>
+                            </select>
+                            <button class="start-button" onclick="runTool('portscanner')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="portscanner-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-plug"></i>Enter a target to scan ports</div></div>
+                        <div id="portscanner-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('portscanner')"><i class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- OS Fingerprinting (inline) -->
+                    <div id="tool-osfp" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-desktop" style="color: var(--purple-gradient-start)"></i> OS Fingerprinting
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="osfp-target" class="control-input" placeholder="example.com or 192.168.1.1" style="flex: 1; min-width: 220px;">
+                            <button class="start-button" onclick="runTool('osfp')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="osfp-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-desktop"></i>Enter a host to fingerprint</div></div>
+                        <div id="osfp-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('osfp')"><i class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Web App Scanner (inline) -->
+                    <div id="tool-webscan" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-shield-halved" style="color: var(--purple-gradient-start)"></i> Web App Scanner
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="webscan-target" class="control-input" placeholder="https://example.com or example.com" style="flex: 1; min-width: 220px;">
+                            <input type="number" id="webscan-maxpages" class="control-input" value="20" min="1" max="100" style="width: 120px;">
+                            <button class="start-button" id="webscan-run-btn" onclick="runTool('webscan')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="webscan-log" class="webscan-log hidden"></div>
+                        <div id="webscan-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-shield-halved"></i>Enter a URL to scan</div></div>
+                    </div>
+
+                    <!-- DNS Tool -->
+                    <div id="tool-dns" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-globe" style="color: var(--purple-gradient-start)"></i> DNS Lookup
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="dns-target" class="control-input" placeholder="example.com" style="flex: 1; min-width: 200px;">
+                            <select id="dns-record-type" class="form-select" style="width: 140px;">
+                                <option value="A">A</option>
+                                <option value="AAAA">AAAA</option>
+                                <option value="MX">MX</option>
+                                <option value="NS">NS</option>
+                                <option value="TXT">TXT</option>
+                                <option value="CNAME">CNAME</option>
+                                <option value="ALL">ALL</option>
+                            </select>
+                            <button class="start-button" onclick="runTool('dns')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="dns-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-globe"></i>Enter a domain and click Run to查询 DNS records</div></div>
+                        <div id="dns-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('dns')"><i class="fa-solid fa-copy"></i> Copy</button>
+                            <button class="btn-secondary" onclick="sendToAI('dns')"><i class="fa-solid fa-robot"></i> Send to AI</button>
+                        </div>
+                    </div>
+
+                    <!-- WHOIS Tool -->
+                    <div id="tool-whois" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-server" style="color: var(--purple-gradient-start)"></i> WHOIS Lookup
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                            <input type="text" id="whois-target" class="control-input" placeholder="example.com" style="flex: 1;">
+                            <button class="start-button" onclick="runTool('whois')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="whois-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-server"></i>Enter a domain to查询 WHOIS 信息</div></div>
+                        <div id="whois-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('whois')"><i class="fa-solid fa-copy"></i> Copy</button>
+                            <button class="btn-secondary" onclick="sendToAI('whois')"><i class="fa-solid fa-robot"></i> Send to AI</button>
+                        </div>
+                    </div>
+
+                    <!-- Ping Tool -->
+                    <div id="tool-ping" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-bolt" style="color: var(--purple-gradient-start)"></i> Ping Test
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="ping-target" class="control-input" placeholder="example.com or 192.168.1.1" style="flex: 1; min-width: 200px;">
+                            <input type="number" id="ping-count" class="control-input" placeholder="Count" value="4" style="width: 100px;">
+                            <button class="start-button" onclick="runTool('ping')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="ping-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-bolt"></i>Enter an IP or hostname to test reachability</div></div>
+                        <div id="ping-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('ping')"><i class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Traceroute Tool -->
+                    <div id="tool-traceroute" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-route" style="color: var(--purple-gradient-start)"></i> Traceroute
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="traceroute-target" class="control-input" placeholder="example.com or 192.168.1.1" style="flex: 1; min-width: 200px;">
+                            <input type="number" id="traceroute-hops" class="control-input" placeholder="Max hops" value="30" style="width: 120px;">
+                            <button class="start-button" onclick="runTool('traceroute')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="traceroute-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-route"></i>Enter a target to trace network path</div></div>
+                        <div id="traceroute-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('traceroute')"><i class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- SSL Tool -->
+                    <div id="tool-ssl" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-lock" style="color: var(--purple-gradient-start)"></i> SSL Certificate Check
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="ssl-host" class="control-input" placeholder="https://example.com or example.com" style="flex: 1; min-width: 200px;">
+                            <input type="number" id="ssl-port" class="control-input" placeholder="Port" value="443" style="width: 100px;">
+                            <button class="start-button" onclick="runTool('ssl')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="ssl-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-lock"></i>Enter a host to check SSL certificate</div></div>
+                        <div id="ssl-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('ssl')"><i class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- HTTP Headers Tool -->
+                    <div id="tool-headers" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-heading" style="color: var(--purple-gradient-start)"></i> HTTP Headers Analysis
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                            <input type="text" id="headers-url" class="control-input" placeholder="https://example.com or example.com" style="flex: 1;">
+                            <button class="start-button" onclick="runTool('headers')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="headers-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-heading"></i>Enter a URL to analyze HTTP headers</div></div>
+                        <div id="headers-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('headers')"><i class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Subdomains Tool -->
+                    <div id="tool-subdomains" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-search" style="color: var(--purple-gradient-start)"></i> Subdomain Discovery
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="subdomains-domain" class="control-input" placeholder="example.com" style="flex: 1; min-width: 200px;">
+                            <select id="subdomains-wordlist" class="form-select" style="width: 140px;">
+                                <option value="small">Small</option>
+                                <option value="medium">Medium</option>
+                                <option value="large">Large</option>
+                            </select>
+                            <button class="start-button" onclick="runTool('subdomains')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="subdomains-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-search"></i>Enter a domain to discover subdomains</div></div>
+                        <div id="subdomains-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('subdomains')"><i class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- GeoIP Tool -->
+                    <div id="tool-geo" class="tool-content" style="display: none;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-map-marker-alt" style="color: var(--purple-gradient-start)"></i> IP Geolocation
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                            <input type="text" id="geo-ip" class="control-input" placeholder="example.com or 8.8.8.8" style="flex: 1; max-width: 400px;">
+                            <button class="start-button" onclick="runTool('geo')"><i class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="geo-output" class="tool-output-box"><div class="placeholder"><i class="fa-solid fa-map-marker-alt"></i>Enter an IP address to lookup geolocation</div></div>
+                        <div id="geo-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('geo')"><i class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Executive Report View -->
+        <div id="executiveSummaryView" class="view-section">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Master AI Executive Report</label>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+                        Aggregated intelligence from all tools run in this session
+                    </div>
+                </div>
+                <button class="start-button" onclick="toolsModule.renderExecutiveSummary()"><i class="fa-solid fa-sync"></i> Refresh Report</button>
+            </div>
+            
+            <div class="results-window">
+                <div class="results-panel" id="executive-summary-output">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-brain" style="font-size:3rem;color:var(--purple-gradient-start);opacity:.4"></i>
+                        <h2 style="font-size:1.25rem;color:var(--text-secondary);margin-top:1rem">AI Executive Report</h2>
+                        <p style="font-size:0.9rem;margin-top:0.5rem">Run some network tools first to generate a master report</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Assistant View -->
+        <div id="aiView" class="view-section">
+            <div class="results-window" style="height: calc(100vh - 200px);">
+                <div class="chat-panel" style="width: 100%; opacity: 1; pointer-events: all;">
+                    <div class="chat-header">
+                        <div class="chat-title">
+                            <i class="fa-solid fa-robot"></i>
+                            <span>AI Security Assistant</span>
+                        </div>
+                        <button onclick="clearAIChat()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.8rem">Clear Chat</button>
+                    </div>
+                    <div id="aiChatMessages" class="chat-messages">
+                        <div class="chat-message ai">
+                            Hello! I'm your CyberSec AI assistant. I can help you analyze scan results, explain vulnerabilities, and provide security recommendations. What would you like to know?
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="aiChatInput" class="chat-input" placeholder="Ask about security, vulnerabilities, or your scan results..." onkeypress="handleAIChatKey(event)">
+                        <button class="chat-send-btn" onclick="sendAIChatMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scan History View -->
+        <div id="historyView" class="view-section">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Scan History</label>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+                        View and manage your past scans
+                    </div>
+                </div>
+                <button class="start-button" onclick="loadScanHistory()"><i class="fa-solid fa-refresh"></i> Refresh</button>
+            </div>
+
+            <div class="results-window" style="height: calc(100vh - 250px);">
+                <div class="results-panel">
+                    <div class="results-container">
+                        <table class="data-table" style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Target</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Open Ports</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-tbody">
+                                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Click Refresh to load scan history</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1119,6 +1852,7 @@
         let scanInterval = null;
         let chatHistory = [];
         let osChatHistory = [];
+        let fullScanRunning = false;
 
         // Port Scanner
         async function startScan() {
@@ -1156,7 +1890,7 @@
             updateStatus(`Starting scan on ${target}...`, 'scanning');
 
             try {
-                const response = await fetch('/api/scans', {
+                const response = await fetch('/api/scans/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1170,13 +1904,21 @@
                     })
                 });
 
-                if (!response.ok) throw new Error('Failed to start scan');
+                if (!response.ok) {
+                    let detail = 'Failed to start scan';
+                    try {
+                        const err = await response.json();
+                        if (err?.detail) detail = err.detail;
+                    } catch (e) {}
+                    throw new Error(detail);
+                }
 
                 const scan = await response.json();
                 currentScanId = scan.id;
                 pollScanStatus(scan.id);
             } catch (err) {
                 updateStatus(`Error: ${err.message}`, 'error');
+                document.getElementById('allPorts').innerHTML = `<div class="error-message">${err.message}</div>`;
                 document.getElementById('startBtn').classList.remove('hidden');
                 document.getElementById('cancelScanBtn')?.classList.add('hidden');
             }
@@ -1228,8 +1970,9 @@
                         scanInterval = null;
                         document.getElementById('startBtn').classList.remove('hidden');
                         document.getElementById('cancelScanBtn')?.classList.add('hidden');
-                        updateStatus('Scan failed', 'error');
-                        document.getElementById('allPorts').innerHTML = '<div class="error-message">Scan failed. Please try again.</div>';
+                        const errMsg = data.error || 'Scan failed. Please try again.';
+                        updateStatus(errMsg, 'error');
+                        document.getElementById('allPorts').innerHTML = `<div class="error-message">${errMsg}</div>`;
                     }
                 } catch (err) {
                     clearInterval(scanInterval);
@@ -1256,74 +1999,182 @@
             const low = scan.results.filter(p => !criticalPorts.includes(p.port) && !highRiskPorts.includes(p.port) && !mediumRiskPorts.includes(p.port));
 
             let html = '';
+            let portIndex = 0;
+            const portDataCache = {};
 
             if (critical.length > 0) {
                 html += '<div class="results-section critical"><div class="results-title" style="color:#DC2626"><i class="fa-solid fa-triangle-exclamation"></i> Critical Risk Ports</div>';
-                critical.forEach(p => html += createPortElement(p, 'critical'));
+                critical.forEach(p => { html += createPortElement(p, 'critical', portIndex); portDataCache[portIndex] = p; portIndex++; });
                 html += '</div>';
                 scanResults.critical = critical;
             }
 
             if (high.length > 0) {
                 html += '<div class="results-section high"><div class="results-title" style="color:#EF4444"><i class="fa-solid fa-exclamation-circle"></i> High Risk Ports</div>';
-                high.forEach(p => html += createPortElement(p, 'high'));
+                high.forEach(p => { html += createPortElement(p, 'high', portIndex); portDataCache[portIndex] = p; portIndex++; });
                 html += '</div>';
                 scanResults.high = high;
             }
 
             if (medium.length > 0) {
                 html += '<div class="results-section medium"><div class="results-title" style="color:#F59E0B"><i class="fa-solid fa-exclamation-triangle"></i> Medium Risk Ports</div>';
-                medium.forEach(p => html += createPortElement(p, 'medium'));
+                medium.forEach(p => { html += createPortElement(p, 'medium', portIndex); portDataCache[portIndex] = p; portIndex++; });
                 html += '</div>';
                 scanResults.medium = medium;
             }
 
             if (low.length > 0) {
                 html += '<div class="results-section low"><div class="results-title" style="color:#3B82F6"><i class="fa-solid fa-info-circle"></i> Low Risk Ports</div>';
-                low.forEach(p => html += createPortElement(p, 'low'));
+                low.forEach(p => { html += createPortElement(p, 'low', portIndex); portDataCache[portIndex] = p; portIndex++; });
                 html += '</div>';
                 scanResults.low = low;
             }
 
+            window.portDetailCache = portDataCache;
             container.innerHTML = html;
         }
 
-        function createPortElement(port, risk) {
+        function createPortElement(port, risk, index) {
             let riskLabel = 'Low';
             if (risk === 'critical') riskLabel = 'Critical';
             else if (risk === 'high') riskLabel = 'High';
             else if (risk === 'medium') riskLabel = 'Medium';
-            
+
             return `
-                <div class="port-item" data-risk="${risk}">
+                <div class="port-item" data-risk="${risk}" data-port-index="${index}">
                     <div class="port-header">
                         <div class="port-info-main">
                             <span class="port-number">Port ${port.port}</span>
                             <span class="port-service">${port.service || 'Unknown'}</span>
                         </div>
-                        <span class="port-risk risk-${risk}">${riskLabel}</span>
-                    </div>
-                    <div class="port-details">
-                        <div class="detail-item">
-                            <span class="detail-label">Status</span>
-                            <span class="detail-value status-open">${port.state || 'Open'}</span>
+                        <div style="display:flex;align-items:center;gap:0.6rem;">
+                            <span class="port-risk risk-${risk}">${riskLabel}</span>
+                            <i class="fa-solid fa-chevron-right port-chevron"></i>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Protocol</span>
-                            <span class="detail-value">${port.protocol || 'TCP'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Service</span>
-                            <span class="detail-value">${port.service || 'Unknown'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Version</span>
-                            <span class="detail-value">${port.version || 'N/A'}</span>
-                        </div>
-                        ${port.banner ? `<div class="detail-item"><span class="detail-label">Banner</span><span class="detail-value" style="font-size:0.75rem;font-family:monospace">${escapeHtml(port.banner.substring(0, 100))}</span></div>` : ''}
                     </div>
                 </div>
             `;
+        }
+
+        function togglePortDetail(el) {
+            el.classList.toggle('open');
+        }
+
+        function showPortDetail(port) {
+            console.log('showPortDetail called with:', port);
+            const modal = document.getElementById('portDetailModal');
+            const severityColors = {
+                'CRITICAL': { bg: 'rgba(220,38,38,0.2)', color: '#DC2626' },
+                'HIGH': { bg: 'rgba(239,68,68,0.2)', color: '#EF4444' },
+                'MEDIUM': { bg: 'rgba(245,158,11,0.2)', color: '#F59E0B' },
+                'LOW': { bg: 'rgba(59,130,246,0.2)', color: '#3B82F6' },
+                'INFO': { bg: 'rgba(156,163,175,0.2)', color: '#9CA3AF' }
+            };
+            const riskLevel = port.risk_level || 'INFO';
+            const colors = severityColors[riskLevel] || severityColors['INFO'];
+
+            document.getElementById('portModalTitle').textContent = `Port ${port.port}`;
+            document.getElementById('portModalService').textContent = port.service || 'Unknown Service';
+            document.getElementById('portModalPort').textContent = port.port;
+            document.getElementById('portModalProtocol').textContent = (port.protocol || 'TCP').toUpperCase();
+            document.getElementById('portModalState').textContent = (port.state || 'Open').charAt(0).toUpperCase() + (port.state || 'Open').slice(1);
+            document.getElementById('portModalVersion').textContent = port.version || 'N/A';
+
+            const riskBadge = document.getElementById('portModalRiskBadge');
+            riskBadge.textContent = riskLevel;
+            riskBadge.style.background = colors.bg;
+            riskBadge.style.color = colors.color;
+
+            const riskScore = port.risk_score || 0;
+            document.getElementById('portModalRiskScore').textContent = `${Math.round(riskScore * 100)}%`;
+            const riskBar = document.getElementById('portModalRiskBar');
+            riskBar.style.width = `${riskScore * 100}%`;
+            riskBar.style.background = colors.color;
+
+            const mitreSection = document.getElementById('portModalMitreSection');
+            const mitreContainer = document.getElementById('portModalMitre');
+            const mitreTechs = port.mitre_techniques || [];
+            if (mitreTechs.length > 0) {
+                mitreSection.style.display = 'block';
+                mitreContainer.innerHTML = mitreTechs.map(t => `
+                    <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <span style="background:rgba(139,127,235,0.2);color:#8B7FEB;padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;">${t.id}</span>
+                        <div>
+                            <div style="font-weight:500;">${t.name || 'Unknown'}</div>
+                            <div style="font-size:0.8rem;color:var(--text-secondary);">Tactics: ${(t.tactics || []).join(', ') || 'N/A'}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                mitreSection.style.display = 'none';
+            }
+
+            const cveSection = document.getElementById('portModalCVESection');
+            const cveContainer = document.getElementById('portModalCVE');
+            const cves = port.cves || [];
+            document.getElementById('portModalCVECount').textContent = cves.length;
+            if (cves.length > 0) {
+                cveSection.style.display = 'block';
+                const severityBadgeColors = {
+                    'CRITICAL': '#DC2626',
+                    'HIGH': '#EF4444',
+                    'MEDIUM': '#F59E0B',
+                    'LOW': '#3B82F6',
+                    'INFO': '#9CA3AF'
+                };
+                cveContainer.innerHTML = cves.map(c => `
+                    <div style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                            <span style="font-weight:600;">${c.id}</span>
+                            <span style="font-size:0.8rem;padding:2px 8px;border-radius:10px;background:${severityBadgeColors[c.severity] || '#9CA3AF'}20;color:${severityBadgeColors[c.severity] || '#9CA3AF'};">${c.severity}</span>
+                            ${c.cvss_score ? `<span style="font-size:0.8rem;color:var(--text-secondary);">CVSS: ${c.cvss_score}</span>` : ''}
+                        </div>
+                        <div style="font-size:0.85rem;color:var(--text-secondary);">${c.description || 'No description available'}</div>
+                    </div>
+                `).join('');
+            } else {
+                cveSection.style.display = 'block';
+                cveContainer.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:10px;">No known CVEs for this service</div>';
+            }
+
+            const banner = port.banner || '';
+            document.getElementById('portModalBanner').textContent = banner || 'No banner information available';
+
+            // AI Action Plan Injector
+            const aiRemediationSection = document.getElementById('portModalAIRemediationSection');
+            if (aiRemediationSection) {
+                // Store globally so finalizePortScan can refresh it if it's open
+                window.currentOpenPort = port;
+                
+                if (window.aiPortRemediations && window.aiPortRemediations[port.port]) {
+                    const aiData = window.aiPortRemediations[port.port];
+                    aiRemediationSection.style.display = 'block';
+                    document.getElementById('portModalAIRemediationText').innerHTML = marked.parse(aiData.remediation || 'No remediation provided.');
+                    
+                    const fixScriptContainer = document.getElementById('portModalAIFixScriptContainer');
+                    if (aiData.fix_script && aiData.fix_script.trim().length > 0) {
+                        fixScriptContainer.style.display = 'block';
+                        document.getElementById('portModalAIFixScript').textContent = aiData.fix_script;
+                    } else {
+                        fixScriptContainer.style.display = 'none';
+                    }
+                } else if (!window.aiAnalysisCompleted) {
+                    aiRemediationSection.style.display = 'block';
+                    document.getElementById('portModalAIRemediationText').innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--accent-blue)"><i class="fa-solid fa-circle-notch fa-spin"></i> AI is currently analyzing this port...</div>';
+                    document.getElementById('portModalAIFixScriptContainer').style.display = 'none';
+                } else {
+                    aiRemediationSection.style.display = 'block';
+                    document.getElementById('portModalAIRemediationText').innerHTML = '<span style="color:var(--text-muted)">No automated remediation available or necessary.</span>';
+                    document.getElementById('portModalAIFixScriptContainer').style.display = 'none';
+                }
+            }
+
+            modal.style.display = 'flex';
+        }
+
+        function hidePortDetailModal() {
+            window.currentOpenPort = null;
+            document.getElementById('portDetailModal').style.display = 'none';
         }
 
         function updateStatus(message, type = 'info') {
@@ -1352,18 +2203,17 @@
             document.getElementById('osResultsContainer').classList.remove('hidden');
 
             // Show loading state
-            document.getElementById('osName').textContent = 'Scanning...';
-            document.getElementById('osVendor').textContent = 'Scanning...';
-            document.getElementById('osFamily').textContent = 'Scanning...';
-            document.getElementById('osGen').textContent = 'Scanning...';
-            document.getElementById('osAccuracy').textContent = '...';
-            document.getElementById('osTargetIp').textContent = target;
-            document.getElementById('osHostname').textContent = target;
-            document.getElementById('osOpenPortsCount').textContent = 'Scanning...';
+            document.getElementById('osResultsContainer').innerHTML = `
+                <div style="padding:60px 20px; text-align:center; color:var(--text-secondary);">
+                    <i class="fa-solid fa-circle-notch fa-spin fa-3x" style="margin-bottom:20px; color:var(--accent-blue)"></i>
+                    <p style="font-size:1.1rem; font-weight:500">Fingerprinting OS via active probe analysis...</p>
+                    <p style="font-size:0.9rem; margin-top:8px; opacity:0.7">This engages the port scanner natively before analyzing SYN patterns.</p>
+                </div>
+            `;
 
             try {
                 // Run a port scan first to get open ports for OS detection
-                const scanResponse = await fetch('/api/scans', {
+                const scanResponse = await fetch('/api/scans/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1372,76 +2222,191 @@
                         port_range: 'common'
                     })
                 });
-                
+
+                if (!scanResponse.ok) throw new Error('Unable to start background scan for OS fingerprinting');
+
                 const scanData = await scanResponse.json();
-                
+
                 // Poll for scan completion
                 let scanComplete = false;
                 let openPorts = [];
-                
+
                 while (!scanComplete) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     const statusResponse = await fetch(`/api/scans/${scanData.id}`);
                     const statusData = await statusResponse.json();
-                    
+
                     if (statusData.status === 'completed') {
                         scanComplete = true;
                         openPorts = statusData.results || [];
-                        document.getElementById('osOpenPortsCount').textContent = openPorts.length;
                     } else if (statusData.status === 'failed') {
                         scanComplete = true;
-                        document.getElementById('osOpenPortsCount').textContent = '0';
                     }
                 }
 
                 // Analyze OS based on open ports
-                const osInfo = analyzeOsFromPorts(openPorts, target);
+                const guesses = analyzeOsFromPorts(openPorts, target);
+                const primary = guesses[0];
                 
-                document.getElementById('osName').textContent = osInfo.name;
-                document.getElementById('osVendor').textContent = osInfo.vendor;
-                document.getElementById('osFamily').textContent = osInfo.family;
-                document.getElementById('osGen').textContent = osInfo.gen;
-                document.getElementById('osAccuracy').textContent = osInfo.accuracy;
+                let confidenceClass = 'low';
+                let confidenceLabel = 'Low Confidence';
+                let confColor = 'var(--text-muted)';
+                if (primary.confidence >= 70) { confidenceClass = 'high'; confidenceLabel = 'High Confidence'; confColor = 'var(--accent-green)'; }
+                else if (primary.confidence >= 40) { confidenceClass = 'medium'; confidenceLabel = 'Medium Confidence'; confColor = 'var(--accent-yellow)'; }
+                else { confColor = 'var(--accent-red)'; }
                 
-                const rawData = {
-                    target: target,
-                    os_info: osInfo,
-                    open_ports: openPorts.map(p => p.port),
-                    scan_id: scanData.id,
-                    detection_method: enhanced ? 'enhanced' : 'basic'
-                };
+                const warningHtml = primary.confidence < 70 ? `
+                    <div class="os-warning-box">
+                       <i class="fa-solid fa-triangle-exclamation" style="font-size:1.5rem"></i>
+                       <div><strong>${confidenceLabel}</strong><br>Result may not be fully accurate. Consider running Advanced Fingerprinting.</div>
+                    </div>
+                ` : '';
+
+                const alternativeHtml = guesses.length > 1 ? `
+                    <div class="os-secondary-guesses" id="osSecondaryGuesses">
+                         <h5>Alternative Matches</h5>
+                         ${guesses.slice(1).map(g => `
+                         <div class="os-guess-item">
+                             <span><i class="${g.icon}" style="margin-right:6px;"></i> ${g.name}</span>
+                             <span>${g.confidence}%</span>
+                         </div>
+                         `).join('')}
+                    </div>
+                ` : '';
+
+                const structureHtml = `
+                <div class="os-hero-card">
+                    <div class="os-hero-header">
+                         <i class="${primary.icon} os-hero-icon"></i>
+                         <div class="os-hero-title">
+                              <h3>${primary.name}</h3>
+                              <p>Detected via Port Pattern Analysis</p>
+                         </div>
+                    </div>
+                    
+                    <div class="os-confidence-section">
+                         <div class="os-confidence-header">
+                             <span>Confidence Score</span>
+                             <span class="os-confidence-value" style="color:${confColor}">${primary.confidence}%</span>
+                         </div>
+                         <div class="os-progress-wrapper"><div class="os-progress-fill ${confidenceClass}" style="width: ${primary.confidence}%"></div></div>
+                    </div>
+
+                    ${warningHtml}
+
+                    <div class="os-details-box">
+                         <h5><i class="fa-solid fa-plug" style="margin-right:6px"></i> Observed Ports</h5>
+                         <p style="font-weight:600;font-size:1.05rem;color:var(--text-primary)">${openPorts.length > 0 ? openPorts.map(p => `${p.port} (${p.service || 'unknown'})`).join(', ') : 'No open ports detected'}</p>
+                    </div>
+
+                    <details class="os-accordion">
+                         <summary><i class="fa-solid fa-layer-group"></i> Show Technical Details <i class="fa-solid fa-chevron-down" style="margin-left:auto;font-size:0.8rem"></i></summary>
+                         <div class="os-accordion-content">
+                             <p><strong>TTL Analysis:</strong> Not performed in basic mode</p>
+                             <p><strong>TCP Window Size:</strong> Not detected</p>
+                             <p style="margin-top:6px;"><strong>SYN Packet Logic:</strong> ${primary.explanation}</p>
+                         </div>
+                    </details>
+
+                    ${alternativeHtml}
+                    
+                    <div style="margin-top:20px; display:flex; gap:10px;">
+                        <button onclick="document.getElementById('osEnhancedDetection').checked=true;startOsFingerprint()" class="start-button" style="padding:10px 16px; font-size:0.9rem; flex:1; background:var(--bg-tertiary); border:1px solid rgba(255,255,255,0.1); color:var(--text-primary)"><i class="fa-solid fa-flask" style="color:var(--accent-green);margin-right:6px"></i> Deep Scan / Improve Accuracy</button>
+                    </div>
+
+                    <div id="os-ai-analysis-container" style="margin-top:20px;"></div>
+                </div>
+                `;
+
+                document.getElementById('osResultsContainer').innerHTML = structureHtml;
                 
-                document.getElementById('osRawData').textContent = JSON.stringify(rawData, null, 2);
-                
+                // AI OS Analysis integration
+                const aiContainer = document.getElementById('os-ai-analysis-container');
+                if (aiContainer) {
+                    aiContainer.innerHTML = `
+                        <div class="ai-insight-box">
+                            <div class="ai-insight-header"><i class="fa-solid fa-robot fa-fade"></i> AI is analyzing fingerprint...</div>
+                            <div class="ai-insight-content">Groq is evaluating port distributions to verify accuracy.</div>
+                        </div>
+                    `;
+                    try {
+                        const analyzeResponse = await fetch('/api/ai/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
+                            body: JSON.stringify({ 
+                                message: "Based on the open ports detected, confirm if the primary OS guess of " + primary.name + " (" + primary.confidence + "% confidence) is accurate. Write a strict 2-3 sentence technical intuition and whether deep scans are advised.",
+                                scan_id: scanData.id,
+                                conversation_history: []
+                            })
+                        });
+                        
+                        if (analyzeResponse.ok) {
+                            const reader = analyzeResponse.body.getReader();
+                            const decoder = new TextDecoder("utf-8");
+                            let aiText = '';
+                            aiContainer.innerHTML = `
+                                <div class="ai-insight-box">
+                                    <div class="ai-insight-header"><i class="fa-solid fa-brain"></i> AI Insight</div>
+                                    <div class="ai-insight-content" id="osAiContent"></div>
+                                </div>
+                            `;
+                            const contentBox = document.getElementById('osAiContent');
+                            while(true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+                                const chunk = decoder.decode(value, {stream: true});
+                                const lines = chunk.split('\\n\\n');
+                                for (const line of lines) {
+                                    if (line.startsWith('data: ')) {
+                                        const text = line.replace('data: ', '');
+                                        if (text !== '[DONE]') {
+                                            aiText += text;
+                                            contentBox.innerHTML = marked.parse(aiText);
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            aiContainer.innerHTML = '';
+                        }
+                    } catch(e) { aiContainer.innerHTML = ''; }
+                }
+
             } catch (err) {
-                document.getElementById('osName').textContent = 'Unknown';
-                document.getElementById('osVendor').textContent = 'Error';
-                document.getElementById('osFamily').textContent = err.message;
-                document.getElementById('osRawData').textContent = 'Error: ' + err.message;
+                document.getElementById('osResultsContainer').innerHTML = `
+                    <div style="padding:20px; background:rgba(248,81,73,0.1); border:1px solid rgba(248,81,73,0.3); border-radius:8px; color:#ff7b72;">
+                        <i class="fa-solid fa-circle-exclamation"></i> Error: ${err.message}
+                    </div>
+                `;
             }
         }
 
         function analyzeOsFromPorts(ports, target) {
             const portNumbers = ports.map(p => p.port);
+            let guesses = [];
             
             // Simple OS fingerprinting based on common port signatures
             if (portNumbers.includes(22) && portNumbers.includes(80)) {
-                return { name: 'Linux/Unix', vendor: 'Generic', family: 'Linux', gen: 'Modern', accuracy: '85%' };
-            }
-            if (portNumbers.includes(3389) && portNumbers.includes(445)) {
-                return { name: 'Windows Server', vendor: 'Microsoft', family: 'Windows', gen: 'Server 2016+', accuracy: '80%' };
-            }
-            if (portNumbers.includes(445) && portNumbers.includes(139)) {
-                return { name: 'Windows', vendor: 'Microsoft', family: 'Windows', gen: 'Desktop/Server', accuracy: '75%' };
-            }
-            if (portNumbers.includes(22)) {
-                return { name: 'Linux/Unix (SSH)', vendor: 'Generic', family: 'Linux/Unix', gen: 'Modern', accuracy: '70%' };
-            }
-            if (portNumbers.includes(80) || portNumbers.includes(443)) {
-                return { name: 'Linux/Windows (Web Server)', vendor: 'Generic', family: 'Web Server', gen: 'Modern', accuracy: '60%' };
+                guesses.push({ name: 'Linux / Unix', icon: 'fa-brands fa-linux', confidence: 85, explanation: 'SSH and HTTP are open, typical for a Linux web server.' });
+                guesses.push({ name: 'FreeBSD', icon: 'fa-solid fa-server', confidence: 30, explanation: 'BSD systems frequently run identical edge services.' });
+            } else if (portNumbers.includes(3389) && portNumbers.includes(445)) {
+                guesses.push({ name: 'Windows Server', icon: 'fa-brands fa-windows', confidence: 80, explanation: 'RDP and SMB point to an exposed Windows Server infrastructure.' });
+                guesses.push({ name: 'Windows Desktop', icon: 'fa-brands fa-windows', confidence: 40, explanation: 'Could be a desktop running RDP on an internal network.' });
+            } else if (portNumbers.includes(445) && portNumbers.includes(139)) {
+                guesses.push({ name: 'Windows', icon: 'fa-brands fa-windows', confidence: 75, explanation: 'SMB (File Sharing) is highly indicative of Windows Active Directory / File servers.' });
+                guesses.push({ name: 'Linux/Samba', icon: 'fa-brands fa-linux', confidence: 35, explanation: 'Samba service sharing network paths on Linux.' });
+            } else if (portNumbers.includes(22)) {
+                guesses.push({ name: 'Linux / Unix', icon: 'fa-brands fa-linux', confidence: 70, explanation: 'SSH is standard on Unix-like operating systems and rarely runs independently on Windows without 445.' });
+                guesses.push({ name: 'macOS', icon: 'fa-brands fa-apple', confidence: 25, explanation: 'macOS can run SSH remotely, though less prevalent.' });
+            } else if (portNumbers.includes(80) || portNumbers.includes(443)) {
+                guesses.push({ name: 'Linux / Unix', icon: 'fa-brands fa-linux', confidence: 60, explanation: 'High probability of Linux running NGINX or Apache.' });
+                guesses.push({ name: 'Windows/IIS', icon: 'fa-brands fa-windows', confidence: 40, explanation: 'Windows server running Internet Information Services (IIS) is also likely.' });
+            } else {
+                guesses.push({ name: 'Unknown OS', icon: 'fa-solid fa-circle-question', confidence: 10, explanation: 'Not enough data to confidently fingerprint OS without TTL analysis.' });
+                guesses.push({ name: 'Custom Hardware', icon: 'fa-solid fa-microchip', confidence: 5, explanation: 'Could be embedded IoT/router software.' });
             }
             
-            return { name: 'Linux/Unix', vendor: 'Generic', family: 'Linux', gen: 'Unknown', accuracy: '50%' };
+            return guesses;
         }
 
         // Web App Scanner
@@ -1476,7 +2441,7 @@
                     fetch('/api/tools/ssl', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ target: target, port: url.startsWith('https') ? 443 : 80 })
+                        body: JSON.stringify({ host: target, port: url.startsWith('https') ? 443 : 80 })
                     }).catch(() => ({ json: () => ({}) }))
                 ]);
 
@@ -1591,8 +2556,8 @@
             document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
             document.getElementById(viewId + 'View').classList.add('active');
             document.querySelectorAll('.nav-menu a').forEach(l => l.classList.remove('active'));
-            const navMap = { portScanner: 'PortScanner', osFingerprint: 'OsFingerprint', webAppScanner: 'WebAppScanner' };
-            document.getElementById('nav' + navMap[viewId]).classList.add('active');
+            const navMap = { portScanner: 'PortScanner', osFingerprint: 'OsFingerprint', webAppScanner: 'WebAppScanner', fullScan: 'FullScan', tools: 'Tools', ai: 'AI', history: 'History' };
+            document.getElementById('nav' + navMap[viewId])?.classList.add('active');
         }
 
         // Chat functions
@@ -1758,6 +2723,1240 @@
             if (!str) return '';
             return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
+
+        // Tool functions
+        let currentTool = 'portscanner';
+        let toolResults = {};
+        let toolResultIds = {};
+
+        function selectTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-nav-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tool === tool);
+            });
+            document.querySelectorAll('.tool-content').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.getElementById('tool-' + tool).style.display = 'block';
+        }
+
+        function normalizeWebTarget(input) {
+            input = input.trim();
+            if (input.startsWith('http://') || input.startsWith('https://')) {
+                return input;
+            }
+            if (input.startsWith('www.')) {
+                return 'https://' + input;
+            }
+            return 'https://' + input;
+        }
+
+        function normalizeDomain(input) {
+            return input.trim()
+                .replace(/^https?:\/\//i, '')
+                .replace(/^www\./i, '')
+                .split('/')[0];
+        }
+
+        function showInputError(inputId, message) {
+            const inputEl = document.getElementById(inputId);
+            if (!inputEl) return;
+            let errorEl = inputEl.parentElement.querySelector('.input-error');
+            if (!errorEl) {
+                errorEl = document.createElement('div');
+                errorEl.className = 'input-error';
+                errorEl.style.cssText = 'color: #f07070; font-size: 12px; margin-top: 6px; opacity: 0; transition: opacity 0.2s;';
+                inputEl.parentElement.appendChild(errorEl);
+            }
+            errorEl.textContent = message;
+            errorEl.style.opacity = '1';
+        }
+
+        function clearInputError(inputId) {
+            const inputEl = document.getElementById(inputId);
+            if (!inputEl) return;
+            const errorEl = inputEl.parentElement.querySelector('.input-error');
+            if (errorEl) errorEl.style.opacity = '0';
+        }
+
+        async function runTool(tool) {
+            let params = {};
+            let target = '';
+            let inputId = '';
+
+            switch (tool) {
+                case 'portscanner':
+                    target = document.getElementById('portscanner-target')?.value?.trim();
+                    inputId = 'portscanner-target';
+                    params.portRange = document.getElementById('portscanner-ports')?.value || 'common';
+                    params.scanType = document.getElementById('scanner-type')?.value || 'port';
+                    target = normalizeDomain(target);
+                    break;
+                case 'osfp':
+                    target = document.getElementById('osfp-target')?.value?.trim();
+                    inputId = 'osfp-target';
+                    target = normalizeDomain(target);
+                    break;
+                case 'webscan':
+                    const webscanInput = document.getElementById('webscan-target')?.value?.trim();
+                    inputId = 'webscan-target';
+                    target = normalizeWebTarget(webscanInput);
+                    document.getElementById('webscan-target').value = target;
+                    params.maxPages = parseInt(document.getElementById('webscan-maxpages')?.value) || 20;
+                    break;
+                case 'dns':
+                    target = document.getElementById('dns-target')?.value?.trim();
+                    inputId = 'dns-target';
+                    target = normalizeDomain(target);
+                    params.recordType = document.getElementById('dns-record-type')?.value || 'A';
+                    break;
+                case 'whois':
+                    target = document.getElementById('whois-target')?.value?.trim();
+                    inputId = 'whois-target';
+                    target = normalizeDomain(target);
+                    break;
+                case 'ping':
+                    target = document.getElementById('ping-target')?.value?.trim();
+                    inputId = 'ping-target';
+                    target = normalizeDomain(target);
+                    params.count = parseInt(document.getElementById('ping-count')?.value) || 4;
+                    break;
+                case 'traceroute':
+                    target = document.getElementById('traceroute-target')?.value?.trim();
+                    inputId = 'traceroute-target';
+                    target = normalizeDomain(target);
+                    params.maxHops = parseInt(document.getElementById('traceroute-hops')?.value) || 30;
+                    break;
+                case 'ssl':
+                    const sslInput = document.getElementById('ssl-host')?.value?.trim();
+                    inputId = 'ssl-host';
+                    target = normalizeWebTarget(sslInput);
+                    document.getElementById('ssl-host').value = target;
+                    params.port = parseInt(document.getElementById('ssl-port')?.value) || 443;
+                    break;
+                case 'headers':
+                    const headersInput = document.getElementById('headers-url')?.value?.trim();
+                    inputId = 'headers-url';
+                    target = normalizeWebTarget(headersInput);
+                    document.getElementById('headers-url').value = target;
+                    break;
+                case 'subdomains':
+                    target = document.getElementById('subdomains-domain')?.value?.trim();
+                    inputId = 'subdomains-domain';
+                    target = normalizeDomain(target);
+                    params.wordlist = document.getElementById('subdomains-wordlist')?.value || 'small';
+                    break;
+                case 'geo':
+                    target = document.getElementById('geo-ip')?.value?.trim();
+                    inputId = 'geo-ip';
+                    target = normalizeDomain(target);
+                    break;
+            }
+
+            if (inputId) {
+                const inputEl = document.getElementById(inputId);
+                if (inputEl) {
+                    inputEl.addEventListener('input', () => clearInputError(inputId), { once: true });
+                }
+            }
+
+            if (!target || target.length < 4) {
+                showInputError(inputId, 'Please enter a valid target');
+                return;
+            }
+
+            const webTools = ['webscan', 'ssl', 'headers'];
+            if (webTools.includes(tool)) {
+                try {
+                    new URL(target);
+                } catch {
+                    showInputError(inputId, 'Invalid URL — try https://' + normalizeDomain(target));
+                    return;
+                }
+            }
+
+            const output = document.getElementById(tool + '-output');
+            output.innerHTML = '<div class="placeholder"><i class="fa-solid fa-circle-notch fa-spin"></i>Running ' + tool + '...</div>';
+            const actions = document.getElementById(tool + '-actions');
+            if (actions) actions.style.display = 'none';
+
+            if (tool === 'webscan') {
+                window.webscanStartTime = Date.now();
+                window.webscanVulns = { vulnerabilities: [], critical_count: 0, high_count: 0, medium_count: 0, low_count: 0, pages_crawled: 0, target: target };
+                initWebscanLog();
+            }
+
+            try {
+                if (tool === 'portscanner') {
+                    await startPortscannerStream(target, params.portRange, params.scanType);
+                    return;
+                }
+
+                let apiResult;
+                switch (tool) {
+                    case 'osfp': apiResult = await api.tools.osfp(target); break;
+                    case 'webscan':
+                        let webScanChecksRun = 0;
+                        apiResult = await api.tools.webscanStream(target, params.maxPages, {
+                            onProgress: (data) => {
+                                const stageColors = {
+                                    'INIT': '',
+                                    'CONFIG': '',
+                                    'CRAWL': 'running',
+                                    'CHECK': '',
+                                    'SCAN': 'running',
+                                    'VULN': 'warning',
+                                    'DONE': 'success',
+                                    'ERROR': 'error'
+                                };
+                                appendWebscanLog(data.stage, data.message, stageColors[data.stage] || '');
+                                
+                                if (data.stage === 'CHECK' || data.stage === 'SCAN') {
+                                    webScanChecksRun++;
+                                }
+                                
+                                if (data.result) {
+                                    window.webscanVulns = data.result;
+                                    toolsModule.renderWebscan({ result: data.result }, false);
+                                } else {
+                                    const output = document.getElementById('webscan-output');
+                                    if (output && output.querySelector('.ws-summary-bar')) {
+                                        const totalVulns = window.webscanVulns ? 
+                                            (window.webscanVulns.critical_count || 0) + 
+                                            (window.webscanVulns.high_count || 0) + 
+                                            (window.webscanVulns.medium_count || 0) + 
+                                            (window.webscanVulns.low_count || 0) : 0;
+                                        const pagesCrawled = data.pages_found || window.webscanVulns?.pages_crawled || 0;
+                                        const scanDuration = window.webscanStartTime ? ((Date.now() - window.webscanStartTime) / 1000).toFixed(1) : '0.0';
+                                        
+                                        const statCards = output.querySelectorAll('.ws-stat-card');
+                                        if (statCards[0]) statCards[0].querySelector('.ws-stat-value').textContent = totalVulns;
+                                        if (statCards[1]) statCards[1].querySelector('.ws-stat-value').textContent = pagesCrawled;
+                                        if (statCards[2]) statCards[2].querySelector('.ws-stat-value').textContent = webScanChecksRun;
+                                        if (statCards[3]) statCards[3].querySelector('.ws-stat-value').textContent = scanDuration + 's';
+                                        
+                                        if (totalVulns > 0 && !output.querySelector('.ws-vuln-table')) {
+                                            output.querySelector('.ws-no-vulns')?.remove();
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        break;
+                    case 'dns': apiResult = await api.tools.dns(target, params.recordType); break;
+                    case 'whois': apiResult = await api.tools.whois(target); break;
+                    case 'ping': apiResult = await api.tools.ping(target, params.count); break;
+                    case 'traceroute': apiResult = await api.tools.traceroute(target, params.maxHops); break;
+                    case 'ssl': apiResult = await api.tools.ssl(target, params.port); break;
+                    case 'headers': apiResult = await api.tools.headers(target); break;
+                    case 'subdomains': apiResult = await api.tools.subdomains(target, params.wordlist); break;
+                    case 'geo': apiResult = await api.tools.geo(target); break;
+                }
+
+                const payload = apiResult?.data || apiResult;
+                if (apiResult?.tool_result_id) {
+                    toolResultIds[tool] = apiResult.tool_result_id;
+                }
+                toolResults[tool] = payload;
+                
+                if (tool === 'webscan') {
+                    toolsModule.renderWebscan({ result: window.webscanVulns }, true);
+                } else {
+                    toolsModule.renderResult(tool, payload);
+                }
+                if (actions) actions.style.display = 'flex';
+            } catch (error) {
+                if (tool === 'webscan') {
+                    appendWebscanLog('ERROR', error.message, 'error');
+                }
+                output.innerHTML = '<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i> ' + error.message + '</div>';
+            }
+        }
+
+        async function startPortscannerStream(target, portRange, scanType = 'port') {
+            window.aiAnalysisCompleted = false;
+            window.aiPortRemediations = {};
+            const output = document.getElementById('portscanner-output');
+            const actions = document.getElementById('portscanner-actions');
+            let rows = [];
+            output.innerHTML = `<div class="placeholder"><i class="fa-solid fa-circle-notch fa-spin"></i> Starting port scan on ${target}...</div>`;
+            if (actions) actions.style.display = 'none';
+
+            try {
+                // Create scan
+                const scan = await api.scans.create(target, scanType, portRange);
+                const scanId = scan.id || scan.scan_id;
+                // Listen to stream
+                const es = new EventSource(`/api/scans/${scanId}/stream`);
+
+                es.onmessage = (evt) => {
+                    if (evt.data === '[DONE]') {
+                        es.close();
+                        finalizePortScan(scanId, target, rows, actions, output);
+                        return;
+                    }
+                    try {
+                        const port = JSON.parse(evt.data);
+                        // Capture adaptive scan stats from the final summary event
+                        if (port.type === 'scan_complete') {
+                            window._adaptiveScanStats = {
+                                scan_duration: port.scan_duration,
+                                avg_latency_ms: port.avg_latency_ms,
+                                peak_concurrency: port.peak_concurrency,
+                            };
+                            return;
+                        }
+                        rows.push(port);
+                        renderPortscannerRows(output, target, rows);
+                    } catch (_) {
+                        // ignore malformed events
+                    }
+                };
+
+                es.onerror = () => {
+                    es.close();
+                    finalizePortScan(scanId, target, rows, actions, output);
+                };
+            } catch (error) {
+                output.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i> ${error.message}</div>`;
+            }
+        }
+
+        window.currentPortScannerFilter = 'ALL';
+        window.currentPortScannerSort = 'PORT_ASC';
+        window.currentPortTargetCache = '';
+
+        window.setPortScannerFilter = (val) => {
+            window.currentPortScannerFilter = val;
+            if(window.currentPortCache) renderPortscannerRows(document.getElementById('portscanner-output'), window.currentPortTargetCache, window.currentPortCache, false);
+        };
+        
+        window.setPortScannerSort = (val) => {
+            window.currentPortScannerSort = val;
+            if(window.currentPortCache) renderPortscannerRows(document.getElementById('portscanner-output'), window.currentPortTargetCache, window.currentPortCache, false);
+        };
+
+        function getPortServiceIcon(serviceStr) {
+            const s = (serviceStr || '').toLowerCase();
+            if (s.includes('http')) return 'fa-globe';
+            if (s.includes('ssh')) return 'fa-terminal';
+            if (s.includes('ftp')) return 'fa-folder-open';
+            if (s.includes('sql') || s.includes('db')) return 'fa-database';
+            if (s.includes('smtp') || s.includes('pop') || s.includes('imap')) return 'fa-envelope';
+            if (s.includes('dns') || s.includes('domain')) return 'fa-network-wired';
+            return 'fa-server';
+        }
+        
+        function getPortInsight(port) {
+            const p = parseInt(port.port);
+            if (p === 80 || p === 443) return 'Standard web service';
+            if (p === 22) return 'Secure shell access';
+            if (p === 21) return 'Insecure file transfer';
+            if (p === 3306 || p === 5432 || p === 27017 || p === 1433) return '<strong>Database exposed</strong> to network';
+            if (p === 3389) return '<strong>Remote Desktop</strong> exposed';
+            if (p === 445 || p === 139) return 'Windows file sharing';
+            return 'Standard service';
+        }
+
+        function renderPortscannerRows(outputEl, target, rows, isFinal = false) {
+            if (!rows.length) return;
+            window.currentPortCache = rows;
+            window.currentPortTargetCache = target;
+
+            const rVal = { 'CRITICAL': 5, 'HIGH': 4, 'MEDIUM': 3, 'LOW': 2, 'INFO': 1 };
+
+            // Counts
+            let highCount = 0, medCount = 0, lowInfoCount = 0;
+            rows.forEach(r => {
+                const risk = r.risk_level || 'INFO';
+                if (risk === 'CRITICAL' || risk === 'HIGH') highCount++;
+                else if (risk === 'MEDIUM') medCount++;
+                else lowInfoCount++;
+            });
+
+            // Filter
+            let filtered = rows.filter(r => {
+                const risk = r.risk_level || 'INFO';
+                if (window.currentPortScannerFilter === 'CRIT_HIGH') return risk === 'CRITICAL' || risk === 'HIGH';
+                if (window.currentPortScannerFilter === 'MEDIUM') return risk === 'MEDIUM';
+                if (window.currentPortScannerFilter === 'LOW_INFO') return risk === 'LOW' || risk === 'INFO';
+                return true;
+            });
+
+            // Sort
+            if (window.currentPortScannerSort === 'PORT_ASC') filtered.sort((a, b) => a.port - b.port);
+            else if (window.currentPortScannerSort === 'PORT_DESC') filtered.sort((a, b) => b.port - a.port);
+            else if (window.currentPortScannerSort === 'RISK_DESC') filtered.sort((a, b) => (rVal[b.risk_level || 'INFO'] || 0) - (rVal[a.risk_level || 'INFO'] || 0));
+
+            // Risk badge builder
+            const riskBadge = (level) => {
+                const l = (level || 'INFO').toUpperCase();
+                const styles = {
+                    CRITICAL: 'background:#2a0a0a;color:#ff5f5f;border:0.5px solid #6a1010',
+                    HIGH:     'background:#2a1414;color:#f07070;border:0.5px solid #5a2020',
+                    MEDIUM:   'background:#2a2010;color:#f0b860;border:0.5px solid #5a4010',
+                    LOW:      'background:#102a18;color:#6acf80;border:0.5px solid #1a5a28',
+                    INFO:     'background:#102a18;color:#6acf80;border:0.5px solid #1a5a28',
+                };
+                const s = styles[l] || styles.INFO;
+                return `<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;display:inline-flex;${s}">${l}</span>`;
+            };
+
+            // Row builder
+            const tableRows = filtered.map((port) => {
+                const isHighRisk = ['HIGH', 'CRITICAL'].includes((port.risk_level || '').toUpperCase());
+                const insight = getPortInsight(port);
+                const rowAccent = isHighRisk
+                    ? 'border-left:3px solid #f07070;background:#1a1214;'
+                    : 'border-left:3px solid transparent;';
+                const versionStr = port.version && port.version !== '-'
+                    ? `${port.protocol || 'tcp'} · ${port.version}`
+                    : (port.protocol || 'tcp');
+                return `
+                <div class="ps-row" style="display:grid;grid-template-columns:80px 1fr 130px 1fr;align-items:center;min-height:48px;padding:0 14px;border-bottom:0.5px solid #1e2028;${rowAccent}cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background='#13151c'" onmouseout="this.style.background='${isHighRisk ? '#1a1214' : 'transparent'}'" onclick="showPortDetail && showPortDetail(${JSON.stringify(port).replace(/"/g, '&quot;')})">
+                    <div style="font-family:monospace;font-size:13px;color:#e2e3e7;font-weight:500">${port.port}</div>
+                    <div>
+                        <div style="font-size:13px;color:#e2e3e7;font-weight:400">${port.service || 'unknown'}</div>
+                        <div style="font-size:11px;color:#6b6e78;font-family:monospace">${versionStr}</div>
+                    </div>
+                    <div>${riskBadge(port.risk_level)}</div>
+                    <div style="font-size:12px;color:#6b6e78;font-style:italic">${insight}</div>
+                </div>`;
+            }).join('');
+
+            const emptyRow = filtered.length === 0
+                ? `<div style="padding:20px 14px;text-align:center;color:#4a4d58;font-size:13px">No ports match the selected filter</div>`
+                : '';
+
+            // Filter pills
+            const pillDef = [
+                { val: 'ALL', label: 'All Issues' },
+                { val: 'CRIT_HIGH', label: 'High & Critical' },
+                { val: 'MEDIUM', label: 'Medium Only' },
+                { val: 'LOW_INFO', label: 'Low & Info Only' },
+            ];
+            const pills = pillDef.map(p => {
+                const active = window.currentPortScannerFilter === p.val;
+                const activeCss = active ? 'background:#1e2130;color:#a78bfa;border-color:#4a3a8e;' : 'background:transparent;color:#6b6e78;';
+                return `<span style="padding:5px 12px;border-radius:20px;font-size:11px;border:0.5px solid #2e3140;cursor:pointer;transition:all 0.15s;${activeCss}" onclick="window.setPortScannerFilter('${p.val}')">${p.label}</span>`;
+            }).join('');
+
+            outputEl.innerHTML = `
+              <div style="font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif">
+
+                <!-- Zone 1: Stat Cards -->
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+                  <div style="background:#111318;border:0.5px solid #2a2d35;border-radius:8px;padding:12px 14px">
+                    <div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#6b6e78;margin-bottom:4px">Total Open Ports</div>
+                    <div style="font-size:22px;font-weight:500;color:#e2e3e7">${rows.length}</div>
+                  </div>
+                  <div style="background:#111318;border:0.5px solid #2a2d35;border-radius:8px;padding:12px 14px">
+                    <div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#6b6e78;margin-bottom:4px">High / Critical</div>
+                    <div style="font-size:22px;font-weight:500;color:#f07070">${highCount}</div>
+                  </div>
+                  <div style="background:#111318;border:0.5px solid #2a2d35;border-radius:8px;padding:12px 14px">
+                    <div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#6b6e78;margin-bottom:4px">Medium Risk</div>
+                    <div style="font-size:22px;font-weight:500;color:#f0b860">${medCount}</div>
+                  </div>
+                  <div style="background:#111318;border:0.5px solid #2a2d35;border-radius:8px;padding:12px 14px">
+                    <div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#6b6e78;margin-bottom:4px">Low / Info</div>
+                    <div style="font-size:22px;font-weight:500;color:#6acf80">${lowInfoCount}</div>
+                  </div>
+                </div>
+
+                <!-- Zone 2: Filter Pills + Sort -->
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+                  ${pills}
+                  <select id="ps-sort-select" style="margin-left:auto;background:#161820;border:0.5px solid #2e3140;border-radius:6px;padding:5px 10px;font-size:11px;color:#b0b2ba;outline:none;cursor:pointer" onchange="window.setPortScannerSort(this.value)">
+                    <option value="PORT_ASC" ${window.currentPortScannerSort === 'PORT_ASC' ? 'selected' : ''}>Port (Low to High)</option>
+                    <option value="PORT_DESC" ${window.currentPortScannerSort === 'PORT_DESC' ? 'selected' : ''}>Port (High to Low)</option>
+                    <option value="RISK_DESC" ${window.currentPortScannerSort === 'RISK_DESC' ? 'selected' : ''}>Risk Level (Highest First)</option>
+                  </select>
+                </div>
+
+                <!-- Zone 3: Grid Header -->
+                <div style="display:grid;grid-template-columns:80px 1fr 130px 1fr;padding:8px 14px;border-bottom:0.5px solid #2a2d35;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6b6e78">
+                  <div>Port</div>
+                  <div>Service Detail</div>
+                  <div>Risk Level</div>
+                  <div>Insight</div>
+                </div>
+
+                <!-- Zone 4: Rows -->
+                <div id="ps-rows-container">
+                  ${tableRows}
+                  ${emptyRow}
+                </div>
+
+                <!-- Zone 5: Bottom Bar -->
+                <div style="padding:10px 14px;border-top:0.5px solid #2a2d35;display:flex;align-items:center">
+                  <button id="ps-copy-btn" onclick="window._portScanCopy()" style="background:#161820;border:0.5px solid #2e3140;border-radius:6px;padding:5px 12px;font-size:11px;color:#b0b2ba;font-family:monospace;cursor:pointer">Copy</button>
+                  <span style="font-size:11px;color:#4a4d58;margin-left:auto">Scanned · ${target} · ${isFinal ? 'just now' : 'scanning...'}</span>
+                </div>
+
+                <div id="port-ai-analysis-container"></div>
+              </div>`;
+        }
+
+        window._portScanCopy = function() {
+            const rows = document.querySelectorAll('#ps-rows-container .ps-row');
+            if (!rows.length) return;
+            const lines = [];
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('div[style*="grid"]') || row.children;
+                const cols = Array.from(row.children).map(c => c.innerText.trim().replace(/\n/g, ' '));
+                lines.push(cols.join('\t'));
+            });
+            navigator.clipboard.writeText(lines.join('\n')).then(() => {
+                const btn = document.getElementById('ps-copy-btn');
+                if (btn) { btn.textContent = 'Copied ✓'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); }
+            });
+        };
+
+        async function finalizePortScan(scanId, target, rows, actions, output) {
+            try {
+                const data = await api.scans.get(scanId);
+                const payload = data.results || [];
+                
+                // Inject adaptive concurrency stats captured during streaming
+                const adaptiveStats = window._adaptiveScanStats || {};
+                window._adaptiveScanStats = null;
+                const enrichedData = {
+                    ...data,
+                    target,
+                    results: payload.length ? payload : rows,
+                    avg_latency_ms: adaptiveStats.avg_latency_ms || null,
+                    peak_concurrency: adaptiveStats.peak_concurrency || null,
+                    scan_duration: adaptiveStats.scan_duration || data.scan_duration || null,
+                };
+                
+                toolResults['portscanner'] = enrichedData;
+                toolsModule.allResults['portscanner'] = enrichedData;
+                renderPortscannerRows(output, target, enrichedData.results, true);
+                if (actions) actions.style.display = 'flex';
+                
+                // Trigger AI Analysis automatically
+                const container = document.getElementById('port-ai-analysis-container');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="ai-insight-box">
+                            <div class="ai-insight-header"><i class="fa-solid fa-robot fa-fade"></i> AI is analyzing scan results...</div>
+                            <div class="ai-insight-content">Groq is generating insights based on exposed ports and vulnerabilities.</div>
+                        </div>
+                    `;
+                    
+                    try {
+                        const analyzeResponse = await fetch('/api/ai/analyze', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
+                            body: JSON.stringify({ scan_id: scanId })
+                        });
+                        
+                        if (analyzeResponse.ok) {
+                            const aiDataRaw = await analyzeResponse.json();
+                            let parsedAnalysis = {};
+                            try {
+                                const analysisStr = aiDataRaw.analysis || '';
+                                if (!analysisStr.startsWith('[') && !analysisStr.startsWith('{') && !analysisStr.includes('{')) {
+                                    parsedAnalysis = { executive_summary: analysisStr || 'AI analysis unavailable.', port_remediations: {} };
+                                } else {
+                                    let str = analysisStr.trim();
+                                    const firstBrace = str.indexOf('{');
+                                    const lastBrace = str.lastIndexOf('}');
+                                    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                                        str = str.substring(firstBrace, lastBrace + 1);
+                                        parsedAnalysis = JSON.parse(str);
+                                    } else {
+                                        parsedAnalysis = { executive_summary: analysisStr || 'AI analysis unavailable.', port_remediations: {} };
+                                    }
+                                }
+                            } catch (e) {
+                                console.error('Failed to parse AI JSON:', e);
+                                parsedAnalysis = { executive_summary: 'AI analysis unavailable due to rate limiting.', port_remediations: {} };
+                            }
+                            
+                            window.aiAnalysisCompleted = true;
+                            window.aiPortRemediations = parsedAnalysis.port_remediations || {};
+
+                            // If modal is currently open viewing a port, refresh it directly!
+                            if (window.currentOpenPort && document.getElementById('portDetailModal').style.display === 'flex') {
+                                showPortDetail(window.currentOpenPort);
+                            }
+
+                            const formattedSummary = marked.parse(parsedAnalysis.executive_summary || 'No executive summary provided.');
+                            container.innerHTML = `
+                                <div class="ai-insight-box">
+                                    <div class="ai-insight-header"><i class="fa-solid fa-brain"></i> AI Executive Summary</div>
+                                    <div class="ai-insight-content">${formattedSummary}</div>
+                                    <div style="margin-top:10px;font-size:0.8rem;color:var(--text-muted)"><i class="fa-solid fa-info-circle"></i> Click on any open port row above to view specific remediation steps and auto-generated fix scripts.</div>
+                                </div>
+                            `;
+                        } else {
+                            container.innerHTML = '';
+                        }
+                    } catch (aiErr) {
+                        console.error('AI Analysis Failed:', aiErr);
+                        container.innerHTML = '';
+                    }
+                }
+            } catch (e) {
+                renderPortscannerRows(output, target, rows, true);
+                if (actions) actions.style.display = 'flex';
+            }
+        }
+
+        function copyToolResult(tool) {
+            const result = toolResults[tool];
+            if (result) {
+                navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+                showToast('Copied to clipboard');
+            }
+        }
+
+        function sendToAI(tool) {
+            const result = toolResults[tool];
+            if (result) {
+                switchView('ai');
+                const summary = summarizeToolResult(tool, result);
+                document.getElementById('aiChatInput').value = 'Analyze these ' + tool + ' results: ' + summary;
+                window.api.streamChat(
+                    'Analyze these ' + tool + ' results: ' + summary,
+                    null,
+                    tool,
+                    toolResultIds[tool] || null,
+                    toolResultIds[tool] ? [toolResultIds[tool]] : null,
+                    []
+                );
+            }
+        }
+
+        function summarizeToolResult(tool, result) {
+            switch (tool) {
+                case 'dns':
+                    return result.target + ': DNS records - ' + (result.a_records?.join(', ') || 'No A records');
+                case 'ssl':
+                    return result.target + ': SSL ' + (result.status || 'unknown') + ' using ' + (result.cipher_suite || 'unknown cipher');
+                case 'geo':
+                    return result.ip + ': ' + (result.city || 'Unknown') + ', ' + (result.country || 'Unknown');
+                case 'whois':
+                    return 'Domain ' + result.target + ': registered by ' + (result.registrar || 'Unknown');
+                default:
+                    return JSON.stringify(result).substring(0, 200);
+            }
+        }
+
+        // Full Scan (runs all tools together)
+        const fullScanResults = {};
+
+        function resetFullScanCards() {
+            const tools = ['port','os','webapp','headers','ssl','dns','whois','ping','traceroute','subdomains','geo'];
+            tools.forEach(t => setFullScanStatus(t, 'pending', 'Not started'));
+            Object.keys(fullScanResults).forEach(k => delete fullScanResults[k]);
+            const log = document.getElementById('fullscanLog');
+            if (log) log.innerHTML = 'Ready. Click Run Full Scan to start.';
+        }
+
+        function setFullScanStatus(tool, state, detail) {
+            const statusEl = document.getElementById(`fullscan-status-${tool}`);
+            const detailEl = document.getElementById(`fullscan-detail-${tool}`);
+            if (statusEl) {
+                statusEl.className = `status-pill ${state}`;
+                statusEl.textContent = state === 'running' ? 'Running' : state === 'success' ? 'Done' : state === 'error' ? 'Error' : 'Pending';
+            }
+            if (detailEl && detail !== undefined) {
+                detailEl.textContent = detail;
+            }
+        }
+
+        function appendFullScanLog(message) {
+            const log = document.getElementById('fullscanLog');
+            if (!log) return;
+            const ts = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.textContent = `[${ts}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        async function pollFullScan(scanId) {
+            let attempts = 0;
+            while (attempts < 120) { // ~3 minutes
+                const data = await api.scans.get(scanId);
+                if (data.status === 'completed') return data;
+                if (data.status === 'failed') throw new Error(data.error || 'Scan failed');
+                await new Promise(r => setTimeout(r, 1500));
+                attempts += 1;
+            }
+            throw new Error('Scan timed out');
+        }
+
+        // Web App Scanner Logging
+        let lastWebscanLogEntry = null;
+        let lastWebscanLogTime = null;
+        
+        function initWebscanLog() {
+            const logEl = document.getElementById('webscan-log');
+            if (!logEl) return;
+            logEl.classList.remove('hidden');
+            logEl.innerHTML = `
+                <style>
+                    .webscan-log { background: #0a0a0f; border: 1px solid #1e1e28; border-radius: 8px; padding: 0; font-size: 12px; overflow: hidden; }
+                    .webscan-log-header { background: #13131a; padding: 10px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #1e1e28; font-size: 12px; color: #a78bfa; }
+                    .webscan-log-header i { color: #6b6e78; }
+                    .webscan-log-body { max-height: 200px; overflow-y: auto; padding: 8px 0; }
+                    .webscan-log-entry { display: flex; gap: 10px; padding: 6px 14px; border-bottom: 1px solid #12121a; }
+                    .webscan-log-entry:last-child { border-bottom: none; }
+                    .webscan-log-entry:hover { background: #0f0f15; }
+                    .webscan-log-time { color: #4a4a58; min-width: 65px; }
+                    .webscan-log-stage { color: #a78bfa; min-width: 70px; display: flex; align-items: center; gap: 6px; }
+                    .webscan-log-msg { color: #b0b2ba; flex: 1; }
+                    .webscan-log-entry.success .webscan-log-msg { color: #6acf80; }
+                    .webscan-log-entry.error .webscan-log-msg { color: #f07070; }
+                    .webscan-log-entry.warning .webscan-log-msg { color: #f0b860; }
+                    .ws-dot-running { background: #a78bfa; animation: pulse-dot 1s infinite; }
+                    .ws-dot-success { background: #6acf80; }
+                    .ws-dot-error { background: #f07070; }
+                    .ws-dot-warning { background: #f0b860; }
+                    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+                </style>
+                <div class="webscan-log-body" id="webscan-log-body"></div>
+            `;
+            lastWebscanLogEntry = null;
+            lastWebscanLogTime = null;
+        }
+
+        function appendWebscanLog(stage, message, type = '') {
+            let logBody = document.getElementById('webscan-log-body');
+            const logEl = document.getElementById('webscan-log');
+            
+            if (!logEl) return;
+            
+            if (!logBody) {
+                logEl.innerHTML = `
+                    <style>
+                        .webscan-log { background: #0a0a0f; border: 1px solid #1e1e28; border-radius: 8px; padding: 0; font-size: 12px; overflow: hidden; }
+                        .webscan-log-body { max-height: 200px; overflow-y: auto; padding: 8px 0; }
+                        .webscan-log-entry { display: flex; gap: 10px; padding: 6px 14px; border-bottom: 1px solid #12121a; }
+                        .webscan-log-entry:last-child { border-bottom: none; }
+                        .webscan-log-entry:hover { background: #0f0f15; }
+                        .webscan-log-time { color: #4a4a58; min-width: 65px; }
+                        .webscan-log-stage { color: #a78bfa; min-width: 70px; display: flex; align-items: center; gap: 6px; }
+                        .webscan-log-msg { color: #b0b2ba; flex: 1; }
+                        .webscan-log-entry.success .webscan-log-msg { color: #6acf80; }
+                        .webscan-log-entry.error .webscan-log-msg { color: #f07070; }
+                        .webscan-log-entry.warning .webscan-log-msg { color: #f0b860; }
+                        .ws-dot-running { background: #a78bfa; animation: pulse-dot 1s infinite; }
+                        .ws-dot-success { background: #6acf80; }
+                        .ws-dot-error { background: #f07070; }
+                        .ws-dot-warning { background: #f0b860; }
+                        @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+                    </style>
+                    <div class="webscan-log-body" id="webscan-log-body"></div>
+                `;
+                logBody = document.getElementById('webscan-log-body');
+            }
+            
+            const entryKey = stage + '|' + message;
+            const nowMs = Date.now();
+            if (lastWebscanLogEntry === entryKey && lastWebscanLogTime && (nowMs - lastWebscanLogTime) < 500) return;
+            lastWebscanLogEntry = entryKey;
+            lastWebscanLogTime = nowMs;
+            
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+            const entry = document.createElement('div');
+            entry.className = `webscan-log-entry ${type}`;
+            
+            let dotClass = 'ws-dot-running';
+            if (type === 'success') dotClass = 'ws-dot-success';
+            else if (type === 'error') dotClass = 'ws-dot-error';
+            else if (type === 'warning') dotClass = 'ws-dot-warning';
+            
+            entry.innerHTML = `
+                <span class="webscan-log-time">${timeStr}</span>
+                <span class="webscan-log-stage"><span class="ws-progress-dot ${dotClass}" style="display:inline-block"></span>${stage}</span>
+                <span class="webscan-log-msg">${message}</span>
+            `;
+            logBody.appendChild(entry);
+            logBody.scrollTop = logBody.scrollHeight;
+        }
+
+        function hideWebscanLog() {
+            const logEl = document.getElementById('webscan-log');
+            if (logEl) logEl.classList.add('hidden');
+        }
+
+        function clearWebscanLog() {
+            const logEl = document.getElementById('webscan-log');
+            if (logEl) logEl.innerHTML = '';
+        }
+
+        function countDnsRecords(data) {
+            return (data?.a_records?.length || 0) +
+                   (data?.aaaa_records?.length || 0) +
+                   (data?.mx_records?.length || 0) +
+                   (data?.ns_records?.length || 0) +
+                   (data?.txt_records?.length || 0) +
+                   (data?.cname_records?.length || 0);
+        }
+
+        function summarizeHeadersMissing(headersObj) {
+            if (!headersObj) return 'No headers';
+            const required = ['strict-transport-security','content-security-policy','x-frame-options','x-content-type-options','x-xss-protection'];
+            const present = Object.keys(headersObj).map(h => h.toLowerCase());
+            const missing = required.filter(h => !present.includes(h));
+            return missing.length === 0 ? 'All key headers present' : `${missing.length} missing`;
+        }
+
+        function buildWebappFindings(url, headersData, sslData) {
+            const headers = headersData?.headers || headersData || {};
+            const findings = [];
+            const addFinding = (severity, title, description) => findings.push({ severity, title, description });
+            const needHeader = (name, severity, desc) => {
+                const key = Object.keys(headers).find(k => k.toLowerCase() === name.toLowerCase());
+                if (!key) addFinding(severity, `Missing ${name}`, desc);
+            };
+
+            needHeader('Strict-Transport-Security', 'medium', 'HSTS header is missing.');
+            needHeader('X-Content-Type-Options', 'low', 'X-Content-Type-Options is missing.');
+            needHeader('X-Frame-Options', 'medium', 'Clickjacking protection header missing.');
+            needHeader('Content-Security-Policy', 'medium', 'CSP header is missing.');
+            needHeader('X-XSS-Protection', 'low', 'X-XSS-Protection header is missing.');
+
+            if (sslData && sslData.status === 'success') {
+                if (sslData.tls_versions && !sslData.tls_versions.includes('TLSv1.3')) addFinding('medium', 'Old TLS version', 'Server does not support TLS 1.3');
+                if (sslData.valid_to) {
+                    const daysLeft = Math.floor((new Date(sslData.valid_to) - new Date()) / (1000 * 60 * 60 * 24));
+                    if (daysLeft < 30) addFinding('high', 'SSL expiring soon', `Certificate expires in ${daysLeft} days`);
+                }
+            } else if (url.startsWith('https')) {
+                addFinding('critical', 'SSL/TLS error', sslData?.error || 'Could not establish TLS');
+            }
+
+            if (url.startsWith('http://') && !url.includes('localhost')) {
+                addFinding('critical', 'Insecure HTTP', 'Traffic is not encrypted');
+            }
+
+            const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+            findings.forEach(f => counts[f.severity] = (counts[f.severity] || 0) + 1);
+            const score = findings.length === 0 ? 100 : Math.max(0, 100 - counts.critical * 20 - counts.high * 15 - counts.medium * 10 - counts.low * 5);
+
+            return { findings, total: findings.length, score };
+        }
+
+        function renderFullScanData(tool, data) {
+            if (!data) return 'No data captured for this tool.';
+            try {
+                switch (tool) {
+                    case 'port':
+                        return JSON.stringify({ open_ports: data.results || [], target: data.target }, null, 2);
+                    case 'os':
+                        return JSON.stringify(data, null, 2);
+                    case 'webapp':
+                        return JSON.stringify(data, null, 2);
+                    case 'headers':
+                    case 'ssl':
+                    case 'dns':
+                    case 'whois':
+                    case 'ping':
+                    case 'traceroute':
+                    case 'subdomains':
+                    case 'geo':
+                        return JSON.stringify(data, null, 2);
+                    default:
+                        return JSON.stringify(data, null, 2);
+                }
+            } catch (e) {
+                return 'Could not render data.';
+            }
+        }
+
+        function showFullScanModal(tool, data) {
+            const modal = document.getElementById('fullscanModal');
+            const body = document.getElementById('fullscanModalBody');
+            const title = document.getElementById('fullscanModalTitle');
+            title.textContent = `Result — ${tool.toUpperCase()}`;
+            body.textContent = renderFullScanData(tool, data);
+            modal.style.display = 'flex';
+        }
+
+        function hideFullScanModal() {
+            const modal = document.getElementById('fullscanModal');
+            modal.style.display = 'none';
+        }
+
+        async function runFullTool(tool, fn, detailBuilder) {
+            try {
+                setFullScanStatus(tool, 'running', 'Running...');
+                const data = await fn();
+                const detail = detailBuilder ? detailBuilder(data) : 'Completed';
+                setFullScanStatus(tool, 'success', detail);
+                fullScanResults[tool] = data;
+                appendFullScanLog(`${tool.toUpperCase()} done`);
+                return data;
+            } catch (err) {
+                setFullScanStatus(tool, 'error', err.detail || err.message);
+                appendFullScanLog(`${tool.toUpperCase()} error: ${err.message}`);
+                return null;
+            }
+        }
+
+        async function runFullScan() {
+            if (fullScanRunning) return;
+            let target = document.getElementById('fullTarget').value.trim();
+            let url = document.getElementById('fullUrl').value.trim();
+
+            if (!target && !url) {
+                alert('Please enter a target host or URL');
+                return;
+            }
+
+            if (!target && url) {
+                try { target = new URL(url).hostname; }
+                catch (e) { target = url.replace(/^https?:\/\//, '').split('/')[0]; }
+            }
+            if (!url && target) {
+                url = target.startsWith('http') ? target : 'https://' + target;
+            }
+
+            const btn = document.getElementById('fullScanBtn');
+            fullScanRunning = true;
+            btn.textContent = 'Running...';
+            btn.disabled = true;
+            resetFullScanCards();
+            appendFullScanLog('Starting full scan on ' + target);
+
+            const portRange = document.getElementById('fullPortRange').value || 'common';
+            const enhanced = document.getElementById('fullEnhanced').checked;
+
+            const portPromise = (async () => {
+                const scan = await api.scans.create(target, 'port', portRange, { enhanced_service_detection: enhanced, os_detection: true });
+                appendFullScanLog('Port scan started (ID ' + scan.id + ')');
+                const result = await pollFullScan(scan.id);
+                const openCount = result.results?.length || 0;
+                setFullScanStatus('port', 'success', `${openCount} open ports`);
+                appendFullScanLog('Port scan completed with ' + openCount + ' open ports');
+                fullScanResults['port'] = result;
+                return result;
+            })().catch(err => {
+                setFullScanStatus('port', 'error', err.detail || err.message);
+                appendFullScanLog('Port scan error: ' + err.message);
+                fullScanResults['port'] = null;
+                return null;
+            });
+
+            const osPromise = portPromise.then(res => {
+                if (!res) throw new Error('Port scan unavailable');
+                const osInfo = analyzeOsFromPorts(res.results || [], target);
+                setFullScanStatus('os', 'success', `${osInfo.name} (${osInfo.accuracy})`);
+                appendFullScanLog('OS fingerprint suggests ' + osInfo.name);
+                fullScanResults['os'] = osInfo;
+                return osInfo;
+            }).catch(err => {
+                setFullScanStatus('os', 'error', err.message);
+                appendFullScanLog('OS fingerprint error: ' + err.message);
+                fullScanResults['os'] = null;
+                return null;
+            });
+
+            const dnsPromise = runFullTool('dns', () => api.tools.dns(target, 'ALL'), data => `${countDnsRecords(data)} records`);
+            const whoisPromise = runFullTool('whois', () => api.tools.whois(target), data => data?.registrar ? `Registrar: ${data.registrar}` : 'Done');
+            const pingPromise = runFullTool('ping', () => api.tools.ping(target, 4), data => data?.avg_ms != null ? `Avg ${data.avg_ms} ms` : 'Done');
+            const traceroutePromise = runFullTool('traceroute', () => api.tools.traceroute(target, 20), data => data?.hops?.length ? `${data.hops.length} hops` : 'Done');
+            const subdomainsPromise = runFullTool('subdomains', () => api.tools.subdomains(target, 'small'), data => `${data?.total_found || 0} found`);
+            const geoPromise = runFullTool('geo', () => api.tools.geo(target), data => data?.country ? `${data.city || ''} ${data.country}`.trim() : 'Done');
+            const headersPromise = runFullTool('headers', () => api.tools.headers(url), data => summarizeHeadersMissing(data.headers));
+            const sslPromise = runFullTool('ssl', () => api.tools.ssl(target, url.startsWith('https') ? 443 : 80), data => {
+                if (!data) return 'Error';
+                if (data.status === 'failed' || data.status === 'ssl_error') return 'SSL error';
+                const days = data.valid_to ? Math.ceil((new Date(data.valid_to) - new Date()) / 86400000) : null;
+                return days != null ? `Expires in ${days}d` : 'Checked';
+            });
+
+            const webappPromise = Promise.all([headersPromise, sslPromise]).then(([headers, ssl]) => {
+                const findings = buildWebappFindings(url, headers || {}, ssl || {});
+                const score = findings.score;
+                setFullScanStatus('webapp', 'success', `${findings.total} issues, score ${score}`);
+                appendFullScanLog('Web app check finished: score ' + score);
+                fullScanResults['webapp'] = findings;
+                return findings;
+            }).catch(err => {
+                setFullScanStatus('webapp', 'error', err.message);
+                appendFullScanLog('Web app check error: ' + err.message);
+                fullScanResults['webapp'] = null;
+                return null;
+            });
+
+            await Promise.allSettled([
+                portPromise,
+                osPromise,
+                dnsPromise,
+                whoisPromise,
+                pingPromise,
+                traceroutePromise,
+                subdomainsPromise,
+                geoPromise,
+                headersPromise,
+                sslPromise,
+                webappPromise
+            ]);
+
+            appendFullScanLog('Full scan finished.');
+            btn.textContent = 'Run Full Scan';
+            btn.disabled = false;
+            fullScanRunning = false;
+        }
+
+        // AI Chat
+        let aiChatHistory = [];
+
+        function handleAIChatKey(e) {
+            if (e.key === 'Enter') sendAIChatMessage();
+        }
+
+        function clearAIChat() {
+            document.getElementById('aiChatMessages').innerHTML = '<div class="chat-message ai">Chat cleared. How can I help you?</div>';
+            aiChatHistory = [];
+        }
+
+        async function sendAIChatMessage() {
+            const input = document.getElementById('aiChatInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const messages = document.getElementById('aiChatMessages');
+            messages.innerHTML += '<div class="chat-message user">' + escapeHtml(text) + '</div>';
+            aiChatHistory.push({ role: 'user', content: text });
+            
+            messages.innerHTML += '<div class="chat-message ai"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
+            messages.scrollTop = messages.scrollHeight;
+            input.value = '';
+
+            try {
+                const response = await fetch('/api/ai/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: text,
+                        conversation_history: aiChatHistory.slice(0, -1)
+                    })
+                });
+
+                if (!response.ok) throw new Error('AI request failed');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data && data !== '[DONE]') {
+                                fullResponse += data;
+                            }
+                        }
+                    }
+                }
+
+                const lastMsg = messages.querySelector('.chat-message.ai:last-child');
+                if (lastMsg) {
+                    lastMsg.innerHTML = fullResponse || 'I apologize, but I could not generate a response.';
+                }
+                aiChatHistory.push({ role: 'assistant', content: fullResponse });
+            } catch (error) {
+                const lastMsg = messages.querySelector('.chat-message.ai:last-child');
+                if (lastMsg) {
+                    lastMsg.innerHTML = 'Error: ' + error.message + '. Make sure the Groq API key is configured.';
+                }
+            }
+        }
+
+        // Scan History
+        async function loadScanHistory() {
+            const tbody = document.getElementById('history-tbody');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading...</td></tr>';
+
+            try {
+                const data = await api.scans.list(1);
+                renderHistory(data.scans || []);
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="6" class="alert alert-error">' + error.message + '</td></tr>';
+            }
+        }
+
+        function renderHistory(scans) {
+            const tbody = document.getElementById('history-tbody');
+
+            if (!scans || scans.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No scans found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = scans.map(scan => {
+                const statusClass = scan.status === 'completed' ? 'badge-green' : scan.status === 'running' ? 'badge-info' : scan.status === 'failed' ? 'badge-critical' : 'badge-medium';
+                return '<tr>' +
+                    '<td><strong>' + scan.target + '</strong></td>' +
+                    '<td><span class="badge badge-info">' + (scan.scan_type || 'port') + '</span></td>' +
+                    '<td><span class="badge ' + statusClass + '">' + scan.status + '</span></td>' +
+                    '<td>' + (scan.results?.length || 0) + '</td>' +
+                    '<td>' + new Date(scan.created_at).toLocaleDateString() + '</td>' +
+                    '<td><button class="btn-secondary" onclick="viewScanHistory(\'' + scan.id + '\')"><i class="fa-solid fa-eye"></i></button></td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        function viewScanHistory(scanId) {
+            switchView('portScanner');
+            // Load scan results into port scanner
+        }
+
+        // Toast notification
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1b26;color:#fff;padding:12px 24px;border-radius:8px;z-index:9999;animation:fadeIn 0.3s';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        }
+
+        // Load history on view switch
+        const originalSwitchView = switchView;
+        switchView = function(viewId) {
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            document.getElementById(viewId + 'View').classList.add('active');
+            document.querySelectorAll('.nav-menu a').forEach(l => l.classList.remove('active'));
+        const navMap = { portScanner: null, osFingerprint: null, webAppScanner: null, fullScan: 'FullScan', tools: 'Tools', ai: 'AI', history: 'History' };
+        const navEl = document.getElementById('nav' + navMap[viewId]);
+        if (navEl) navEl.classList.add('active');
+            
+        if (viewId === 'history') {
+            loadScanHistory();
+            }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadScanHistory();
+            // Hook card clicks to show per-tool detail
+            document.querySelectorAll('#fullscanGrid .fullscan-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const tool = card.dataset.tool;
+                    if (!tool) return;
+                    showFullScanModal(tool, fullScanResults[tool]);
+                });
+            });
+            // Port detail modal handlers
+            const portModal = document.getElementById('portDetailModal');
+            if (portModal) {
+                portModal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        hidePortDetailModal();
+                    }
+                });
+            }
+            // Port item click handler
+            document.addEventListener('click', function(e) {
+                const portItem = e.target.closest('.port-item');
+                if (portItem && portItem.dataset.portIndex !== undefined && window.portDetailCache) {
+                    const portData = window.portDetailCache[portItem.dataset.portIndex];
+                    if (portData) {
+                        showPortDetail(portData);
+                    }
+                }
+            });
+        });
     </script>
+<div id="portDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:99999;align-items:center;justify-content:center;padding:1.5rem;">
+    <div style="background:#0f111c;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 25px 80px rgba(0,0,0,0.5);">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);background:linear-gradient(135deg, rgba(139,127,235,0.1), rgba(123,111,219,0.05));">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div id="portModalIcon" style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg, var(--purple-gradient-start), var(--purple-gradient-end));display:flex;align-items:center;justify-content:center;font-size:1.3rem;"><i class="fa-solid fa-plug"></i></div>
+                <div>
+                    <div id="portModalTitle" style="font-weight:700;font-size:1.2rem;">Port Details</div>
+                    <div id="portModalService" style="color:var(--text-secondary);font-size:0.85rem;">Service Information</div>
+                </div>
+            </div>
+            <button onclick="hidePortDetailModal()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;">✕</button>
+        </div>
+        <div style="padding:20px;">
+            <div id="portModalRiskBadge" style="display:inline-block;padding:6px 14px;border-radius:20px;font-weight:600;font-size:0.85rem;margin-bottom:16px;"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+                <div style="background:rgba(255,255,255,0.03);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:4px;">PORT</div>
+                    <div id="portModalPort" style="font-weight:600;font-size:1.1rem;">—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:4px;">PROTOCOL</div>
+                    <div id="portModalProtocol" style="font-weight:600;font-size:1.1rem;">—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:4px;">STATE</div>
+                    <div id="portModalState" style="font-weight:600;font-size:1.1rem;">—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:4px;">VERSION</div>
+                    <div id="portModalVersion" style="font-weight:600;font-size:1.1rem;">—</div>
+                </div>
+            </div>
+            <div style="margin-bottom:20px;">
+                <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i class="fa-solid fa-shield-halved"></i> RISK ANALYSIS</div>
+                <div style="background:rgba(255,255,255,0.03);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                        <span style="color:var(--text-secondary);">Risk Score</span>
+                        <span id="portModalRiskScore" style="font-weight:600;">—</span>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:4px;height:8px;overflow:hidden;">
+                        <div id="portModalRiskBar" style="height:100%;border-radius:4px;transition:width 0.3s;width:0%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="portModalMitreSection" style="margin-bottom:20px;">
+                <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i class="fa-solid fa-crosshairs"></i> MITRE ATT&CK TECHNIQUES</div>
+                <div id="portModalMitre" style="background:rgba(255,255,255,0.03);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);"></div>
+            </div>
+            <div id="portModalCVESection" style="margin-bottom:20px;">
+                <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i class="fa-solid fa-bug"></i> CVE ENTRIES (<span id="portModalCVECount">0</span>)</div>
+                <div id="portModalCVE" style="background:rgba(255,255,255,0.03);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);"></div>
+            </div>
+            <div id="portModalAIRemediationSection" style="margin-bottom:20px; display:none;">
+                <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i class="fa-solid fa-robot" style="color:var(--purple-gradient-start)"></i> AI ACTION PLAN</div>
+                <div style="background:linear-gradient(135deg, rgba(20,22,33,1) 0%, rgba(20,22,33,0.8) 100%);padding:14px;border-radius:10px;border:1px solid var(--purple-gradient-start);">
+                    <div id="portModalAIRemediationText" style="font-size:0.95rem;line-height:1.6;color:var(--text-primary);margin-bottom:12px;"></div>
+                    
+                    <div id="portModalAIFixScriptContainer" style="display:none;margin-top:16px;">
+                        <div style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:6px;font-weight:600;"><i class="fa-solid fa-code"></i> FIX SCRIPT</div>
+                        <div style="position:relative;">
+                            <pre id="portModalAIFixScript" style="background:#05060a;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);font-family:monospace;font-size:0.85rem;white-space:pre-wrap;color:#a5d6ff;margin:0;"></pre>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('portModalAIFixScript').textContent);showToast('Fix script copied!');" style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:0.75rem;"><i class="fa-regular fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i class="fa-solid fa-terminal"></i> BANNER</div>
+                <pre id="portModalBanner" style="background:#05060a;padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-all;color:#10b981;margin:0;"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="fullscanModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(2px);z-index:9999;align-items:center;justify-content:center;padding:1.5rem;">
+    <div style="background:#0f111c;border:1px solid rgba(255,255,255,0.08);border-radius:12px;max-width:720px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.35);">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+            <div id="fullscanModalTitle" style="font-weight:700;">Scan Result</div>
+            <button onclick="hideFullScanModal()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;">✕</button>
+        </div>
+        <div id="fullscanModalBody" style="padding:16px;font-family:monospace;font-size:0.9rem;white-space:pre-wrap;word-break:break-word;color:#e5e7eb;"></div>
+    </div>
+</div>
+<script src="/js/api.js?v=7"></script>
+<script src="/js/tools.js?v=7"></script>
 </body>
 </html>

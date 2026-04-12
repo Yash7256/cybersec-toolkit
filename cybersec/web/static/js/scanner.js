@@ -104,11 +104,13 @@ const scannerModule = {
   },
 
   displayResults(data) {
-    const { scan, results } = data;
+    const scan = data.scan || data;
+    const results = data.results || [];
     const output = document.getElementById('scanner-output');
+    const targetLabel = scan.target || 'target';
 
     if (!results || results.length === 0) {
-      output.innerHTML = `<div class="alert alert-success">No open ports found on ${scan.target}</div>`;
+      output.innerHTML = `<div class="alert alert-success">No open ports found on ${targetLabel}</div>`;
       document.getElementById('scanner-actions').style.display = 'flex';
       return;
     }
@@ -135,7 +137,7 @@ const scannerModule = {
 
     output.innerHTML = `
       <div class="result-section">
-        <div class="result-title">Scan Summary: ${scan.target}</div>
+        <div class="result-title">Scan Summary: ${targetLabel}</div>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">Open Ports</div>
@@ -172,7 +174,7 @@ const scannerModule = {
     `;
 
     document.getElementById('scanner-actions').style.display = 'flex';
-    app.scanResults[this.currentScanId] = data;
+    app.scanResults[this.currentScanId] = { scan, results };
   },
 
   resetScanButton() {
@@ -192,7 +194,9 @@ const scannerModule = {
   sendToAI() {
     if (!this.currentScanId || !app.scanResults[this.currentScanId]) return;
     const data = app.scanResults[this.currentScanId];
-    window.aiModule?.sendMessage(`Analyse this port scan: ${data.scan.target} has ${data.results?.filter(r => r.state === 'open').length || 0} open ports.`, this.currentScanId);
+    const target = data.scan?.target || 'target';
+    const openCount = data.results?.filter(r => r.state === 'open').length || 0;
+    window.aiModule?.sendMessage(`Analyse this port scan: ${target} has ${openCount} open ports.`, this.currentScanId);
   },
 
   exportResults(format) {

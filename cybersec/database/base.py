@@ -1,33 +1,18 @@
+"""
+Base database models and mixins.
+"""
 import uuid
-from datetime import datetime
-
-from sqlalchemy import DateTime, func
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
+from sqlalchemy.orm import DeclarativeBase, mapped_column
+from sqlalchemy import UUID, DateTime, func
 
 class Base(DeclarativeBase):
     pass
 
+class UUIDPrimaryKeyMixin:
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        init=False,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        init=False,
-    )
+    created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
-
-class UUIDPrimaryKeyMixin:
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=func.gen_random_uuid(),
-        init=False,
-    )
+# TODO: implement additional mixins

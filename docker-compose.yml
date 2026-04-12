@@ -1,45 +1,68 @@
 version: "3.9"
 
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: cybersec
+    ports:
+      - "5432:5432"
     volumes:
-      - cybersec_db:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build: .
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/cybersec
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/cybersec
+      APP_SECRET_KEY: change-this-in-production
+      APP_DEBUG: "false"
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      REDIS_URL: redis://redis:6379/0
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
-
-  web:
-    image: nginx:alpine
-    ports:
-      - "80:80"
+      redis:
+        condition: service_started
     volumes:
-      - ./cybersec/web/static:/usr/share/nginx/html:ro
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - ./cybersec:/app/cybersec
+    command: >
+      sh -c "poetry run alembic upgrade head &&
+             poetry run uvicorn cybersec.api.main:app
+             --host 0.0.0.0 --port 8000 --workers 1"
+
+  celery_worker:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/cybersec
+      APP_SECRET_KEY: change-this-in-production
+      APP_DEBUG: "false"
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./cybersec:/app/cybersec
+    command: poetry run celery -A cybersec.core.tasks worker --loglevel=info
 
 volumes:
-  cybersec_db:
+  postgres_data:
+  redis_data:

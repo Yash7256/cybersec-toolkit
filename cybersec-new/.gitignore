@@ -1,8 +1,0 @@
-__pycache__
-*.pyc
-.env
-.venv
-dist
-*.egg-info
-.pytest_cache
-alembic/versions/*.py

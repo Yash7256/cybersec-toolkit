@@ -159,6 +159,17 @@ const app = {
     let result, params = {};
 
     switch (tool) {
+      case 'portscanner':
+        params.target = document.getElementById('portscan-target')?.value;
+        params.portRange = document.getElementById('portscan-ports')?.value || 'common';
+        break;
+      case 'osfp':
+        params.target = document.getElementById('osfp-target')?.value;
+        break;
+      case 'webscan':
+        params.target = document.getElementById('webscan-target')?.value;
+        params.maxPages = parseInt(document.getElementById('webscan-maxpages')?.value) || 20;
+        break;
       case 'dns':
         params.target = document.getElementById('dns-target')?.value;
         params.recordType = document.getElementById('dns-record-type')?.value || 'A';
@@ -195,10 +206,14 @@ const app = {
       return;
     }
 
+    // For portscanner we show loading in its own box and return if missing target handled above.
     this.showLoading(tool);
 
     try {
       switch (tool) {
+        case 'portscanner': result = await api.tools.portscanner(params.target, params.portRange, params.scanType); break;
+        case 'osfp': result = await api.tools.osfp(params.target); break;
+        case 'webscan': result = await api.tools.webscan(params.target, params.maxPages); break;
         case 'dns': result = await api.tools.dns(params.target, params.recordType); break;
         case 'whois': result = await api.tools.whois(params.target); break;
         case 'ping': result = await api.tools.ping(params.target, params.count); break;

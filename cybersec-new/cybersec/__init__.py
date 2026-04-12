@@ -1,4 +1,0 @@
-"""
-cybersec init
-"""
-# TODO: implement

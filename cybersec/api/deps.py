@@ -1,78 +1,57 @@
-from typing import Annotated, AsyncGenerator, Optional
+"""
+FastAPI dependencies (get_db, get_current_user).
+"""
+from typing import Optional
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy import select
+from fastapi import Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from cybersec.api.auth import verify_token
+from cybersec.database.session import get_db
 from cybersec.database.models import User
-from cybersec.database.session import get_db as _get_db
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
-
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async for session in _get_db():
-        yield session
-
-
-DBSession = Annotated[AsyncSession, Depends(get_db)]
-
+from cybersec.api.auth import verify_token, oauth2_scheme
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    db: DBSession,
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
 ) -> User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    payload = verify_token(token)
-    if payload is None:
-        raise credentials_exception
-
-    user_id: Optional[str] = payload.get("sub")
-    if user_id is None:
-        raise credentials_exception
-
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-
-    if user is None:
-        raise credentials_exception
-
-    if not user.is_active:
+    token_data = verify_token(token)
+    
+    result = await db.execute(select(User).where(User.id == token_data.user_id))
+    user = result.scalars().first()
+    
+    if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is inactive",
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-
+    
     return user
 
 
-async def optional_current_user(
-    token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    db: Annotated[Optional[AsyncSession], Depends(get_db)] = None,
+async def get_optional_user(
+    authorization: Optional[str] = Header(default=None),
+    db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
-    if token is None or db is None:
+    if not authorization:
+        return None
+        
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+        
+    token = parts[1]
+    
+    try:
+        token_data = verify_token(token)
+    except HTTPException:
         return None
 
-    payload = verify_token(token)
-    if payload is None:
+    try:
+        result = await db.execute(select(User).where(User.id == token_data.user_id))
+        user = result.scalars().first()
+        return user
+    except Exception:
+        # If DB is unavailable, treat as anonymous instead of failing the request.
         return None
-
-    user_id: Optional[str] = payload.get("sub")
-    if user_id is None:
-        return None
-
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-
-    return user
-
-
-CurrentUser = Annotated[User, Depends(get_current_user)]
-OptionalUser = Annotated[Optional[User], Depends(optional_current_user)]

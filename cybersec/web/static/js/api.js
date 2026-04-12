@@ -9,6 +9,12 @@ class ApiError extends Error {
 
 const api = {
   token: null,
+  _withTimeout(promise, ms, message = 'Request timed out') {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new ApiError(message, message)), ms))
+    ]);
+  },
 
   async request(endpoint, options = {}) {
     const url = `${API_BASE}${endpoint}`;
@@ -71,32 +77,32 @@ const api = {
       }
 
       const data = await response.json();
-      this.token = data.access_token;
+      api.token = data.access_token;
       localStorage.setItem('cybersec_token', data.access_token);
       return data;
     },
 
     async register(email, password) {
-      return this.request('/api/auth/register', {
+      return api.request('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
     },
 
     logout() {
-      this.token = null;
+      api.token = null;
       localStorage.removeItem('cybersec_token');
     },
 
     restoreSession() {
-      this.token = localStorage.getItem('cybersec_token');
-      return !!this.token;
+      api.token = localStorage.getItem('cybersec_token');
+      return !!api.token;
     },
   },
 
   scans: {
     async create(target, scanType, portRange, options = {}) {
-      return this.request('/api/scans/', {
+      return api.request('/api/scans/', {
         method: 'POST',
         body: JSON.stringify({
           target,
@@ -108,27 +114,41 @@ const api = {
     },
 
     async get(scanId) {
-      return this.request(`/api/scans/${scanId}`);
+      const data = await api.request(`/api/scans/${scanId}`);
+      // Normalize shape so UI code can access both `scan` and top-level fields.
+      return {
+        ...data,
+        scan: data.scan || data,
+        results: data.results || data.data || [],
+      };
     },
 
     async getStatus(scanId) {
-      return this.request(`/api/scans/${scanId}/status`);
+      return api.request(`/api/scans/${scanId}/status`);
     },
 
     async list(page = 1, status = null) {
-      const params = new URLSearchParams({ page, page_size: 20 });
+      // Backend accepts `limit`; keep `page` for future pagination compatibility.
+      const params = new URLSearchParams({ limit: 20, page });
       if (status) params.append('status_filter', status);
-      return this.request(`/api/scans/?${params}`);
+      const data = await api.request(`/api/scans/?${params}`);
+      if (Array.isArray(data)) {
+        return { scans: data, total: data.length };
+      }
+      return {
+        scans: data.scans || [],
+        total: data.total ?? (data.scans ? data.scans.length : 0),
+      };
     },
 
     async delete(scanId) {
-      return this.request(`/api/scans/${scanId}`, { method: 'DELETE' });
+      return api.request(`/api/scans/${scanId}`, { method: 'DELETE' });
     },
 
     async export(scanId, format) {
       const response = await fetch(`${API_BASE}/api/reports/scan/${scanId}/${format}`, {
         headers: {
-          'Authorization': `Bearer ${this.token}`,
+          'Authorization': `Bearer ${api.token}`,
         },
       });
 
@@ -149,75 +169,171 @@ const api = {
   },
 
   tools: {
+    async portscanner(target, portRange = 'common', scanType = 'port') {
+      const scan = await api.request('/api/scans/', {
+        method: 'POST',
+        body: JSON.stringify({
+          target,
+          scan_type: scanType,
+          port_range: portRange,
+        }),
+      });
+      // poll status & results
+      const scanId = scan.id || scan.scan_id;
+      let attempts = 0;
+      while (attempts < 120) {
+        const status = await api.scans.get(scanId);
+        if (status.status === 'completed') return { ...status, target };
+        if (status.status === 'failed') throw new ApiError('Scan failed', status.error || 'Scan failed');
+        await new Promise(r => setTimeout(r, 1500));
+        attempts += 1;
+      }
+      throw new ApiError('Timeout', 'Port scan timed out');
+    },
+
+    async osfp(target) {
+      return api._withTimeout(api.request('/api/scans/os-fingerprint', {
+        method: 'POST',
+        body: JSON.stringify({ target }),
+      }), 20000, 'OS fingerprint timed out');
+    },
+
+    async webscan(target, maxPages = 20) {
+      return api.request('/api/webapp/scan', {
+        method: 'POST',
+        body: JSON.stringify({ target, max_pages: maxPages }),
+      });
+    },
+
+    async webscanStream(target, maxPages = 20, callbacks = {}) {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const scanResponse = await api.request('/api/webapp/start-scan', {
+            method: 'POST',
+            body: JSON.stringify({ target, max_pages: maxPages }),
+          });
+          
+          const scanId = scanResponse.scan_id;
+          const es = new EventSource(`/api/webapp/stream/${scanId}`);
+          let finalResult = null;
+          let isDone = false;
+          
+          es.onmessage = (evt) => {
+            if (evt.data === '[DONE]') {
+              isDone = true;
+              es.close();
+              if (finalResult) {
+                resolve(finalResult);
+              } else {
+                resolve({ result: null });
+              }
+              return;
+            }
+            
+            try {
+              const data = JSON.parse(evt.data);
+              if (data.stage === 'DONE' && data.result) {
+                finalResult = data.result;
+              }
+              if (callbacks.onProgress) callbacks.onProgress(data);
+            } catch (e) {
+              console.error('Webscan stream parse error:', e);
+            }
+          };
+          
+          es.onerror = (err) => {
+            if (!isDone) {
+              es.close();
+              if (finalResult) {
+                resolve(finalResult);
+              } else {
+                reject(new Error('Webscan stream connection error'));
+              }
+            }
+          };
+        } catch (err) {
+          reject(err);
+        }
+      });
+    },
     async dns(target, recordType = 'A') {
-      return this.request('/api/tools/dns', {
+      const resp = await api.request('/api/tools/dns', {
         method: 'POST',
         body: JSON.stringify({ target, record_type: recordType }),
       });
+      return { tool_result_id: resp.tool_result_id, ...(resp.data || resp) };
     },
 
     async whois(target) {
-      return this.request('/api/tools/whois', {
+      const resp = await api.request('/api/tools/whois', {
         method: 'POST',
         body: JSON.stringify({ target }),
       });
+      return { tool_result_id: resp.tool_result_id, ...(resp.data || resp) };
     },
 
     async ping(target, count = 4) {
-      return this.request('/api/tools/ping', {
+      const resp = await api.request('/api/tools/ping', {
         method: 'POST',
         body: JSON.stringify({ target, count }),
       });
+      return { tool_result_id: resp.tool_result_id, ...(resp.data || resp) };
     },
 
     async traceroute(target, maxHops = 30) {
-      return this.request('/api/tools/traceroute', {
+      const resp = await api.request('/api/tools/traceroute', {
         method: 'POST',
         body: JSON.stringify({ target, max_hops: maxHops }),
       });
+      return { tool_result_id: resp.tool_result_id, ...(resp.data || resp) };
     },
 
     async ssl(host, port = 443) {
-      return this.request('/api/tools/ssl', {
+      const resp = await api.request('/api/tools/ssl', {
         method: 'POST',
         body: JSON.stringify({ host, port }),
       });
+      return { tool_result_id: resp.tool_result_id, ...(resp.data || resp) };
     },
 
     async headers(url) {
-      return this.request('/api/tools/http_headers', {
+      const resp = await api.request('/api/tools/http_headers', {
         method: 'POST',
         body: JSON.stringify({ target: url }),
       });
+      return { tool_result_id: resp.tool_result_id, ...(resp.data || resp) };
     },
 
     async subdomains(domain, wordlistSize = 'small') {
-      return this.request('/api/tools/subdomain', {
+      const resp = await api.request('/api/tools/subdomain', {
         method: 'POST',
         body: JSON.stringify({ domain, wordlist: wordlistSize }),
       });
+      return { tool_result_id: resp.tool_result_id, ...(resp.data || resp) };
     },
 
     async geo(ip) {
-      return this.request('/api/tools/geoip', {
+      const resp = await api.request('/api/tools/geoip', {
         method: 'POST',
         body: JSON.stringify({ target: ip }),
       });
+      return { tool_result_id: resp.tool_result_id, ...(resp.data || resp) };
     },
   },
 
-  async streamChat(message, scanId = null, toolName = null, toolResultId = null, history = []) {
+  async streamChat(message, scanId = null, toolName = null, toolResultId = null, toolResultIds = null, history = []) {
     const response = await fetch(`${API_BASE}/api/ai/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.token}`,
+        'Authorization': `Bearer ${api.token}`,
       },
       body: JSON.stringify({
         message,
         scan_id: scanId,
         tool_name: toolName,
         tool_result_id: toolResultId,
+        tool_result_ids: toolResultIds,
         conversation_history: history,
       }),
     });
@@ -231,4 +347,6 @@ const api = {
   },
 };
 
+// Ensure request always has correct context even if extracted
+api.request = api.request.bind(api);
 window.api = api;
