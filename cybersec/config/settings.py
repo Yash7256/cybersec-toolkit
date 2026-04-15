@@ -95,6 +95,8 @@ class Settings(BaseSettings):
     AI_RECOMMENDATIONS_CACHE_TTL_SECONDS: int = 86400  # 24 hours
     OS_FINGERPRINT_CACHE_TTL_SECONDS: int = 1800  # 30 minutes
     PING_HISTORY_TTL_SECONDS: int = 3600  # 1 hour
+    TRACEROUTE_TIMEOUT_SECONDS: int = 60  # max wall-clock budget for the traceroute subprocess
+    HOP_INFO_CACHE_TTL_SECONDS: int = 86400  # 24 hours — router hostnames are stable
 
     @property
     def whois_privacy_patterns_list(self) -> list[str]:

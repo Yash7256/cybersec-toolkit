@@ -216,7 +216,8 @@ async def run_traceroute(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user)
 ):
-    result = await traceroute(body.target, body.max_hops)
+    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    result = await traceroute(body.target, body.max_hops, allow_private=allow_private)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "traceroute", body.target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}

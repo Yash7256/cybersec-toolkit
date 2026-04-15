@@ -5,6 +5,8 @@ import socket
 from dataclasses import dataclass
 from ipaddress import ip_address
 
+from cybersec.config.settings import settings
+from cybersec.core.redis_client import RedisKeys, get_shared_redis_client
 from cybersec.core.tools.geoip import geoip_lookup
 
 @dataclass
@@ -93,12 +95,32 @@ def _private_ip(ip: str | None) -> bool:
 async def _reverse_dns(ip: str | None) -> str | None:
     if not ip or _private_ip(ip):
         return None
+    redis = get_shared_redis_client()
+    if redis is not None:
+        try:
+            cached = await redis.get(RedisKeys.hop_reverse_dns(ip))
+            if cached is not None:
+                return cached or None  # empty string stored as sentinel for "no PTR"
+        except Exception:
+            pass
     loop = asyncio.get_running_loop()
     try:
-        hostname, _, _ = await loop.run_in_executor(None, socket.gethostbyaddr, ip)
-        return hostname
-    except (socket.herror, socket.gaierror, OSError):
-        return None
+        hostname, _, _ = await asyncio.wait_for(
+            loop.run_in_executor(None, socket.gethostbyaddr, ip),
+            timeout=2.0,
+        )
+    except (asyncio.TimeoutError, socket.herror, socket.gaierror, OSError):
+        hostname = None
+    if redis is not None:
+        try:
+            await redis.set(
+                RedisKeys.hop_reverse_dns(ip),
+                hostname or "",
+                ex=settings.HOP_INFO_CACHE_TTL_SECONDS,
+            )
+        except Exception:
+            pass
+    return hostname
 
 
 async def _geoip_for_hop(ip: str | None) -> dict:
@@ -370,63 +392,107 @@ def _build_route_intelligence(target: str, hops: list[TracerouteHop], destinatio
         "security_insights": security_insights,
     }
 
-async def traceroute(target: str, max_hops: int = 30) -> TracerouteResult:
+async def traceroute(target: str, max_hops: int = 30, *, allow_private: bool = False) -> TracerouteResult:
     max_hops = max(1, min(64, max_hops))
-    
-    if sys.platform == "win32":
-        cmd = ["tracert", "-h", str(max_hops), "-d", target]
-    else:
-        cmd = ["traceroute", "-m", str(max_hops), "-n", target]
 
+    # Resolve target to IP for SSRF guard and to avoid TOCTOU / arg-injection
+    try:
+        loop = asyncio.get_running_loop()
+        resolved_ip = (await loop.getaddrinfo(target, None, family=socket.AF_INET))[0][4][0]
+    except Exception as exc:
+        return TracerouteResult(target, [], 0, f"DNS resolution failed: {exc}")
+
+    from cybersec.core.tools.port_scanner import _is_scan_target_allowed
+    if not allow_private and not _is_scan_target_allowed(resolved_ip):
+        return TracerouteResult(
+            target, [], 0,
+            "Traceroute to private, loopback, or cloud-metadata addresses is not permitted",
+        )
+
+    if sys.platform == "win32":
+        cmd = ["tracert", "-h", str(max_hops), "-d", resolved_ip]
+    else:
+        cmd = ["traceroute", "-m", str(max_hops), "-n", "--", resolved_ip]
+
+    process = None
     try:
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await process.communicate()
-        out_str = stdout.decode('utf-8', errors='ignore')
+        stdout, _stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=settings.TRACEROUTE_TIMEOUT_SECONDS,
+        )
+        out_str = stdout.decode("utf-8", errors="ignore")
 
-        hops = []
-        previous_rtt = None
+        # --- Pass 1: parse all hop lines into raw tuples (no awaits) ---
+        raw_hops: list[tuple[int, str | None, list[float]]] = []  # (hop_num, ip_or_None, samples)
         destination_ip = None
-        
+
         for line in out_str.splitlines():
             line = line.strip()
             if not line or not line[0].isdigit():
                 continue
-                
+
             if sys.platform != "win32":
                 if "* * *" in line:
-                    hop_num = int(line.split()[0])
-                    hops.append(_empty_hop(hop_num))
+                    raw_hops.append((int(line.split()[0]), None, []))
                 else:
                     m = re.match(r"^\s*(\d+)\s+([0-9a-fA-F:.]+|\*)", line)
                     if m:
                         hop_num = int(m.group(1))
                         ip = m.group(2)
                         if ip != "*":
-                            samples = [float(value) for value in re.findall(r"(\d+(?:\.\d+)?)\s*ms", line)]
-                            hop = await _enrich_hop(hop_num, ip, samples, previous_rtt)
-                            hops.append(hop)
-                            previous_rtt = hop.rtt_ms if hop.rtt_ms is not None else previous_rtt
+                            samples = [float(v) for v in re.findall(r"(\d+(?:\.\d+)?)\s*ms", line)]
+                            raw_hops.append((hop_num, ip, samples))
                             destination_ip = ip
             else:
                 parts = line.split()
                 if len(parts) >= 4 and parts[0].isdigit():
                     hop_num = int(parts[0])
                     if "*" in line:
-                        hops.append(_empty_hop(hop_num))
+                        raw_hops.append((hop_num, None, []))
                     else:
                         ip = parts[-1].strip("[]")
-                        samples = [float(value) for value in re.findall(r"<?(\d+)\s*ms", line)]
-                        hop = await _enrich_hop(hop_num, ip, samples, previous_rtt)
-                        hops.append(hop)
-                        previous_rtt = hop.rtt_ms if hop.rtt_ms is not None else previous_rtt
+                        samples = [float(v) for v in re.findall(r"<?(\d+)\s*ms", line)]
+                        raw_hops.append((hop_num, ip, samples))
                         destination_ip = ip
+
+        # --- Pass 2: enrich all hops concurrently ---
+        # Build previous_rtt per hop (serial order; only known after pass 1)
+        previous_rtts: list[float | None] = []
+        prev = None
+        for _, ip, samples in raw_hops:
+            previous_rtts.append(prev)
+            if ip is not None and samples:
+                prev = round(sum(samples) / len(samples), 3)
+
+        async def _enrich_or_empty(hop_num: int, ip: str | None, samples: list[float], prev_rtt: float | None) -> TracerouteHop:
+            if ip is None:
+                return _empty_hop(hop_num)
+            return await _enrich_hop(hop_num, ip, samples, prev_rtt)
+
+        hops = list(await asyncio.gather(*(
+            _enrich_or_empty(hop_num, ip, samples, prev_rtt)
+            for (hop_num, ip, samples), prev_rtt in zip(raw_hops, previous_rtts)
+        )))
 
         await _apply_geoip_to_hops(hops)
         intelligence = _build_route_intelligence(target, hops, destination_ip)
         return TracerouteResult(target, hops, len(hops), None, **intelligence)
-    except Exception as e:
-        return TracerouteResult(target, [], 0, str(e))
+
+    except asyncio.TimeoutError:
+        if process is not None:
+            try:
+                process.kill()
+                await process.wait()
+            except Exception:
+                pass
+        return TracerouteResult(
+            target, [], 0,
+            f"Traceroute timed out after {settings.TRACEROUTE_TIMEOUT_SECONDS}s",
+        )
+    except Exception as exc:
+        return TracerouteResult(target, [], 0, str(exc))

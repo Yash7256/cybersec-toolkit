@@ -65,6 +65,10 @@ class RedisKeys:
     def ping_history(ip_or_target: str) -> str:
         return f"ping_history:{ip_or_target}"
 
+    @staticmethod
+    def hop_reverse_dns(ip: str) -> str:
+        return f"hop_rdns:{ip}"
+
 _shared_client: Optional["aioredis.Redis"] = None
 
 
