@@ -3,8 +3,9 @@ Web App Scanner router implementation.
 
 DB-OPTIONAL: Web app scans work even when PostgreSQL is unavailable.
 Results are returned directly in the response or streamed via SSE.
+Azure-compatible: sends heartbeat events every 10s to prevent LB timeout.
 """
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
@@ -43,7 +44,11 @@ async def generate_webscan_events(
     user_id: str | None = None,
     db_scan_id: str | None = None,
 ):
-    """Generate SSE events for a web scan, optionally persisting to DB on completion."""
+    """Generate SSE events for a web scan with heartbeat support for Azure.
+
+    Sends a heartbeat event every 10 seconds to prevent Azure's load balancer
+    from closing the SSE connection during long scans.
+    """
     import httpx
     scanner = WebAppScanner(max_pages=max_pages)
 
@@ -59,9 +64,26 @@ async def generate_webscan_events(
     }
     _wapp_scan_events[scan_id] = asyncio.Queue()
 
+    async def _heartbeat_loop() -> None:
+        """Send heartbeat every 10s to keep Azure LB connection alive."""
+        while True:
+            await asyncio.sleep(10.0)
+            meta = _wapp_scan_meta.get(scan_id)
+            if meta is None or meta["status"] in ("completed", "failed"):
+                break
+            try:
+                await _wapp_scan_events[scan_id].put(json.dumps({
+                    "stage": "heartbeat",
+                    "message": "Scan in progress...",
+                    "timestamp": asyncio.get_event_loop().time(),
+                }))
+            except Exception:
+                break
+
+    heartbeat_task = asyncio.create_task(_heartbeat_loop())
+
     def send_event(stage: str, message: str, **extra):
-        import time
-        return f"data: {json.dumps({'stage': stage, 'message': message, 'timestamp': time.time(), **extra})}\n\n"
+        return f"data: {json.dumps({'stage': stage, 'message': message, 'timestamp': asyncio.get_event_loop().time(), **extra})}\n\n"
 
     await asyncio.sleep(0)
     yield send_event('INIT', f'Starting web scan on {target}')
@@ -128,7 +150,12 @@ async def generate_webscan_events(
         yield send_event('ERROR', f'Scan error: {str(e)}')
         _wapp_scan_meta[scan_id]["status"] = "failed"
         _wapp_scan_meta[scan_id]["error"] = str(e)
-        return
+    finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
 
     seen = set()
     unique_vulns = []
@@ -179,21 +206,6 @@ async def _persist_web_scan(db_scan_id: str | None, vulns: list) -> None:
         logging.getLogger(__name__).warning("Failed to persist web scan to DB (scan=%s): %s", db_scan_id, e)
 
 
-async def _run_web_scan_sync(
-    target: str,
-    max_pages: int,
-    user_id: str | None = None,
-) -> tuple[str, dict, str]:
-    """Run web scan synchronously, return (scan_id, result_dict, storage)."""
-    scanner = WebAppScanner(max_pages=max_pages)
-    result = await scanner.scan(target)
-
-    unique_vulns = result.vulnerabilities
-    result_dict = dataclasses.asdict(result)
-
-    return str(uuid4()), result_dict, "memory"
-
-
 @router.post("/start-scan")
 async def webapp_scan_start(
     body: WebAppScanStartRequest,
@@ -240,24 +252,16 @@ async def webapp_scan_start(
 async def webapp_scan_stream(scan_id: str):
     """Stream web scan progress via SSE.
 
-    If the scan was started without DB, pass target via query param ?target=...
-    Otherwise the scan metadata is looked up from in-memory or DB stores.
+    Azure-compatible: heartbeat every 10s, keepalive every 55s.
     """
     meta = _wapp_scan_meta.get(scan_id)
 
     if meta:
         target = meta["target"]
-        max_pages = 20
         user_id = meta.get("user_id")
         db_scan_id = meta.get("db_scan_id")
     else:
-        target = None
-
-    if not target:
-        raise HTTPException(status_code=404, detail="Scan not found. Pass ?target=... if started without DB.")
-
-    user_id = meta.get("user_id") if meta else None
-    db_scan_id = meta.get("db_scan_id") if meta else None
+        raise HTTPException(status_code=404, detail="Scan not found. Start a scan first via /api/webapp/start-scan or /api/webapp/scan.")
 
     async def stream_response():
         try:
@@ -284,7 +288,6 @@ async def webapp_scan_stream(scan_id: str):
 @router.post("/scan")
 async def webapp_scan(
     body: WebAppScanRequest,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user),
 ):
@@ -375,6 +378,3 @@ async def webapp_scan_status(scan_id: str):
         pass
 
     raise HTTPException(status_code=404, detail="Web scan not found")
-
-
-from fastapi import HTTPException

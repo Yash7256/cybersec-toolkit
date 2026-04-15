@@ -92,8 +92,10 @@ async def chat(
         generate(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
         }
     )
 

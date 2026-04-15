@@ -159,6 +159,8 @@ async def _run_scan(
 
     Stores results in-memory always, and additionally persists to DB
     if db_scan_id is provided and DB is reachable.
+
+    Emits heartbeat events every ~10s to keep Azure's load balancer connection alive.
     """
     progress = {"status": "running", "progress_pct": 0, "open_ports_found": 0}
     _scan_progress[scan_id] = progress
@@ -177,7 +179,31 @@ async def _run_scan(
     }
     _scan_results[scan_id] = []
 
+    # Emit scan-start heartbeat so client knows scan is alive
+    await _scan_events[scan_id].put(json.dumps({
+        "type": "scan_start",
+        "target": target,
+        "port_range": port_range,
+        "status": "running",
+        "message": f"Scan started on {target}",
+    }))
+
     results_buffer = []
+    last_heartbeat = asyncio.get_event_loop().time()
+    heartbeat_interval = 10.0  # seconds — keeps Azure LB connection alive
+
+    async def _emit_heartbeat() -> None:
+        """Emit a heartbeat event if enough time has passed."""
+        nonlocal last_heartbeat
+        now = asyncio.get_event_loop().time()
+        if now - last_heartbeat >= heartbeat_interval:
+            last_heartbeat = now
+            await _scan_events[scan_id].put(json.dumps({
+                "type": "heartbeat",
+                "status": "running",
+                "open_ports_found": progress["open_ports_found"],
+                "message": "Scan in progress...",
+            }))
 
     async def on_port_found(port_result) -> None:
         progress["open_ports_found"] += 1
@@ -185,6 +211,25 @@ async def _run_scan(
         results_buffer.append((port_result, evt))
         _scan_results[scan_id].append(evt)
         await _scan_events[scan_id].put(json.dumps(evt))
+
+    async def _heartbeat_loop() -> None:
+        """Background heartbeat: emits events every 10s so Azure LB never times out."""
+        while True:
+            await asyncio.sleep(10.0)
+            if progress["status"] in ("completed", "failed"):
+                break
+            try:
+                await _scan_events[scan_id].put(json.dumps({
+                    "type": "heartbeat",
+                    "status": progress["status"],
+                    "progress_pct": progress["progress_pct"],
+                    "open_ports_found": progress["open_ports_found"],
+                    "message": f"Scan running... ({progress['open_ports_found']} open ports found)",
+                }))
+            except Exception:
+                break
+
+    heartbeat_task = asyncio.create_task(_heartbeat_loop())
 
     try:
         scanner = AsyncPortScanner(timeout=3.0)
@@ -220,6 +265,11 @@ async def _run_scan(
         logger.exception("Scan %s failed for target %s", scan_id, target)
         await _persist_scan_results(db_scan_id, results_buffer, "failed", error_msg)
     finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
         await _scan_events[scan_id].put("[DONE]")
 
 
@@ -329,6 +379,7 @@ async def stream_scan_results(scan_id: str):
     """SSE stream delivering port results in real time as they are discovered.
 
     Works with both in-memory and DB-backed scans.
+    Azure-compatible: keepalive every 55s (under 4-min LB timeout).
     """
     async def event_generator():
         queue = _scan_events.get(scan_id)
@@ -338,7 +389,7 @@ async def stream_scan_results(scan_id: str):
 
         while True:
             try:
-                msg = await asyncio.wait_for(queue.get(), timeout=30.0)
+                msg = await asyncio.wait_for(queue.get(), timeout=55.0)
             except asyncio.TimeoutError:
                 yield ": keepalive\n\n"
                 continue
@@ -352,8 +403,10 @@ async def stream_scan_results(scan_id: str):
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
             "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
         },
     )
 
