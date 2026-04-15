@@ -2,6 +2,9 @@
 Scans router — full implementation.
 Handles scan creation (runs AsyncPortScanner in background task),
 real-time SSE streaming, status polling, OS fingerprint, and results retrieval.
+
+DB-OPTIONAL: Scans work even when PostgreSQL is unavailable.
+Results are stored in-memory when DB is unreachable.
 """
 import asyncio
 import json
@@ -9,7 +12,7 @@ import dataclasses
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket
 from fastapi.responses import StreamingResponse
@@ -27,9 +30,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# ─── In-memory progress store (keyed by scan_id string) ────────────────────
-# Stores {scan_id: {"status", "progress_pct", "open_ports_found"}}
+# ─── In-memory scan stores (used when DB is unavailable) ──────────────────
+# Stores scan metadata keyed by scan_id string
+_scan_meta: dict[str, dict] = {}
+# Stores full results keyed by scan_id string
+_scan_results: dict[str, list[dict]] = {}
+# Progress tracking
 _scan_progress: dict[str, dict] = {}
+# SSE event queues
 _scan_events: dict[str, asyncio.Queue] = {}
 
 
@@ -48,64 +56,134 @@ class ScanCreate(BaseModel):
     scan_type: str = Field(default="port")
     options: Optional[dict] = None
 
+
 class OSFingerprintRequest(BaseModel):
     target: str = Field(min_length=1, max_length=255)
 
 
+def _build_evt(port_result) -> dict:
+    """Build a serializable port result event dict."""
+    cves_data = []
+    if port_result.cves:
+        for c in port_result.cves:
+            cves_data.append({
+                "id": c.id, "severity": c.severity,
+                "cvss_score": c.cvss_score, "description": c.description
+            })
+    mitre_names = {
+        "T1021.004": "SSH Remote Services",
+        "T1021.001": "RDP Remote Services",
+        "T1021.002": "SMB/Windows Admin Shares",
+        "T1040": "Network Sniffing",
+        "T1071.002": "FTP/Application Layer Protocol",
+        "T1071.001": "HTTP/HTTPS Application Layer Protocol",
+        "T1190": "Exploit Public-Facing Application",
+        "T1210": "Exploitation of Remote Services",
+        "T1133": "External Remote Services",
+    }
+    mitre_info = []
+    if port_result.risk and port_result.risk.mitre_techniques:
+        for technique in port_result.risk.mitre_techniques:
+            mitre_info.append({
+                "id": technique,
+                "name": mitre_names.get(technique, "Unknown Technique"),
+                "tactics": ["Lateral Movement"] if "T1021" in technique
+                    else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
+            })
+    return {
+        "port": port_result.port,
+        "protocol": port_result.protocol,
+        "state": port_result.state,
+        "service": port_result.service.name if port_result.service else None,
+        "version": port_result.service.version if port_result.service else None,
+        "banner": _safe_text(port_result.banner),
+        "risk_level": port_result.risk.risk_level if port_result.risk else "INFO",
+        "risk_score": port_result.risk.risk_score if port_result.risk else 0.0,
+        "cves": cves_data,
+        "mitre_techniques": mitre_info,
+    }
+
+
+async def _persist_scan_results(
+    db_scan_id: str | None,
+    results_buffer: list[tuple],
+    status: str,
+    error: str | None = None
+) -> None:
+    """Persist scan results to DB if available; silently skip on failure."""
+    if not db_scan_id:
+        return
+    try:
+        async with async_session_maker() as db:
+            scan_row = await db.get(Scan, db_scan_id)
+            if scan_row:
+                if status == "completed":
+                    for port_res, _ in results_buffer:
+                        cves_list = [
+                            {"id": c.id, "severity": c.severity, "cvss_score": c.cvss_score}
+                            for c in (port_res.cves or [])
+                        ]
+                        db.add(ScanResult(
+                            scan_id=scan_row.id,
+                            port=port_res.port,
+                            protocol=port_res.protocol or "tcp",
+                            state=port_res.state or "open",
+                            service=port_res.service.name if port_res.service else None,
+                            version=port_res.service.version if port_res.service else None,
+                            banner=_safe_text(port_res.banner),
+                            cves=cves_list,
+                        ))
+                    scan_row.status = "completed"
+                    scan_row.completed_at = datetime.now(timezone.utc)
+                elif status == "failed":
+                    opts = scan_row.options or {}
+                    opts["error"] = error
+                    scan_row.options = opts
+                    scan_row.status = "failed"
+                await db.commit()
+    except Exception as e:
+        logger.warning("Failed to persist scan results to DB (scan=%s): %s", db_scan_id, e)
+
+
 # ─── Background scan task ────────────────────────────────────────────────────
 
-async def _run_scan(scan_id: str, target: str, port_range: str, resolved_ip: str | None = None) -> None:
-    """Runs the actual port scan in a background task, updating DB as results arrive."""
+async def _run_scan(
+    scan_id: str,
+    target: str,
+    port_range: str,
+    resolved_ip: str | None = None,
+    db_scan_id: str | None = None,
+    user_id: str | None = None,
+) -> None:
+    """Runs the actual port scan in a background task.
+
+    Stores results in-memory always, and additionally persists to DB
+    if db_scan_id is provided and DB is reachable.
+    """
     progress = {"status": "running", "progress_pct": 0, "open_ports_found": 0}
     _scan_progress[scan_id] = progress
     _scan_events[scan_id] = asyncio.Queue()
+    _scan_meta[scan_id] = {
+        "target": target,
+        "port_range": port_range,
+        "resolved_ip": resolved_ip,
+        "scan_type": "port",
+        "status": "running",
+        "user_id": user_id,
+        "db_scan_id": db_scan_id,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+        "error": None,
+    }
+    _scan_results[scan_id] = []
 
     results_buffer = []
-    total_ports_hint = 100  # will be updated from scanner
 
     async def on_port_found(port_result) -> None:
         progress["open_ports_found"] += 1
-        port_result.banner = _safe_text(port_result.banner)
-        # Emit SSE event with port data
-        cves_data = []
-        if port_result.cves:
-            for c in port_result.cves:
-                cves_data.append({
-                    "id": c.id, "severity": c.severity,
-                    "cvss_score": c.cvss_score, "description": c.description
-                })
-        mitre_names = {
-            "T1021.004": "SSH Remote Services",
-            "T1021.001": "RDP Remote Services",
-            "T1021.002": "SMB/Windows Admin Shares",
-            "T1040": "Network Sniffing",
-            "T1071.002": "FTP/Application Layer Protocol",
-            "T1071.001": "HTTP/HTTPS Application Layer Protocol",
-            "T1190": "Exploit Public-Facing Application",
-            "T1210": "Exploitation of Remote Services",
-            "T1133": "External Remote Services",
-        }
-        mitre_info = []
-        if port_result.risk and port_result.risk.mitre_techniques:
-            for technique in port_result.risk.mitre_techniques:
-                mitre_info.append({
-                    "id": technique,
-                    "name": mitre_names.get(technique, "Unknown Technique"),
-                    "tactics": ["Lateral Movement"] if "T1021" in technique else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
-                })
-        evt = {
-            "port": port_result.port,
-            "protocol": port_result.protocol,
-            "state": port_result.state,
-            "service": port_result.service.name if port_result.service else None,
-            "version": port_result.service.version if port_result.service else None,
-            "banner": port_result.banner,
-            "risk_level": port_result.risk.risk_level if port_result.risk else "INFO",
-            "risk_score": port_result.risk.risk_score if port_result.risk else 0.0,
-            "cves": cves_data,
-            "mitre_techniques": mitre_info,
-        }
+        evt = _build_evt(port_result)
         results_buffer.append((port_result, evt))
+        _scan_results[scan_id].append(evt)
         await _scan_events[scan_id].put(json.dumps(evt))
 
     try:
@@ -115,30 +193,15 @@ async def _run_scan(scan_id: str, target: str, port_range: str, resolved_ip: str
         progress["progress_pct"] = 100
         progress["status"] = "completed"
 
-        # Persist results to DB
-        async with async_session_maker() as db:
-            scan_row = await db.get(Scan, scan_id)
-            if scan_row:
-                for port_res, _ in results_buffer:
-                    cves_list = [
-                        {"id": c.id, "severity": c.severity, "cvss_score": c.cvss_score}
-                        for c in (port_res.cves or [])
-                    ]
-                    db.add(ScanResult(
-                        scan_id=scan_row.id,
-                        port=port_res.port,
-                        protocol=port_res.protocol or "tcp",
-                        state=port_res.state or "open",
-                        service=port_res.service.name if port_res.service else None,
-                        version=port_res.service.version if port_res.service else None,
-                        banner=_safe_text(port_res.banner),
-                        cves=cves_list,
-                    ))
-                scan_row.status = "completed"
-                scan_row.completed_at = datetime.now(timezone.utc)
-                await db.commit()
+        _scan_meta[scan_id]["status"] = "completed"
+        _scan_meta[scan_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
+        _scan_meta[scan_id]["scan_duration"] = round(report.scan_duration, 2)
+        _scan_meta[scan_id]["avg_latency_ms"] = report.avg_latency_ms
+        _scan_meta[scan_id]["peak_concurrency"] = report.peak_concurrency
+        _scan_meta[scan_id]["total_open"] = len(report.open_ports)
 
-        # Emit final adaptive scan summary
+        await _persist_scan_results(db_scan_id, results_buffer, "completed")
+
         summary_event = {
             "type": "scan_complete",
             "scan_duration": round(report.scan_duration, 2),
@@ -149,18 +212,13 @@ async def _run_scan(scan_id: str, target: str, port_range: str, resolved_ip: str
         await _scan_events[scan_id].put(json.dumps(summary_event))
 
     except Exception as e:
+        error_msg = f"{e.__class__.__name__}: {e}"
         progress["status"] = "failed"
-        progress["error"] = f"{e.__class__.__name__}: {e}"
+        progress["error"] = error_msg
+        _scan_meta[scan_id]["status"] = "failed"
+        _scan_meta[scan_id]["error"] = error_msg
         logger.exception("Scan %s failed for target %s", scan_id, target)
-        async with async_session_maker() as db:
-            scan_row = await db.get(Scan, scan_id)
-            if scan_row:
-                # Preserve existing options but annotate the error for visibility
-                opts = scan_row.options or {}
-                opts["error"] = progress["error"]
-                scan_row.options = opts
-                scan_row.status = "failed"
-                await db.commit()
+        await _persist_scan_results(db_scan_id, results_buffer, "failed", error_msg)
     finally:
         await _scan_events[scan_id].put("[DONE]")
 
@@ -174,12 +232,19 @@ async def create_scan(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
-    """Create a new port scan and kick off the background scanner."""
-    # Validate target early and capture the resolved IP to avoid double DNS failures
+    """Create a new port scan and kick off the background scanner.
+
+    DB-OPTIONAL: If the database is unavailable, the scan still runs
+    using in-memory storage. The response includes a `storage` field
+    indicating where results are stored.
+    """
     try:
         resolved_ip = resolve_target(body.target)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+    db_scan_id: str | None = None
+    storage = "memory"
 
     try:
         scan = Scan(
@@ -194,12 +259,21 @@ async def create_scan(
         db.add(scan)
         await db.commit()
         await db.refresh(scan)
+        db_scan_id = str(scan.id)
+        storage = "database"
     except Exception as e:
-        logger.warning("Create scan failed due to DB error: %s", e)
-        raise HTTPException(status_code=503, detail="Database unavailable; please start Postgres and try again")
+        logger.warning("DB unavailable during scan creation (target=%s): %s", body.target, e)
 
-    scan_id_str = str(scan.id)
-    background_tasks.add_task(_run_scan, scan_id_str, body.target, body.port_range, resolved_ip)
+    scan_id_str = str(db_scan_id) if db_scan_id else str(uuid4())
+    background_tasks.add_task(
+        _run_scan,
+        scan_id_str,
+        body.target,
+        body.port_range,
+        resolved_ip,
+        db_scan_id,
+        str(current_user.id) if current_user else None,
+    )
 
     return {
         "id": scan_id_str,
@@ -207,57 +281,58 @@ async def create_scan(
         "target": body.target,
         "status": "running",
         "port_range": body.port_range,
+        "storage": storage,
+        "note": "Results are streamed via /api/scans/{id}/stream" if storage == "memory"
+            else None,
     }
 
 
 @router.get("/{scan_id}/status")
-async def get_scan_status(
-    scan_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """Return current status and progress for a scan."""
+async def get_scan_status(scan_id: str):
+    """Return current status and progress for a scan.
+
+    Checks in-memory stores first, then falls back to DB.
+    """
     progress = _scan_progress.get(scan_id)
-    if progress:
+    meta = _scan_meta.get(scan_id)
+
+    if progress or meta:
         return {
             "scan_id": scan_id,
-            "status": progress["status"],
-            "progress_pct": progress["progress_pct"],
-            "open_ports_found": progress["open_ports_found"],
-            "error": progress.get("error"),
+            "status": progress.get("status", meta.get("status", "unknown")) if progress else meta.get("status", "unknown"),
+            "progress_pct": progress.get("progress_pct", 0) if progress else (100 if meta and meta.get("status") == "completed" else 0),
+            "open_ports_found": progress.get("open_ports_found", 0) if progress else len(_scan_results.get(scan_id, [])),
+            "error": progress.get("error") or meta.get("error") if meta else None,
+            "storage": "memory",
         }
 
-    # Fallback: query DB
     try:
-        scan = await db.get(Scan, scan_id)
+        async with async_session_maker() as db:
+            scan = await db.get(Scan, scan_id)
+            if scan:
+                return {
+                    "scan_id": scan_id,
+                    "status": scan.status,
+                    "progress_pct": 100 if scan.status == "completed" else 0,
+                    "open_ports_found": 0,
+                    "error": (scan.options or {}).get("error"),
+                    "storage": "database",
+                }
     except Exception as e:
-        logger.warning("Status lookup failed due to DB error: %s", e)
-        return {
-            "scan_id": scan_id,
-            "status": "unknown",
-            "progress_pct": 0,
-            "open_ports_found": 0,
-            "error": "database unavailable",
-        }
+        logger.warning("Status lookup failed (scan_id=%s): %s", scan_id, e)
 
-    if not scan:
-        raise HTTPException(status_code=404, detail="Scan not found")
-
-    return {
-        "scan_id": scan_id,
-        "status": scan.status,
-        "progress_pct": 100 if scan.status == "completed" else 0,
-        "open_ports_found": 0,
-        "error": (scan.options or {}).get("error"),
-    }
+    raise HTTPException(status_code=404, detail="Scan not found")
 
 
 @router.get("/{scan_id}/stream")
 async def stream_scan_results(scan_id: str):
-    """SSE stream delivering port results in real time as they are discovered."""
+    """SSE stream delivering port results in real time as they are discovered.
+
+    Works with both in-memory and DB-backed scans.
+    """
     async def event_generator():
         queue = _scan_events.get(scan_id)
         if queue is None:
-            # Scan already completed — replay from DB not implemented; send done
             yield "data: [DONE]\n\n"
             return
 
@@ -284,69 +359,95 @@ async def stream_scan_results(scan_id: str):
 
 
 @router.get("/{scan_id}")
-async def get_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
-    """Return full scan details with all results."""
+async def get_scan(scan_id: str):
+    """Return full scan details with all results.
+
+    Checks in-memory stores first, then falls back to DB.
+    """
+    meta = _scan_meta.get(scan_id)
+    results = _scan_results.get(scan_id, [])
+
+    if meta is not None:
+        return {
+            "id": scan_id,
+            "target": meta["target"],
+            "scan_type": meta.get("scan_type", "port"),
+            "status": meta["status"],
+            "port_range": meta.get("port_range"),
+            "started_at": meta.get("started_at"),
+            "completed_at": meta.get("completed_at"),
+            "error": meta.get("error"),
+            "storage": "memory",
+            "results": results,
+        }
+
     try:
-        scan = await db.get(Scan, scan_id)
+        async with async_session_maker() as db:
+            scan = await db.get(Scan, scan_id)
+            if not scan:
+                raise HTTPException(status_code=404, detail="Scan not found")
+
+            results_q = await db.execute(
+                select(ScanResult).where(ScanResult.scan_id == scan_id).order_by(ScanResult.port.asc())
+            )
+            db_results = results_q.scalars().all()
+
+            from cybersec.core.port_analyzer import PortAnalyzer
+            analyzer = PortAnalyzer()
+            mitre_names = {
+                "T1021.004": "SSH Remote Services",
+                "T1021.001": "RDP Remote Services",
+                "T1021.002": "SMB/Windows Admin Shares",
+                "T1040": "Network Sniffing",
+                "T1071.002": "FTP/Application Layer Protocol",
+                "T1071.001": "HTTP/HTTPS Application Layer Protocol",
+                "T1190": "Exploit Public-Facing Application",
+                "T1210": "Exploitation of Remote Services",
+                "T1133": "External Remote Services",
+            }
+
+            result_dicts = []
+            for r in db_results:
+                cves = r.cves or []
+                risk = analyzer.analyze(r.port, [])
+                mitre_info = []
+                for technique in analyzer.MITRE_MAP.get(r.port, []):
+                    mitre_info.append({
+                        "id": technique,
+                        "name": mitre_names.get(technique, "Unknown Technique"),
+                        "tactics": ["Lateral Movement"] if "T1021" in technique
+                            else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
+                    })
+                result_dicts.append({
+                    "port": r.port,
+                    "protocol": r.protocol,
+                    "state": r.state,
+                    "service": r.service,
+                    "version": r.version,
+                    "banner": r.banner,
+                    "cves": cves,
+                    "risk_level": risk.risk_level,
+                    "risk_score": risk.risk_score,
+                    "mitre_techniques": mitre_info,
+                })
+
+            return {
+                "id": str(scan.id),
+                "target": scan.target,
+                "scan_type": scan.scan_type,
+                "status": scan.status,
+                "port_range": scan.port_range,
+                "started_at": scan.started_at.isoformat() if scan.started_at else None,
+                "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+                "error": (scan.options or {}).get("error"),
+                "storage": "database",
+                "results": result_dicts,
+            }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.warning("Get scan failed due to DB error: %s", e)
+        logger.warning("Get scan failed (scan_id=%s): %s", scan_id, e)
         raise HTTPException(status_code=503, detail="Database unavailable; please start Postgres")
-
-    if not scan:
-        raise HTTPException(status_code=404, detail="Scan not found")
-
-    results_q = await db.execute(select(ScanResult).where(ScanResult.scan_id == scan_id))
-    results = results_q.scalars().all()
-
-    from cybersec.core.port_analyzer import PortAnalyzer
-    analyzer = PortAnalyzer()
-    mitre_names = {
-        "T1021.004": "SSH Remote Services",
-        "T1021.001": "RDP Remote Services",
-        "T1021.002": "SMB/Windows Admin Shares",
-        "T1040": "Network Sniffing",
-        "T1071.002": "FTP/Application Layer Protocol",
-        "T1071.001": "HTTP/HTTPS Application Layer Protocol",
-        "T1190": "Exploit Public-Facing Application",
-        "T1210": "Exploitation of Remote Services",
-        "T1133": "External Remote Services",
-    }
-
-    result_dicts = []
-    for r in results:
-        cves = r.cves or []
-        risk = analyzer.analyze(r.port, [])
-        mitre_info = []
-        for technique in analyzer.MITRE_MAP.get(r.port, []):
-            mitre_info.append({
-                "id": technique,
-                "name": mitre_names.get(technique, "Unknown Technique"),
-                "tactics": ["Lateral Movement"] if "T1021" in technique else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
-            })
-        result_dicts.append({
-            "port": r.port,
-            "protocol": r.protocol,
-            "state": r.state,
-            "service": r.service,
-            "version": r.version,
-            "banner": r.banner,
-            "cves": cves,
-            "risk_level": risk.risk_level,
-            "risk_score": risk.risk_score,
-            "mitre_techniques": mitre_info,
-        })
-
-    return {
-        "id": str(scan.id),
-        "target": scan.target,
-        "scan_type": scan.scan_type,
-        "status": scan.status,
-        "port_range": scan.port_range,
-        "started_at": scan.started_at.isoformat() if scan.started_at else None,
-        "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
-        "error": (scan.options or {}).get("error"),
-        "results": result_dicts,
-    }
 
 
 @router.get("/")
@@ -355,24 +456,27 @@ async def list_scans(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
-    """List recent scans."""
+    """List recent scans from DB. Falls back to empty list if DB unavailable."""
     try:
         q = await db.execute(select(Scan).order_by(Scan.created_at.desc()).limit(limit))
         scans = q.scalars().all()
     except Exception as e:
         logger.warning("List scans failed due to DB error: %s", e)
-        return []
-    return [
-        {
-            "id": str(s.id),
-            "target": s.target,
-            "scan_type": s.scan_type,
-            "status": s.status,
-            "port_range": s.port_range,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
-        }
-        for s in scans
-    ]
+        return {"scans": [], "storage": "database_unavailable"}
+    return {
+        "scans": [
+            {
+                "id": str(s.id),
+                "target": s.target,
+                "scan_type": s.scan_type,
+                "status": s.status,
+                "port_range": s.port_range,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            }
+            for s in scans
+        ],
+        "storage": "database",
+    }
 
 
 # ─── OS Fingerprint ──────────────────────────────────────────────────────────
@@ -383,7 +487,11 @@ async def os_fingerprint(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
-    """Run OS fingerprinting by scanning key ports and analyzing banners."""
+    """Run OS fingerprinting by scanning key ports and analyzing banners.
+
+    DB-OPTIONAL: If DB is unavailable, still returns full results
+    but tool_result_id will be None.
+    """
     try:
         resolved_ip = resolve_target(body.target)
     except (ValueError, Exception) as e:
@@ -401,21 +509,28 @@ async def os_fingerprint(
     from cybersec.core.os_fingerprint import OSFingerprinter
     fp = OSFingerprinter().fingerprint(banners, [r.port for r in report.open_ports])
 
-    tool_result = ToolResult(
-        user_id=current_user.id if current_user else None,
-        tool_name="os_fingerprint",
-        target=body.target,
-        result_data={
-            "os_name": fp.os_name,
-            "confidence": fp.confidence,
-            "method": fp.method,
-            "open_ports": [r.port for r in report.open_ports],
-            "scan_duration": report.scan_duration,
-        },
-    )
-    db.add(tool_result)
-    await db.commit()
-    await db.refresh(tool_result)
+    result_data = {
+        "os_name": fp.os_name,
+        "confidence": fp.confidence,
+        "method": fp.method,
+        "open_ports": [r.port for r in report.open_ports],
+        "scan_duration": report.scan_duration,
+    }
+    tool_result_id = None
+
+    try:
+        tool_result = ToolResult(
+            user_id=current_user.id if current_user else None,
+            tool_name="os_fingerprint",
+            target=body.target,
+            result_data=result_data,
+        )
+        db.add(tool_result)
+        await db.commit()
+        await db.refresh(tool_result)
+        tool_result_id = str(tool_result.id)
+    except Exception as e:
+        logger.warning("OS fingerprint DB save failed: %s", e)
 
     return {
         "target": body.target,
@@ -425,7 +540,8 @@ async def os_fingerprint(
         "confidence_pct": round(fp.confidence * 100, 1),
         "method": fp.method,
         "open_ports_scanned": [r.port for r in report.open_ports],
-        "tool_result_id": str(tool_result.id),
+        "tool_result_id": tool_result_id,
+        "storage": "database" if tool_result_id else "memory",
     }
 
 
@@ -436,16 +552,15 @@ async def websocket_scan_progress(websocket: WebSocket, scan_id: str):
         if scan_id not in _scan_events:
             await websocket.send_json({"error": "Scan not found"})
             return
-        
+
         queue = _scan_events[scan_id]
         while True:
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=30)
                 await websocket.send_json(event)
             except asyncio.TimeoutError:
-                # Send ping to keep connection alive
                 await websocket.send_json({"type": "ping"})
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        logger.error("WebSocket error: %s", e)
     finally:
         await websocket.close()
