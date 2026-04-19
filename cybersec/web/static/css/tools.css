@@ -21,7 +21,7 @@
 }
 
 .tool-title i {
-  color: var(--accent-blue);
+  color: var(--accent-secondary);
 }
 
 .tool-desc {
@@ -55,7 +55,7 @@
 }
 
 .tool-input:focus {
-  border-color: var(--accent-blue);
+  border-color: var(--accent-secondary);
 }
 
 .tool-input::placeholder {
@@ -140,7 +140,7 @@
 .result-title {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--accent-blue);
+  color: var(--accent-secondary);
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-default);
@@ -238,12 +238,12 @@
 }
 
 .headers-checklist li.present .check-icon {
-  background: var(--accent-green);
+  background: var(--accent-primary);
   color: white;
 }
 
 .headers-checklist li.missing .check-icon {
-  background: var(--accent-red);
+  background: var(--accent-danger);
   color: white;
 }
 
@@ -273,7 +273,7 @@
 
 .subdomain-name {
   font-family: var(--font-mono);
-  color: var(--accent-blue);
+  color: var(--accent-secondary);
 }
 
 .subdomain-count {
@@ -294,7 +294,7 @@
 
 .progress-fill {
   height: 100%;
-  background: var(--accent-blue);
+  background: var(--accent-secondary);
   transition: width var(--transition-normal);
 }
 
@@ -327,16 +327,16 @@
 }
 
 .scan-status-dot.running {
-  background: var(--accent-blue);
+  background: var(--accent-secondary);
   animation: pulse 1.5s infinite;
 }
 
 .scan-status-dot.completed {
-  background: var(--accent-green);
+  background: var(--accent-primary);
 }
 
 .scan-status-dot.failed {
-  background: var(--accent-red);
+  background: var(--accent-danger);
 }
 
 @keyframes pulse {
@@ -405,7 +405,7 @@
 }
 
 .select-control:focus {
-  border-color: var(--accent-blue);
+  border-color: var(--accent-secondary);
 }
 
 .hoverable-glow-row {
@@ -428,11 +428,11 @@
   font-weight: 600;
 }
 
-.risk-badge.critical { background: rgba(220,38,38,0.15); color: #DC2626; border: 1px solid rgba(220,38,38,0.3); }
-.risk-badge.high { background: rgba(239,68,68,0.15); color: #EF4444; border: 1px solid rgba(239,68,68,0.3); }
-.risk-badge.medium { background: rgba(245,158,11,0.15); color: #F59E0B; border: 1px solid rgba(245,158,11,0.3); }
-.risk-badge.low { background: rgba(59,130,246,0.15); color: #3B82F6; border: 1px solid rgba(59,130,246,0.3); }
-.risk-badge.info { background: rgba(156,163,175,0.15); color: #9CA3AF; border: 1px solid rgba(156,163,175,0.3); }
+.risk-badge.critical { background: rgba(239,68,68,0.15); color: #EF4444; border: 1px solid rgba(239,68,68,0.3); }
+.risk-badge.high { background: rgba(245,158,11,0.15); color: #F59E0B; border: 1px solid rgba(245,158,11,0.3); }
+.risk-badge.medium { background: rgba(234,179,8,0.15); color: #EAB308; border: 1px solid rgba(234,179,8,0.3); }
+.risk-badge.low { background: rgba(16,185,129,0.15); color: #10B981; border: 1px solid rgba(16,185,129,0.3); }
+.risk-badge.info { background: rgba(167,173,189,0.15); color: #A7ADBD; border: 1px solid rgba(167,173,189,0.3); }
 
 .service-icon {
   width: 28px;
@@ -444,7 +444,7 @@
   border: 1px solid var(--border-default);
   border-radius: 6px;
   margin-right: 8px;
-  color: var(--accent-blue);
+  color: var(--accent-secondary);
 }
 
 .port-insight {
@@ -470,7 +470,7 @@
   content: '';
   position: absolute;
   top: 0; left: 0; width: 100%; height: 3px;
-  background: linear-gradient(90deg, #8B7FEB, #41B883); /* Match cybersec theme */
+  background: linear-gradient(90deg, #8B5CF6, #10B981); /* Match cybersec theme */
 }
 
 .ai-insight-header {
@@ -483,7 +483,7 @@
 }
 
 .ai-insight-header i {
-  color: #8B7FEB;
+  color: var(--accent-secondary);
 }
 
 .ai-insight-content {
@@ -510,7 +510,7 @@
 
 .os-hero-icon {
   font-size: 3rem;
-  color: var(--accent-blue);
+  color: var(--accent-secondary);
   background: rgba(59,130,246,0.1);
   width: 70px;
   height: 70px;
@@ -557,9 +557,9 @@
   transition: width 0.5s ease-in-out;
 }
 
-.os-progress-fill.high { background: #3FB950; box-shadow: 0 0 10px rgba(63,185,80,0.5); }
-.os-progress-fill.medium { background: #D29922; box-shadow: 0 0 10px rgba(210,153,34,0.5); }
-.os-progress-fill.low { background: #F85149; box-shadow: 0 0 10px rgba(248,81,73,0.5); }
+.os-progress-fill.high { background: #10B981; box-shadow: 0 0 10px rgba(16,185,129,0.5); }
+.os-progress-fill.medium { background: #EAB308; box-shadow: 0 0 10px rgba(234,179,8,0.5); }
+.os-progress-fill.low { background: #EF4444; box-shadow: 0 0 10px rgba(239,68,68,0.5); }
 
 .os-warning-box {
   background: rgba(248,81,73,0.1);
@@ -662,9 +662,9 @@
   background: var(--bg-primary);
 }
 
-.webscan-score-dial.high { color: var(--accent-green); border-color: rgba(63,185,80,0.5); box-shadow: 0 0 15px rgba(63,185,80,0.2); }
-.webscan-score-dial.medium { color: var(--accent-yellow); border-color: rgba(210,153,34,0.5); box-shadow: 0 0 15px rgba(210,153,34,0.2); }
-.webscan-score-dial.critical { color: var(--accent-red); border-color: rgba(248,81,73,0.5); box-shadow: 0 0 15px rgba(248,81,73,0.2); }
+.webscan-score-dial.high { color: var(--accent-primary); border-color: rgba(63,185,80,0.5); box-shadow: 0 0 15px rgba(63,185,80,0.2); }
+.webscan-score-dial.medium { color: var(--accent-gold); border-color: rgba(210,153,34,0.5); box-shadow: 0 0 15px rgba(210,153,34,0.2); }
+.webscan-score-dial.critical { color: var(--accent-danger); border-color: rgba(248,81,73,0.5); box-shadow: 0 0 15px rgba(248,81,73,0.2); }
 
 .webscan-score-info h3 {
   font-size: 1.4rem;
@@ -730,9 +730,9 @@
   text-transform: uppercase;
   color: #fff;
 }
-.vuln-badge.high { background: var(--accent-red); }
-.vuln-badge.medium { background: var(--accent-yellow); color: #000; }
-.vuln-badge.low { background: var(--accent-green); }
+.vuln-badge.high { background: var(--accent-danger); }
+.vuln-badge.medium { background: var(--accent-gold); color: #000; }
+.vuln-badge.low { background: var(--accent-primary); }
 
 .vuln-group-content {
   padding: 15px;
@@ -762,7 +762,7 @@
   margin-top: 10px;
   font-size: 0.9rem;
 }
-.webscan-fix-box h6 { color: var(--accent-green); margin-bottom: 6px; display:flex; align-items:center; gap:6px; font-size: 0.9rem;}
+.webscan-fix-box h6 { color: var(--accent-primary); margin-bottom: 6px; display:flex; align-items:center; gap:6px; font-size: 0.9rem;}
 .webscan-fix-box code { display: block; margin-top: 6px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; color: var(--text-primary); }
 
 .webscan-controls {
@@ -914,8 +914,8 @@
   font-weight: 700;
   border: 2px solid var(--border-default);
 }
-.timeline-node.left { color: var(--accent-green); }
-.timeline-node.right { color: var(--accent-red); }
+.timeline-node.left { color: var(--accent-primary); }
+.timeline-node.right { color: var(--accent-danger); }
 
 .labels {
   display: flex;
@@ -939,7 +939,7 @@
   border: 1px solid rgba(248, 81, 73, 0.3);
   border-radius: var(--radius-md);
   padding: 16px 20px;
-  color: var(--accent-red);
+  color: var(--accent-danger);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1024,12 +1024,12 @@
 
 .dns-health-item:last-child { border-bottom: none; }
 .dns-health-item .status { font-size: 1.1rem; }
-.dns-health-item.issue { color: var(--accent-yellow); }
-.dns-health-item.pass { color: var(--accent-green); }
+.dns-health-item.issue { color: var(--accent-gold); }
+.dns-health-item.pass { color: var(--accent-primary); }
 
 .remediation-code-block {
-  background: #0d1117;
-  border: 1px solid #30363d;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
   padding: 16px;
   margin-top: 12px;
@@ -1042,7 +1042,7 @@
   align-items: center;
   margin-bottom: 10px;
   font-size: 0.8rem;
-  color: #8b949e;
+  color: var(--text-secondary);
   text-transform: uppercase;
 }
 
@@ -1057,7 +1057,7 @@
 .attack-scenario-alert {
   background: rgba(248,81,73,0.05);
   border: 1px solid rgba(248,81,73,0.2);
-  border-left: 4px solid var(--accent-red);
+  border-left: 4px solid var(--accent-danger);
   padding: 16px;
   border-radius: 4px;
   margin-top: 15px;
@@ -1067,14 +1067,14 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--accent-red);
+  color: var(--accent-danger);
   font-weight: 700;
   margin-bottom: 8px;
   font-size: 0.95rem;
 }
 
 .badge-high-interest {
-  background: var(--accent-red);
+  background: var(--accent-danger);
   color: #fff;
   padding: 2px 8px;
   border-radius: 4px;
@@ -1145,8 +1145,8 @@
 }
 
 .ws-stat-card {
-  background: #111318;
-  border: 0.5px solid #2a2d35;
+  background: var(--bg-tertiary);
+  border: 0.5px solid var(--border-default);
   border-radius: 8px;
   padding: 12px 16px;
   text-align: center;
@@ -1217,9 +1217,9 @@
 .ws-vuln-table th {
   text-align: left;
   padding: 10px 14px;
-  background: #161820;
-  border-bottom: 1px solid #2a2d35;
-  color: #6b6e78;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-muted);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1327,14 +1327,14 @@
   align-items: center;
   gap: 8px;
   padding: 12px 14px 0;
-  border-top: 0.5px solid #2a2d35;
+  border-top: 0.5px solid var(--border-default);
   margin-top: 16px;
 }
 
 .ws-rescan-btn {
   background: transparent;
-  border: 1px solid #2a2d35;
-  color: #b0b2ba;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   padding: 6px 14px;
   border-radius: 6px;
   font-size: 12px;
@@ -1361,8 +1361,8 @@
 }
 
 .ws-log-header {
-  background: #161820;
-  border: 0.5px solid #2a2d35;
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--border-default);
   border-radius: 8px;
   padding: 10px 14px;
   display: flex;
@@ -1392,8 +1392,8 @@
 }
 
 .ws-log-content {
-  background: #0d0f14;
-  border: 0.5px solid #2a2d35;
+  background: var(--bg-primary);
+  border: 0.5px solid var(--border-default);
   border-top: none;
   border-radius: 0 0 8px 8px;
   max-height: 200px;

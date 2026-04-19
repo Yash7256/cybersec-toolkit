@@ -238,6 +238,17 @@ async def webapp_scan_start(
 
     scan_id = db_scan_id if db_scan_id else str(uuid4())
 
+    _wapp_scan_meta[scan_id] = {
+        "target": body.target,
+        "status": "pending",
+        "user_id": current_user.id if current_user else None,
+        "db_scan_id": db_scan_id,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+        "error": None,
+        "vulnerabilities": [],
+    }
+
     return {
         "scan_id": scan_id,
         "target": body.target,

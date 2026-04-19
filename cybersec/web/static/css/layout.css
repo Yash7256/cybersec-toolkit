@@ -46,7 +46,7 @@
   font-weight: 700;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -94,7 +94,7 @@
 
 .nav-item.active {
   background: rgba(88, 166, 255, 0.15);
-  color: var(--accent-blue);
+  color: var(--accent-secondary);
 }
 
 .nav-item i {
@@ -151,7 +151,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent-green);
+  background: var(--accent-primary);
 }
 
 .ai-messages {
@@ -182,12 +182,12 @@
 }
 
 .ai-input:focus {
-  border-color: var(--accent-blue);
+  border-color: var(--accent-secondary);
 }
 
 .ai-send-btn {
   padding: 10px 16px;
-  background: var(--accent-blue);
+  background: var(--accent-secondary);
   color: white;
   border-radius: var(--radius-md);
   font-weight: 500;
@@ -208,7 +208,7 @@
 
 .message.user {
   align-self: flex-end;
-  background: var(--accent-blue);
+  background: var(--accent-secondary);
   color: white;
   border-bottom-right-radius: var(--radius-sm);
 }
@@ -226,8 +226,8 @@
 
 .message.error {
   background: rgba(248, 81, 73, 0.15);
-  border: 1px solid var(--accent-red);
-  color: var(--accent-red);
+  border: 1px solid var(--accent-danger);
+  color: var(--accent-danger);
 }
 
 @media (max-width: 1200px) {

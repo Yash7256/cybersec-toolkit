@@ -17,6 +17,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,6 +52,16 @@ def _safe_text(text: str | None) -> str | None:
 # ─── Schemas ────────────────────────────────────────────────────────────────
 
 class ScanCreate(BaseModel):
+    target: str = Field(min_length=1, max_length=255)
+    port_range: str = Field(default="common")
+    scan_type: Literal[
+        "connect", "syn", "udp",
+        "stealth_fin", "stealth_null", "stealth_xmas", "stealth_ack",
+        "zombie", "ack", "full", "port"
+    ] = "port"
+    options: Optional[dict] = None
+
+class OSFingerprintRequest(BaseModel):
     target: str = Field(min_length=1, max_length=255)
     port_range: str = Field(default="common")
     scan_type: str = Field(default="port")
@@ -300,7 +311,7 @@ async def create_scan(
         scan = Scan(
             user_id=current_user.id if current_user else None,
             target=body.target,
-            scan_type=body.scan_type if body.scan_type in ("port", "web", "full") else "port",
+            scan_type=body.scan_type if body.scan_type else "port",
             status="running",
             port_range=body.port_range,
             options={**(body.options or {}), "resolved_ip": resolved_ip},

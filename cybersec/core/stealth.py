@@ -31,6 +31,7 @@ class StealthScanner:
         "fin": 0x01,
         "null": 0x00,
         "xmas": 0x29,
+        "ack": 0x10,
     }
     
     def __init__(self, timeout: float = 3.0, decoy_count: int = 3):
@@ -119,6 +120,36 @@ class StealthScanner:
             
         except Exception:
             return StealthResult(port=port, state="error", scan_type="xmas")
+
+    def _sync_ack_scan(self, target: str, port: int) -> StealthResult:
+        """ACK scan: sends ACK with seq=0. RST response = unfiltered; no response = filtered/filtered.
+
+        ACK scan maps firewall rules rather than finding open ports.
+        - RST received → port is UNFILTERED (no firewall rule blocking)
+        - No response → port is FILTERED (firewall is blocking)
+        - Used to discover firewall rule sets, not port state.
+        """
+        if not self.is_available():
+            return StealthResult(port=port, state="requires_root", scan_type="ack")
+
+        conf.verb = 0
+        pkt = IP(dst=target)/TCP(dport=port, flags="A", seq=0)
+
+        try:
+            resp = sr1(pkt, timeout=self.timeout, verbose=0)
+
+            if resp is None:
+                return StealthResult(port=port, state="filtered", scan_type="ack")
+
+            if resp.haslayer(TCP):
+                flags = resp[TCP].flags
+                if flags & 0x04:
+                    return StealthResult(port=port, state="unfiltered", scan_type="ack")
+
+            return StealthResult(port=port, state="filtered", scan_type="ack")
+
+        except Exception:
+            return StealthResult(port=port, state="error", scan_type="ack")
 
     def _sync_fragment_scan(self, target: str, port: int) -> List[StealthResult]:
         if not self.is_available():
@@ -212,6 +243,8 @@ class StealthScanner:
                 result = result_list[0] if result_list else StealthResult(port=port, state="error", scan_type="fragment")
             elif scan_type == "decoy":
                 result = await loop.run_in_executor(self._executor, self._sync_decoy_scan, target, port)
+            elif scan_type == "ack":
+                result = await loop.run_in_executor(self._executor, self._sync_ack_scan, target, port)
             else:
                 result = StealthResult(port=port, state="unknown", scan_type=scan_type)
             

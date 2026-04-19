@@ -1,13 +1,17 @@
 """
 Scan pydantic schemas.
 """
-from pydantic import BaseModel
-from typing import Optional, Any
+from pydantic import BaseModel, Field
+from typing import Optional, Any, Literal
 from uuid import UUID
 
 class ScanCreate(BaseModel):
     target: str
-    scan_type: str
+    scan_type: Literal[
+        "connect", "syn", "udp",
+        "stealth_fin", "stealth_null", "stealth_xmas", "stealth_ack",
+        "zombie", "ack", "full"
+    ] = "connect"
     port_range: Optional[str] = None
     options: Optional[dict[str, Any]] = None
 

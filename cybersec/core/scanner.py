@@ -150,6 +150,25 @@ class AsyncPortScanner:
         except socket.error:
             return False
 
+    async def _rst_probe(self, ip: str, port: int) -> bool:
+        """Send a second SYN with a short timeout. If we get RST → closed. Otherwise → filtered."""
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(ip, port), timeout=1.0
+            )
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            return True
+        except ConnectionRefusedError:
+            return True
+        except (asyncio.TimeoutError, OSError):
+            return False
+        except Exception:
+            return False
+
     async def _scan_port(
         self,
         ip: str,
@@ -175,11 +194,14 @@ class AsyncPortScanner:
                 await controller.on_attempt(True)
 
             except asyncio.TimeoutError:
-                state = "filtered"
+                is_closed = await self._rst_probe(ip, port)
+                state = "closed" if is_closed else "filtered"
                 await controller.on_attempt(False)
+
             except ConnectionRefusedError:
                 state = "closed"
                 await controller.on_attempt(True)
+
             except OSError as e:
                 if e.errno in (errno.EHOSTUNREACH, 113):
                     state = "unreachable"
@@ -304,17 +326,32 @@ class AsyncPortScanner:
             else:
                 scan_mode = "connect"
 
-        elif scan_mode in ["stealth_fin", "stealth_null", "stealth_xmas"]:
+        elif scan_mode in ["stealth_fin", "stealth_null", "stealth_xmas", "stealth_ack"]:
             stealth_scanner = self._get_stealth_scanner()
             scan_type = scan_mode.replace("stealth_", "")
             if stealth_scanner and stealth_scanner.is_available():
                 stealth_results = await stealth_scanner.scan(ip, ports, scan_type=scan_type)
                 for stealth_res in stealth_results:
-                    if stealth_res.state in ["open", "open|filtered"]:
+                    if stealth_res.state in ["open", "open|filtered", "unfiltered"]:
                         port_result = PortResult(
                             port=stealth_res.port,
                             protocol="tcp",
                             state=stealth_res.state
+                        )
+                        open_ports_results.append(port_result)
+            else:
+                scan_mode = "connect"
+
+        elif scan_mode == "ack":
+            stealth_scanner = self._get_stealth_scanner()
+            if stealth_scanner and stealth_scanner.is_available():
+                ack_results = await stealth_scanner.scan(ip, ports, scan_type="ack")
+                for ack_res in ack_results:
+                    if ack_res.state in ("unfiltered", "filtered"):
+                        port_result = PortResult(
+                            port=ack_res.port,
+                            protocol="tcp",
+                            state=ack_res.state
                         )
                         open_ports_results.append(port_result)
             else:

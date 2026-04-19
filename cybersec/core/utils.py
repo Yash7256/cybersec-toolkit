@@ -84,16 +84,85 @@ def resolve_target_ipv6(target: str) -> str:
     raise ValueError("Could not resolve target to IPv6")
 
 
-def parse_ports(port_range: str) -> list[int]:
-    common_ports = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 5432, 6379, 8080, 8443, 27017]
-    top1000 = list(range(1, 1001)) 
+COMMON_PORTS = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 5432, 6379, 8080, 8443, 27017]
 
+_TOP_100_ORDERED = [
+    80, 443, 22, 21, 25, 3389, 110, 445, 139, 143, 53, 135, 3306, 8080,
+    1723, 111, 995, 1025, 587, 888, 199, 1720, 465, 548, 113, 81, 10000,
+    514, 5060, 179, 1026, 2000, 2001, 2049, 2121, 2717, 3128, 3333, 49152,
+    5009, 1900, 3986, 13, 5051, 6646, 49154, 1027, 5666, 646, 5000, 49156,
+    543, 544, 5101, 144, 7, 389, 8000, 8009, 8081, 5800, 106, 5222, 8888,
+    511, 997, 1028, 873, 1755, 3478, 4000, 4899, 5050, 5432, 5054, 5061,
+    5900, 6000, 8008, 8443, 9090, 9101, 10001, 32768, 49153, 49155, 49157,
+    50000, 50030, 50060, 50070, 50090, 54321,
+    23, 24, 26, 37, 42, 49, 63, 67, 68, 69, 70, 79, 82, 83, 84,
+    85, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100,
+]
+
+_TOP_250_ORDERED = [
+    554, 1029, 1755, 1901, 4000, 4899, 5050, 5432, 5054, 5061,
+    5900, 6000, 8008, 8080, 8443, 8888, 9090, 9101, 10001, 10010,
+    50000, 50030, 50060, 50070, 50090,
+    1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20,
+    27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 38, 39, 40, 41, 43, 44, 45, 46, 47, 48,
+    50, 51, 52, 54, 55, 56, 57, 58, 59, 60, 61, 62, 64, 65, 66,
+    101, 102, 103, 104, 105, 107, 108, 109, 112, 114, 115, 116, 117, 118, 119,
+    120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
+    136, 137, 138, 140, 141, 142, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155,
+    156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170,
+    171, 172, 173, 174, 175, 176, 177, 178, 180, 181, 182, 183, 184, 185, 186,
+    187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198,
+    200, 201, 202, 203, 204, 205, 206, 207, 208, 209,
+    210, 211, 212, 213, 214, 215, 216, 217, 218, 219,
+    220, 221, 222, 223, 224, 225, 226, 227, 228, 229,
+    230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
+    240, 241, 242, 243, 244, 245, 246, 247, 248, 249,
+    250, 251, 252, 253, 254, 255, 256, 257, 258, 259,
+    260, 261, 262, 263, 264, 265, 266, 267, 268, 269,
+    270, 271, 272, 273, 274, 275, 276, 277, 278, 279,
+    280, 281, 282, 283, 284, 285, 286, 287, 288, 289,
+    290, 291, 292, 293, 294, 295, 296, 297, 298, 299,
+]
+
+_TOP_100_DEDUPED = list(dict.fromkeys(_TOP_100_ORDERED))
+_TOP_250_DEDUPED = list(dict.fromkeys(_TOP_100_ORDERED + _TOP_250_ORDERED))
+
+assert len(_TOP_100_DEDUPED) >= 100, f"Need 100 unique ports, got {len(_TOP_100_DEDUPED)}"
+assert len(_TOP_250_DEDUPED) >= 250, f"Need 250 unique ports, got {len(_TOP_250_DEDUPED)}"
+
+TOP_100_PORTS = _TOP_100_DEDUPED[:100]
+TOP_250_PORTS = _TOP_250_DEDUPED[:250]
+TOP_1000_PORTS = list(range(1, 1001))
+
+
+def parse_ports(port_range: str) -> list[int]:
     if port_range == "common":
-        ports = common_ports
+        ports = COMMON_PORTS
+    elif port_range == "top100":
+        ports = TOP_100_PORTS
+    elif port_range == "top250":
+        ports = TOP_250_PORTS[:250]
     elif port_range == "top1000":
-        ports = top1000
+        ports = TOP_1000_PORTS
     elif port_range == "all":
         ports = list(range(1, 65536))
+    elif port_range.startswith("top-"):
+        try:
+            n = int(port_range.split("-")[1])
+            if n <= 0:
+                raise ValueError("top-N must be > 0")
+            if n <= len(TOP_100_PORTS):
+                ports = TOP_100_PORTS[:n]
+            elif n <= 250:
+                ports = TOP_250_PORTS[:n]
+            elif n <= 1000:
+                ports = TOP_1000_PORTS[:n]
+            else:
+                ports = list(range(1, n + 1))
+        except (ValueError, IndexError) as e:
+            raise ValueError(
+                f"Invalid top-ports format. Use top-N (e.g. top-100, top-250, top-1000) or top-{len(TOP_100_PORTS)} max for top-ports. Error: {e}"
+            ) from e
     else:
         ports = []
         parts = port_range.split(",")
@@ -115,11 +184,16 @@ def parse_ports(port_range: str) -> list[int]:
                 except Exception:
                     raise ValueError("Invalid port format")
                     
-    ports = sorted(list(set(ports)))
+    seen = set()
+    deduped = []
     for p in ports:
+        if p not in seen:
+            seen.add(p)
+            deduped.append(p)
+    for p in deduped:
         if p < 1 or p > 65535:
             raise ValueError("Port out of range")
-    return ports
+    return deduped
 
 def format_duration(seconds: float) -> str:
     secs = int(seconds)
