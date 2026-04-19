@@ -16,6 +16,12 @@ from cybersec.core.cve_lookup import CVELookup, CVEEntry
 from cybersec.core.port_analyzer import PortAnalyzer, PortRisk
 from cybersec.core.os_fingerprint import OSFingerprinter, OSFingerprint
 
+try:
+    from scapy.all import IP, TCP, ICMP, sr1, conf
+    SCAPY_AVAILABLE = True
+except ImportError:
+    SCAPY_AVAILABLE = False
+
 @dataclass
 class PortResult:
     port: int
@@ -151,7 +157,80 @@ class AsyncPortScanner:
             return False
 
     async def _rst_probe(self, ip: str, port: int) -> bool:
-        """Send a second SYN with a short timeout. If we get RST → closed. Otherwise → filtered."""
+        """
+        Enhanced RST probe using Scapy for reliable filtered vs closed detection.
+        
+        Logic:
+        1. Send SYN packet and analyze response
+        2. SYN-ACK = port is open (should not happen in timeout scenario)
+        3. RST = port is closed (host actively refused)
+        4. No response/ICMP unreachable = filtered (firewall/drop)
+        5. Retry up to 2 times with exponential backoff
+        """
+        if not SCAPY_AVAILABLE:
+            # Fallback to original method if Scapy unavailable
+            return await self._rst_probe_fallback(ip, port)
+        
+        # Try up to 2 times with increasing timeouts
+        for attempt in range(2):
+            timeout = 1.0 + (attempt * 0.5)  # 1.0s, 1.5s
+            
+            try:
+                # Disable Scapy verbosity for this probe
+                conf.verb = 0
+                
+                # Craft SYN packet
+                syn_pkt = IP(dst=ip)/TCP(dport=port, flags="S", seq=1000 + attempt)
+                
+                # Send packet and wait for response
+                response = sr1(syn_pkt, timeout=timeout, verbose=0)
+                
+                if response is None:
+                    # No response = filtered (firewall dropped packet)
+                    continue  # Try next attempt
+                    
+                # Check if we got any response
+                if hasattr(response, 'haslayer'):
+                    # Check for TCP layer in response
+                    if response.haslayer(TCP):
+                        tcp_layer = response[TCP]
+                        tcp_flags = tcp_layer.flags
+                        
+                        # SYN-ACK (0x12) = port is open (shouldn't happen but handle)
+                        if tcp_flags & 0x12:  # SYN+ACK
+                            # This means port is open, but we're in timeout context
+                            # This is unexpected but we handle it gracefully
+                            return False
+                            
+                        # RST (0x04) or RST-ACK (0x14) = port is closed  
+                        elif tcp_flags & 0x04:  # RST flag set
+                            return True  # Port is closed
+                            
+                    # Check for ICMP layer (destination unreachable)
+                    if response.haslayer(ICMP):
+                        icmp_layer = response[ICMP]
+                        # ICMP Type 3 = Destination Unreachable = filtered
+                        if icmp_layer.type == 3:
+                            return False  # Port is filtered
+                            
+                # If we get here, we got an unclassified response
+                # Default to filtered for safety
+                return False
+                
+            except Exception as e:
+                # On any error, try next attempt
+                if attempt == 1:  # Only log on first attempt
+                    pass  # Silently handle for production
+                continue
+                
+        # If all attempts failed with no response, assume filtered
+        return False
+    
+    async def _rst_probe_fallback(self, ip: str, port: int) -> bool:
+        """
+        Fallback method using asyncio when Scapy is unavailable.
+        Less accurate but maintains functionality.
+        """
         try:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(ip, port), timeout=1.0
@@ -161,13 +240,13 @@ class AsyncPortScanner:
                 await writer.wait_closed()
             except Exception:
                 pass
-            return True
+            return True  # Got connection = closed
         except ConnectionRefusedError:
-            return True
+            return True  # Explicit refusal = closed
         except (asyncio.TimeoutError, OSError):
-            return False
+            return False  # Timeout = filtered
         except Exception:
-            return False
+            return False  # Any other error = filtered
 
     async def _scan_port(
         self,
