@@ -43,11 +43,18 @@ def create_app() -> FastAPI:
     async def health_check():
         return {"status": "ok", "app": settings.APP_NAME}
 
-    # Mount static files at the root
+    # Mount static files at /static/ path
     # Note: the directory 'cybersec/web/static' handles the static site
     # This must be mounted last so it doesn't mask API routes
     try:
-        app.mount("/", StaticFiles(directory="cybersec/web/static", html=True), name="static")
+        app.mount("/static", StaticFiles(directory="cybersec/web/static", html=True), name="static")
+        # Serve index.html at root
+        from fastapi.responses import FileResponse
+        import os
+        
+        @app.get("/", include_in_schema=False)
+        async def read_index():
+            return FileResponse("cybersec/web/static/index.html")
     except RuntimeError:
         pass # Handle case where directory may not exist yet in tests/init
 
