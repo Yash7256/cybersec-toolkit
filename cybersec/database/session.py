@@ -6,10 +6,13 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from cybersec.config import settings
 from cybersec.database.base import Base
 
+# Create engine with connection pool settings for Supabase
 engine = create_async_engine(
     settings.DATABASE_URL,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW
+    pool_size=1,  # Smaller pool for Supabase
+    max_overflow=2,
+    pool_pre_ping=True,  # Verify connections before use
+    pool_recycle=300,  # Recycle connections every 5 minutes
 )
 
 async_session_maker = async_sessionmaker(
