@@ -1,6 +1,7 @@
 """
 FastAPI application main entry point.
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -14,8 +15,19 @@ from cybersec.config import settings
 # Import routers (they are stubs for now)
 from cybersec.api.routers import auth, scans, tools, ai, reports, webapp
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        from cybersec.database.session import init_db
+        await init_db()
+        print("Database tables initialized successfully")
+    except Exception as e:
+        print(f"Database init warning: {e}")
+    yield
+
 def create_app() -> FastAPI:
     app = FastAPI(
+        lifespan=lifespan,
         title="CyberSec Port Scanner API",
         description="""Comprehensive port scanning and network reconnaissance API.
         
