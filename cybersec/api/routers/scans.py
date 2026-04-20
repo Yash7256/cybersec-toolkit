@@ -1257,15 +1257,31 @@ async def list_scans(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
-    """List recent scans from DB. Falls back to empty list if DB unavailable."""
+    """List recent scans from DB. Falls back to in-memory storage if DB unavailable."""
     try:
         q = await db.execute(select(Scan).order_by(Scan.created_at.desc()).limit(limit))
         scans = q.scalars().all()
-    except Exception as e:
-        logger.warning("List scans failed due to DB error: %s", e)
-        import traceback
-        logger.warning("Trace: %s", traceback.format_exc())
-        return {"scans": [], "storage": "database_unavailable", "error": str(e)}
+        return {
+            "scans": [
+                {
+                    "id": str(s.id),
+                    "target": s.target,
+                    "scan_type": s.scan_type,
+                    "status": s.status,
+                    "port_range": s.port_range,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                }
+                for s in scans
+            ],
+            "storage": "database",
+        }
+    except Exception:
+        # Return in-memory scans when DB unavailable
+        in_memory_scans = list(_scan_meta.values())[:limit]
+        return {
+            "scans": in_memory_scans,
+            "storage": "in_memory",
+        }
     return {
         "scans": [
             {
