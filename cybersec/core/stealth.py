@@ -34,10 +34,11 @@ class StealthScanner:
         "ack": 0x10,
     }
     
-    def __init__(self, timeout: float = 3.0, decoy_count: int = 3):
+    def __init__(self, timeout: float = 3.0, decoy_count: int = 3, rate_pps: Optional[float] = None):
         self.timeout = timeout
         self.decoy_count = decoy_count
-        self._executor = ThreadPoolExecutor(max_workers=10)
+        self.rate_pps = rate_pps or 100.0  # Default to 100 pps for stealth
+        self._executor = ThreadPoolExecutor(max_workers=1)
         self._has_root = is_root()
 
     def is_available(self) -> bool:
@@ -232,17 +233,18 @@ class StealthScanner:
         total = len(ports)
         
         for i, port in enumerate(ports):
+            # Apply rate limiting BEFORE the scan
+            if i > 0:  # Don't delay the first packet
+                inter_packet_delay = 1.0 / self.rate_pps if self.rate_pps > 0 else 0.01
+                print(f"DEBUG: Sleeping for {inter_packet_delay:.3f}s before port {port}")
+                await asyncio.sleep(inter_packet_delay)
+            
             if scan_type == "fin":
                 result = await loop.run_in_executor(self._executor, self._sync_fin_scan, target, port)
             elif scan_type == "null":
                 result = await loop.run_in_executor(self._executor, self._sync_null_scan, target, port)
             elif scan_type == "xmas":
                 result = await loop.run_in_executor(self._executor, self._sync_xmas_scan, target, port)
-            elif scan_type == "fragment":
-                result_list = await loop.run_in_executor(self._executor, self._sync_fragment_scan, target, port)
-                result = result_list[0] if result_list else StealthResult(port=port, state="error", scan_type="fragment")
-            elif scan_type == "decoy":
-                result = await loop.run_in_executor(self._executor, self._sync_decoy_scan, target, port)
             elif scan_type == "ack":
                 result = await loop.run_in_executor(self._executor, self._sync_ack_scan, target, port)
             else:
@@ -252,7 +254,5 @@ class StealthScanner:
             
             if progress_callback:
                 progress_callback(i + 1, total)
-            
-            await asyncio.sleep(0.01)
         
         return results

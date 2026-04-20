@@ -1,0 +1,27 @@
+{
+  "name": "cybersec",
+  "version": "1.0.0",
+  "description": "A comprehensive async network security toolkit built with FastAPI, React, and Click.   Advanced port scanning, web vulnerability detection, OS fingerprinting, AI-powered analysis, and rich reporting — all in one.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yash7256/cybersec-new.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Yash7256/cybersec-new/issues"
+  },
+  "homepage": "https://github.com/Yash7256/cybersec-new#readme",
+  "devDependencies": {
+    "eslint": "^10.2.1"
+  }
+}

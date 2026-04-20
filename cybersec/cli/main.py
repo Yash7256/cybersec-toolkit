@@ -131,9 +131,12 @@ def scan():
 @click.option("--ports", default="common", help="Port range: common|top1000|all|1-1000|80,443")
 @click.option("--timeout", default=3.0, type=float, help="Connection timeout in seconds")
 @click.option("--concurrency", default=500, type=int, help="Max concurrent connections")
+@click.option("--rate", default="normal", type=click.Choice(["stealth", "normal", "aggressive"]), help="Rate preset: stealth (100 pps), normal (1000 pps), aggressive (5000 pps)")
+@click.option("--rate-pps", type=float, help="Custom rate in packets per second")
 @click.option("--output", default="table", type=click.Choice(["table", "json", "csv"]), help="Output format")
+@click.option("--save-file", is_flag=True, help="Save results to file with auto-generated filename")
 @click.option("--save", is_flag=True, help="Save results to database")
-def scan_run(target, ports, timeout, concurrency, output, save):
+def scan_run(target, ports, timeout, concurrency, rate, rate_pps, output, save, save_file):
     """Run a port scan against TARGET"""
     from cybersec.core.scanner import AsyncPortScanner
 
@@ -149,7 +152,12 @@ def scan_run(target, ports, timeout, concurrency, output, save):
     with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
         task = progress.add_task("Initializing scanner...", total=None)
         try:
-            scanner = AsyncPortScanner(concurrency=concurrency, timeout=timeout)
+            scanner = AsyncPortScanner(
+                timeout=timeout, 
+                enable_connection_pool=True,
+                rate_preset=rate,
+                rate_pps=rate_pps
+            )
             progress.update(task, description=f"Scanning {target}...")
             report = asyncio.run(scanner.scan(target, ports))
             progress.update(task, description="Scan complete.")
@@ -161,6 +169,9 @@ def scan_run(target, ports, timeout, concurrency, output, save):
         _render_scan_table(report)
     elif output == "json":
         print(json.dumps(_report_to_dict(report), indent=2))
+        if save_file:
+            filepath = report.save_to_file("json")
+            console.print(f"[bold green]✓ Saved to:[/bold green] {filepath}")
     elif output == "csv":
         writer = csv.writer(sys.stdout)
         writer.writerow(["port", "protocol", "service", "version", "state", "risk_score", "cve_count"])
@@ -168,12 +179,15 @@ def scan_run(target, ports, timeout, concurrency, output, save):
             writer.writerow([
                 p.port,
                 p.protocol or "tcp",
-                (p.service.name if p.service else "") or "",
+                (p.service.name if p.service else "") or "unknown",
                 (p.service.version if p.service else "") or "",
                 p.state or "open",
                 p.risk.risk_score if p.risk else 0.0,
                 len(p.cves) if p.cves else 0,
             ])
+        if save_file:
+            filepath = report.save_to_file("csv")
+            console.print(f"[bold green]✓ Saved to:[/bold green] {filepath}")
 
     if save:
         async def _save():

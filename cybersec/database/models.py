@@ -20,7 +20,7 @@ class Scan(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     user_id = Column(ForeignKey("users.id"), nullable=True)
     target = Column(String(255), nullable=False)
-    scan_type = Column(Enum('port', 'web', 'full', name='scan_type_enum'), nullable=False)
+    scan_type = Column(String(50), nullable=False)
     status = Column(Enum('pending', 'running', 'completed', 'failed', name='scan_status_enum'), default='pending')
     port_range = Column(String(100), nullable=True)
     options = Column(JSONB, nullable=True)

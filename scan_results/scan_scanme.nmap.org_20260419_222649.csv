@@ -1,0 +1,9 @@
+target,port,protocol,state,service,version,banner,risk_level,risk_score,cve_count
+scanme.nmap.org,80,tcp,open,http,,"HTTP/1.1 200 OK
+Date: Sun, 19 Apr 2026 16:56:49 GMT
+Server: Apache/2.4.7 (Ubuntu)
+Accept-Ranges: bytes
+Vary: Accept-Encoding
+Connection: close
+Content-Type: text/html",HIGH,0.775,1
+scanme.nmap.org,22,tcp,open,ssh,2.0,SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13,CRITICAL,1.0,2

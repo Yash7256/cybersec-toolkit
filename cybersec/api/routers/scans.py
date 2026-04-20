@@ -11,7 +11,7 @@ import json
 import dataclasses
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket
@@ -25,7 +25,7 @@ from cybersec.api.deps import get_db, get_optional_user
 from cybersec.database.models import Scan, ScanResult, ToolResult, User
 from cybersec.database.session import async_session_maker
 from cybersec.core.scanner import AsyncPortScanner
-from cybersec.core.utils import resolve_target
+from cybersec.core.utils import resolve_target, expand_target_range
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +52,192 @@ def _safe_text(text: str | None) -> str | None:
 # ─── Schemas ────────────────────────────────────────────────────────────────
 
 class ScanCreate(BaseModel):
-    target: str = Field(min_length=1, max_length=255)
-    port_range: str = Field(default="common")
+    """Request model for creating a single-host port scan.
+    
+    Example:
+    ```json
+    {
+        "target": "192.168.1.1",
+        "port_range": "1-1000",
+        "scan_type": "connect",
+        "timeout": 3.0,
+        "concurrency": 500,
+        "rate_preset": "normal",
+        "retry_config": {
+            "max_retries": 3,
+            "base_delay": 0.5,
+            "backoff_multiplier": 2.0,
+            "max_delay": 5.0
+        }
+    }
+    ```
+    """
+    target: str = Field(
+        min_length=1, 
+        max_length=255,
+        description="Target IP address, hostname, or domain to scan",
+        examples=["192.168.1.1", "example.com", "scanme.nmap.org"]
+    )
+    port_range: str = Field(
+        default="common",
+        description="Port range specification. Options: 'common', 'top1000', 'all', or custom range like '1-1000' or '80,443,8080'",
+        examples=["common", "top1000", "1-1000", "80,443,8080"]
+    )
     scan_type: Literal[
         "connect", "syn", "udp",
         "stealth_fin", "stealth_null", "stealth_xmas", "stealth_ack",
         "zombie", "ack", "full", "port"
-    ] = "port"
-    options: Optional[dict] = None
+    ] = Field(
+        default="port",
+        description="Scanning technique to use. 'port' uses automatic mode selection",
+        examples=["connect", "syn", "udp", "stealth_fin", "zombie"]
+    )
+    timeout: Optional[float] = Field(
+        default=3.0,
+        ge=0.1,
+        le=30.0,
+        description="Connection timeout in seconds for each port probe",
+        examples=[1.0, 3.0, 5.0]
+    )
+    concurrency: Optional[int] = Field(
+        default=500,
+        ge=1,
+        le=2000,
+        description="Maximum concurrent connections for TCP scans",
+        examples=[100, 500, 1000]
+    )
+    rate_preset: str = Field(
+        default="normal",
+        description="Rate limiting preset. Options: 'stealth' (100 pps), 'normal' (1000 pps), 'aggressive' (5000 pps)",
+        examples=["stealth", "normal", "aggressive"]
+    )
+    rate_pps: Optional[float] = Field(
+        default=None,
+        ge=1.0,
+        le=10000.0,
+        description="Custom rate limit in packets per second. Overrides rate_preset if specified",
+        examples=[100.0, 1000.0, 5000.0]
+    )
+    retry_config: Optional[dict] = Field(
+        default=None,
+        description="Retry configuration for failed probes. Defaults to 3 retries with exponential backoff",
+        examples=[
+            {
+                "max_retries": 3,
+                "base_delay": 0.5,
+                "backoff_multiplier": 2.0,
+                "max_delay": 5.0
+            }
+        ]
+    )
+    options: Optional[dict] = Field(
+        default=None,
+        description="Additional scan options (advanced usage)",
+        examples=[{"verbose": True, "save_to_db": True}]
+    )
+    host_concurrency_limit: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum concurrent hosts for multi-host scans (deprecated, use concurrency instead)"
+    )
+    
+class MultiHostScanCreate(BaseModel):
+    """Request model for creating a multi-host port scan.
+    
+    Example:
+    ```json
+    {
+        "targets": ["192.168.1.1", "192.168.1.2", "example.com"],
+        "port_range": "1-1000",
+        "scan_type": "connect",
+        "timeout": 3.0,
+        "concurrency": 500,
+        "rate_preset": "normal",
+        "host_concurrency_limit": 5,
+        "retry_config": {
+            "max_retries": 3,
+            "base_delay": 0.5,
+            "backoff_multiplier": 2.0,
+            "max_delay": 5.0
+        }
+    }
+    ```
+    """
+    targets: List[str] = Field(
+        min_items=1,
+        max_items=1000,
+        description="List of targets to scan. Supports IP addresses, hostnames, and CIDR ranges",
+        examples=[
+            ["192.168.1.1", "192.168.1.2"],
+            ["example.com", "scanme.nmap.org"],
+            ["192.168.1.0/24", "10.0.0.0/30"]
+        ]
+    )
+    port_range: str = Field(
+        default="common",
+        description="Port range specification. Options: 'common', 'top1000', 'all', or custom range like '1-1000' or '80,443,8080'",
+        examples=["common", "top1000", "1-1000", "80,443,8080"]
+    )
+    scan_type: Literal[
+        "connect", "syn", "udp",
+        "stealth_fin", "stealth_null", "stealth_xmas", "stealth_ack",
+        "zombie", "ack", "full", "port"
+    ] = Field(
+        default="port",
+        description="Scanning technique to use. 'port' uses automatic mode selection",
+        examples=["connect", "syn", "udp", "stealth_fin", "zombie"]
+    )
+    timeout: Optional[float] = Field(
+        default=3.0,
+        ge=0.1,
+        le=30.0,
+        description="Connection timeout in seconds for each port probe",
+        examples=[1.0, 3.0, 5.0]
+    )
+    concurrency: Optional[int] = Field(
+        default=500,
+        ge=1,
+        le=2000,
+        description="Maximum concurrent connections for TCP scans",
+        examples=[100, 500, 1000]
+    )
+    rate_preset: str = Field(
+        default="normal",
+        description="Rate limiting preset. Options: 'stealth' (100 pps), 'normal' (1000 pps), 'aggressive' (5000 pps)",
+        examples=["stealth", "normal", "aggressive"]
+    )
+    rate_pps: Optional[float] = Field(
+        default=None,
+        ge=1.0,
+        le=10000.0,
+        description="Custom rate limit in packets per second. Overrides rate_preset if specified",
+        examples=[100.0, 1000.0, 5000.0]
+    )
+    host_concurrency_limit: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum number of hosts to scan concurrently",
+        examples=[5, 10, 20]
+    )
+    retry_config: Optional[dict] = Field(
+        default=None,
+        description="Retry configuration for failed probes. Defaults to 3 retries with exponential backoff",
+        examples=[
+            {
+                "max_retries": 3,
+                "base_delay": 0.5,
+                "backoff_multiplier": 2.0,
+                "max_delay": 5.0
+            }
+        ]
+    )
+    options: Optional[dict] = Field(
+        default=None,
+        description="Additional scan options (advanced usage)",
+        examples=[{"verbose": True, "save_to_db": True}]
+    )
 
 class OSFingerprintRequest(BaseModel):
     target: str = Field(min_length=1, max_length=255)
@@ -156,7 +334,265 @@ async def _persist_scan_results(
         logger.warning("Failed to persist scan results to DB (scan=%s): %s", db_scan_id, e)
 
 
-# ─── Background scan task ────────────────────────────────────────────────────
+# ─── Background scan tasks ────────────────────────────────────────────────────
+
+async def _run_multi_host_scan(
+    scan_id: str,
+    targets: List[str],
+    port_range: str,
+    db_scan_id: str | None = None,
+    user_id: str | None = None,
+    host_concurrency_limit: int = 10,
+    scan_mode: str = "port",
+    options: Optional[dict] = None
+) -> None:
+    """Runs multi-host scan in a background task.
+    
+    Supports CIDR ranges, IP ranges, and multiple individual targets.
+    Stores results in-memory always, and additionally persists to DB
+    if db_scan_id is provided and DB is reachable.
+    """
+    progress = {"status": "running", "progress_pct": 0, "hosts_scanned": 0, "total_hosts": 0}
+    _scan_progress[scan_id] = progress
+    _scan_events[scan_id] = asyncio.Queue()
+    
+    # Store scan metadata
+    _scan_meta[scan_id] = {
+        "targets": targets,
+        "port_range": port_range,
+        "scan_type": "multi_host",
+        "status": "running",
+        "user_id": user_id,
+        "db_scan_id": db_scan_id,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+        "error": None,
+        "host_concurrency_limit": host_concurrency_limit,
+        "options": options or {}
+    }
+    _scan_results[scan_id] = []
+
+    # Emit scan-start event
+    await _scan_events[scan_id].put(json.dumps({
+        "type": "multi_host_scan_start",
+        "targets": targets,
+        "port_range": port_range,
+        "status": "running",
+        "message": f"Multi-host scan started on {len(targets)} targets",
+        "host_concurrency_limit": host_concurrency_limit
+    }))
+
+    results_buffer = []
+    last_heartbeat = asyncio.get_event_loop().time()
+    heartbeat_interval = 10.0
+
+    async def _emit_heartbeat() -> None:
+        nonlocal last_heartbeat
+        now = asyncio.get_event_loop().time()
+        if now - last_heartbeat >= heartbeat_interval:
+            last_heartbeat = now
+            await _scan_events[scan_id].put(json.dumps({
+                "type": "heartbeat",
+                "status": "running",
+                "hosts_scanned": progress["hosts_scanned"],
+                "total_hosts": progress["total_hosts"],
+                "message": "Multi-host scan in progress...",
+            }))
+
+    async def on_host_port_found(target: str, port_result) -> None:
+        """Callback for when a port is found on any host."""
+        evt = _build_evt(port_result)
+        evt["target"] = target  # Add target to event
+        results_buffer.append((target, port_result, evt))
+        _scan_results[scan_id].append(evt)
+        await _scan_events[scan_id].put(json.dumps(evt))
+
+    async def _heartbeat_loop() -> None:
+        while True:
+            await asyncio.sleep(10.0)
+            if progress["status"] in ("completed", "failed"):
+                break
+            try:
+                await _scan_events[scan_id].put(json.dumps({
+                    "type": "heartbeat",
+                    "status": progress["status"],
+                    "progress_pct": progress["progress_pct"],
+                    "hosts_scanned": progress["hosts_scanned"],
+                    "total_hosts": progress["total_hosts"],
+                    "message": f"Multi-host scan running... ({progress['hosts_scanned']}/{progress['total_hosts']} hosts scanned)",
+                }))
+            except Exception:
+                break
+
+    heartbeat_task = asyncio.create_task(_heartbeat_loop())
+
+    try:
+        # Parse retry configuration from options
+        retry_config = None
+        if options and "retry_config" in options:
+            retry_opts = options["retry_config"]
+            from cybersec.core.scanner import RetryConfig
+            retry_config = RetryConfig(
+                max_retries=retry_opts.get("max_retries", 3),
+                base_delay=retry_opts.get("base_delay", 0.5),
+                backoff_multiplier=retry_opts.get("backoff_multiplier", 2.0),
+                max_delay=retry_opts.get("max_delay", 5.0)
+            )
+        
+        # Parse rate configuration from options
+        rate_preset = options.get("rate_preset", "normal") if options else "normal"
+        rate_pps = options.get("rate_pps") if options else None
+        
+        scanner = AsyncPortScanner(
+            timeout=3.0, 
+            verbose=options.get("verbose", False) if options else False,
+            retry_config=retry_config,
+            rate_preset=rate_preset,
+            rate_pps=rate_pps
+        )
+        
+        # Run multi-host scan
+        multi_report = await scanner.scan_multiple_hosts(
+            targets=targets,
+            port_range=port_range,
+            scan_callback=on_host_port_found,
+            scan_mode=scan_mode,
+            host_concurrency_limit=host_concurrency_limit,
+            verbose=options.get("verbose", False) if options else False
+        )
+
+        progress["progress_pct"] = 100
+        progress["status"] = "completed"
+        progress["hosts_scanned"] = multi_report.total_hosts_scanned
+        progress["total_hosts"] = multi_report.total_hosts_scanned
+
+        # Update metadata
+        _scan_meta[scan_id].update({
+            "status": "completed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "overall_scan_duration": multi_report.overall_scan_duration,
+            "total_hosts_scanned": multi_report.total_hosts_scanned,
+            "total_hosts_with_open_ports": multi_report.total_hosts_with_open_ports,
+            "total_open_ports_found": multi_report.total_open_ports_found,
+            "errors": multi_report.errors,
+            "retry_stats": {
+                "total_retries": multi_report.retry_stats.total_retries if multi_report.retry_stats else 0,
+                "timeout_retries": multi_report.retry_stats.timeout_retries if multi_report.retry_stats else 0,
+                "connection_reset_retries": multi_report.retry_stats.connection_reset_retries if multi_report.retry_stats else 0,
+                "host_unreachable_failures": multi_report.retry_stats.host_unreachable_failures if multi_report.retry_stats else 0,
+                "permission_denied_failures": multi_report.retry_stats.permission_denied_failures if multi_report.retry_stats else 0,
+                "hard_failures": multi_report.retry_stats.hard_failures if multi_report.retry_stats else 0
+            }
+        })
+
+        # Convert host reports to serializable format
+        host_results = []
+        for host_report in multi_report.host_reports:
+            if host_report.scan_report:
+                host_data = {
+                    "target": host_report.target,
+                    "ip": host_report.ip,
+                    "total_ports_scanned": host_report.total_ports_scanned,
+                    "open_ports_count": host_report.open_ports_count,
+                    "scan_duration": host_report.scan_duration,
+                    "error": host_report.error,
+                    "ports": [_build_evt(port) for port in host_report.scan_report.open_ports]
+                }
+            else:
+                host_data = {
+                    "target": host_report.target,
+                    "ip": host_report.ip,
+                    "total_ports_scanned": host_report.total_ports_scanned,
+                    "open_ports_count": host_report.open_ports_count,
+                    "scan_duration": host_report.scan_duration,
+                    "error": host_report.error,
+                    "ports": []
+                }
+            host_results.append(host_data)
+
+        # Store host results in scan metadata for retrieval
+        _scan_meta[scan_id]["host_results"] = host_results
+
+        await _persist_multi_host_scan_results(db_scan_id, results_buffer, "completed")
+
+        summary_event = {
+            "type": "multi_host_scan_complete",
+            "overall_scan_duration": multi_report.overall_scan_duration,
+            "total_hosts_scanned": multi_report.total_hosts_scanned,
+            "total_hosts_with_open_ports": multi_report.total_hosts_with_open_ports,
+            "total_open_ports_found": multi_report.total_open_ports_found,
+            "host_concurrency_limit": host_concurrency_limit,
+            "errors": multi_report.errors
+        }
+        await _scan_events[scan_id].put(json.dumps(summary_event))
+
+    except Exception as e:
+        error_msg = f"{e.__class__.__name__}: {e}"
+        progress["status"] = "failed"
+        progress["error"] = error_msg
+        _scan_meta[scan_id]["status"] = "failed"
+        _scan_meta[scan_id]["error"] = error_msg
+        logger.exception("Multi-host scan %s failed for targets %s", scan_id, targets)
+        await _persist_multi_host_scan_results(db_scan_id, results_buffer, "failed", error_msg)
+    finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
+        await _scan_events[scan_id].put("[DONE]")
+
+
+async def _persist_multi_host_scan_results(
+    db_scan_id: str | None,
+    results_buffer: List[tuple],
+    status: str,
+    error: str | None = None
+) -> None:
+    """Persist multi-host scan results to DB if available."""
+    if not db_scan_id:
+        return
+    try:
+        async with async_session_maker() as db:
+            scan_row = await db.get(Scan, db_scan_id)
+            if scan_row:
+                if status == "completed":
+                    # Group results by host for storage
+                    host_results = {}
+                    for target, port_res, _ in results_buffer:
+                        if target not in host_results:
+                            host_results[target] = []
+                        host_results[target].append(port_res)
+                    
+                    # Store results for each host
+                    for target, port_results in host_results.items():
+                        for port_res in port_results:
+                            cves_list = [
+                                {"id": c.id, "severity": c.severity, "cvss_score": c.cvss_score}
+                                for c in (port_res.cves or [])
+                            ]
+                            db.add(ScanResult(
+                                scan_id=scan_row.id,
+                                port=port_res.port,
+                                protocol=port_res.protocol or "tcp",
+                                state=port_res.state or "open",
+                                service=port_res.service.name if port_res.service else None,
+                                version=port_res.service.version if port_res.service else None,
+                                banner=_safe_text(port_res.banner),
+                                cves=cves_list,
+                                target_host=target  # Add target host to distinguish multi-host results
+                            ))
+                    scan_row.status = "completed"
+                    scan_row.completed_at = datetime.now(timezone.utc)
+                elif status == "failed":
+                    opts = scan_row.options or {}
+                    opts["error"] = error
+                    scan_row.options = opts
+                    scan_row.status = "failed"
+                await db.commit()
+    except Exception as e:
+        logger.warning("Failed to persist multi-host scan results to DB (scan=%s): %s", db_scan_id, e)
+
 
 async def _run_scan(
     scan_id: str,
@@ -165,6 +601,7 @@ async def _run_scan(
     resolved_ip: str | None = None,
     db_scan_id: str | None = None,
     user_id: str | None = None,
+    options: dict | None = None,
 ) -> None:
     """Runs the actual port scan in a background task.
 
@@ -217,7 +654,9 @@ async def _run_scan(
             }))
 
     async def on_port_found(port_result) -> None:
-        progress["open_ports_found"] += 1
+        # Only increment open_ports_found for open ports
+        if port_result.state == "open":
+            progress["open_ports_found"] += 1
         evt = _build_evt(port_result)
         results_buffer.append((port_result, evt))
         _scan_results[scan_id].append(evt)
@@ -243,7 +682,16 @@ async def _run_scan(
     heartbeat_task = asyncio.create_task(_heartbeat_loop())
 
     try:
-        scanner = AsyncPortScanner(timeout=3.0)
+        # Parse rate configuration from options
+        rate_preset = options.get("rate_preset", "normal") if options else "normal"
+        rate_pps = options.get("rate_pps") if options else None
+        
+        scanner = AsyncPortScanner(
+            timeout=3.0,
+            rate_preset=rate_preset,
+            rate_pps=rate_pps,
+            enable_connection_pool=False
+        )
         report = await scanner.scan(target, port_range, scan_callback=on_port_found, resolved_ip=resolved_ip)
 
         progress["progress_pct"] = 100
@@ -293,14 +741,34 @@ async def create_scan(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
-    """Create a new port scan and kick off the background scanner.
-
-    DB-OPTIONAL: If the database is unavailable, the scan still runs
+    """Create a new port scan and kick off background scanner.
+    
+    Supports CIDR ranges, IP ranges, and single targets.
+    DB-OPTIONAL: If database is unavailable, scan still runs
     using in-memory storage. The response includes a `storage` field
     indicating where results are stored.
     """
     try:
-        resolved_ip = resolve_target(body.target)
+        # Check if target is a CIDR range or IP range
+        if '/' in body.target or '-' in body.target:
+            # Expand to multiple IPs and convert to multi-host scan
+            expanded_targets = expand_target_range(body.target)
+            if len(expanded_targets) == 1:
+                # Single target after expansion, use regular scan
+                resolved_ip = expanded_targets[0]
+            else:
+                # Multiple targets, create multi-host scan
+                multi_body = MultiHostScanCreate(
+                    targets=[body.target],
+                    port_range=body.port_range,
+                    scan_type=body.scan_type,
+                    options=body.options,
+                    host_concurrency_limit=body.host_concurrency_limit
+                )
+                return await create_multi_host_scan(multi_body, background_tasks, db, current_user)
+        else:
+            # Single target, resolve normally
+            resolved_ip = resolve_target(body.target)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -314,7 +782,7 @@ async def create_scan(
             scan_type=body.scan_type if body.scan_type else "port",
             status="running",
             port_range=body.port_range,
-            options={**(body.options or {}), "resolved_ip": resolved_ip},
+            options={**(body.options or {}), "resolved_ip": resolved_ip, "host_concurrency_limit": body.host_concurrency_limit},
             started_at=datetime.now(timezone.utc),
         )
         db.add(scan)
@@ -334,6 +802,7 @@ async def create_scan(
         resolved_ip,
         db_scan_id,
         str(current_user.id) if current_user else None,
+        body.options,
     )
 
     return {
@@ -342,6 +811,85 @@ async def create_scan(
         "target": body.target,
         "status": "running",
         "port_range": body.port_range,
+        "storage": storage,
+        "note": "Results are streamed via /api/scans/{id}/stream" if storage == "memory"
+            else None,
+    }
+
+
+@router.post("/multi-host")
+async def create_multi_host_scan(
+    body: MultiHostScanCreate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Create a new multi-host scan with CIDR range support.
+    
+    Supports multiple targets, CIDR ranges, and IP ranges.
+    DB-OPTIONAL: If database is unavailable, scan still runs
+    using in-memory storage.
+    """
+    # Validate all targets first
+    invalid_targets = []
+    for target in body.targets:
+        try:
+            expand_target_range(target)
+        except ValueError as e:
+            invalid_targets.append(f"{target}: {e}")
+    
+    if invalid_targets:
+        raise HTTPException(
+            status_code=422, 
+            detail={"invalid_targets": invalid_targets}
+        )
+
+    db_scan_id: str | None = None
+    storage = "memory"
+
+    try:
+        scan = Scan(
+            user_id=current_user.id if current_user else None,
+            target=", ".join(body.targets),  # Store as comma-separated for DB
+            scan_type="multi_host",
+            status="running",
+            port_range=body.port_range,
+            options={
+                **(body.options or {}), 
+                "targets": body.targets,
+                "host_concurrency_limit": body.host_concurrency_limit
+            },
+            started_at=datetime.now(timezone.utc),
+        )
+        db.add(scan)
+        await db.commit()
+        await db.refresh(scan)
+        db_scan_id = str(scan.id)
+        storage = "database"
+    except Exception as e:
+        logger.warning("DB unavailable during multi-host scan creation (targets=%s): %s", body.targets, e)
+
+    scan_id_str = str(db_scan_id) if db_scan_id else str(uuid4())
+    background_tasks.add_task(
+        _run_multi_host_scan,
+        scan_id_str,
+        body.targets,
+        body.port_range,
+        db_scan_id,
+        str(current_user.id) if current_user else None,
+        body.host_concurrency_limit,
+        body.scan_type,
+        body.options
+    )
+
+    return {
+        "id": scan_id_str,
+        "scan_id": scan_id_str,
+        "targets": body.targets,
+        "status": "running",
+        "port_range": body.port_range,
+        "scan_type": "multi_host",
+        "host_concurrency_limit": body.host_concurrency_limit,
         "storage": storage,
         "note": "Results are streamed via /api/scans/{id}/stream" if storage == "memory"
             else None,
@@ -422,19 +970,81 @@ async def stream_scan_results(scan_id: str):
     )
 
 
-@router.get("/{scan_id}")
-async def get_scan(scan_id: str):
-    """Return full scan details with all results.
+def _generate_single_host_csv(results: List[dict]) -> str:
+    """Generate CSV content for single-host scan results."""
+    if not results:
+        return "No open ports found\n"
+    
+    output = []
+    output.append("target,port,protocol,state,service,version,cve_count,highest_cvss,risk_level\n")
+    
+    for result in results:
+        port = result.get("port", "")
+        protocol = result.get("protocol", "")
+        state = result.get("state", "")
+        service_info = result.get("service", {})
+        service_name = service_info.get("name", "unknown")
+        service_version = service_info.get("version", "")
+        cves = result.get("cves", [])
+        cve_count = len(cves)
+        highest_cvss = max([cve.get("cvss_score", 0) for cve in cves]) if cves else 0.0
+        risk_info = result.get("risk", {})
+        risk_level = risk_info.get("risk_level", "INFO")
+        
+        target = result.get("target", "")
+        
+        output.append(f"{target},{port},{protocol},{state},\"{service_name}\",\"{service_version}\",{cve_count},{highest_cvss},{risk_level}")
+    
+    return "\n".join(output)
 
+def _generate_multi_host_csv(host_results: List[dict]) -> str:
+    """Generate CSV content for multi-host scan results."""
+    if not host_results:
+        return "No hosts scanned\n"
+    
+    output = []
+    output.append("target,port,protocol,state,service,version,cve_count,highest_cvss,risk_level\n")
+    
+    for host_report in host_results:
+        target = host_report.get("target", "")
+        ports = host_report.get("ports", [])
+        
+        for port in ports:
+            port_num = port.get("port", "")
+            protocol = port.get("protocol", "")
+            state = port.get("state", "")
+            service_info = port.get("service", {})
+            service_name = service_info.get("name", "unknown")
+            service_version = service_info.get("version", "")
+            cves = port.get("cves", [])
+            cve_count = len(cves)
+            highest_cvss = max([cve.get("cvss_score", 0) for cve in cves]) if cves else 0.0
+            risk_info = port.get("risk", {})
+            risk_level = risk_info.get("risk_level", "INFO")
+            
+            output.append(f"{target},{port_num},{protocol},{state},\"{service_name}\",\"{service_version}\",{cve_count},{highest_cvss},{risk_level}")
+    
+    return "\n".join(output)
+
+
+@router.get("/{scan_id}")
+async def get_scan(scan_id: str, format: str = "html"):
+    """Return full scan details with all results.
+    
+    Supports format parameter:
+    - ?format=json: Returns JSON response
+    - ?format=csv: Returns CSV response
+    - ?format=html: Returns HTML response (default)
+    
     Checks in-memory stores first, then falls back to DB.
+    Supports both single-host and multi-host scans.
     """
     meta = _scan_meta.get(scan_id)
     results = _scan_results.get(scan_id, [])
 
     if meta is not None:
-        return {
+        response = {
             "id": scan_id,
-            "target": meta["target"],
             "scan_type": meta.get("scan_type", "port"),
             "status": meta["status"],
             "port_range": meta.get("port_range"),
@@ -442,8 +1052,50 @@ async def get_scan(scan_id: str):
             "completed_at": meta.get("completed_at"),
             "error": meta.get("error"),
             "storage": "memory",
-            "results": results,
         }
+        
+        if meta.get("scan_type") == "multi_host":
+            # Multi-host scan specific fields
+            response.update({
+                "targets": meta.get("targets", []),
+                "host_concurrency_limit": meta.get("host_concurrency_limit", 10),
+                "total_hosts_scanned": meta.get("total_hosts_scanned", 0),
+                "total_hosts_with_open_ports": meta.get("total_hosts_with_open_ports", 0),
+                "total_open_ports_found": meta.get("total_open_ports_found", 0),
+                "overall_scan_duration": meta.get("overall_scan_duration", 0),
+                "host_results": meta.get("host_results", []),
+                "errors": meta.get("errors", []),
+                "results": results  # Also include flat results for compatibility
+            })
+        else:
+            # Single-host scan
+            response.update({
+                "target": meta.get("target"),
+                "results": results
+            })
+        
+        # Handle format parameter
+        if format.lower() == "json":
+            from fastapi.responses import JSONResponse
+            return JSONResponse(content=response)
+        elif format.lower() == "csv":
+            # Generate CSV content
+            if meta.get("scan_type") == "multi_host":
+                # Multi-host CSV
+                csv_content = _generate_multi_host_csv(meta.get("host_results", []))
+            else:
+                # Single-host CSV  
+                csv_content = _generate_single_host_csv(results)
+            
+            from fastapi.responses import Response
+            return Response(
+                content=csv_content,
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=scan_{scan_id}.csv"}
+            )
+        else:
+            # Default HTML response
+            return response
 
     try:
         async with async_session_maker() as db:
@@ -470,43 +1122,110 @@ async def get_scan(scan_id: str):
                 "T1133": "External Remote Services",
             }
 
-            result_dicts = []
-            for r in db_results:
-                cves = r.cves or []
-                risk = analyzer.analyze(r.port, [])
-                mitre_info = []
-                for technique in analyzer.MITRE_MAP.get(r.port, []):
-                    mitre_info.append({
-                        "id": technique,
-                        "name": mitre_names.get(technique, "Unknown Technique"),
-                        "tactics": ["Lateral Movement"] if "T1021" in technique
-                            else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
+            if scan.scan_type == "multi_host":
+                # Group results by target host
+                host_results = {}
+                for r in db_results:
+                    target_host = getattr(r, 'target_host', None) or scan.target
+                    if target_host not in host_results:
+                        host_results[target_host] = []
+                    
+                    cves = r.cves or []
+                    risk = analyzer.analyze(r.port, [])
+                    mitre_info = []
+                    for technique in analyzer.MITRE_MAP.get(r.port, []):
+                        mitre_info.append({
+                            "id": technique,
+                            "name": mitre_names.get(technique, "Unknown Technique"),
+                            "tactics": ["Lateral Movement"] if "T1021" in technique
+                                else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
+                        })
+                    
+                    host_results[target_host].append({
+                        "port": r.port,
+                        "protocol": r.protocol,
+                        "state": r.state,
+                        "service": r.service,
+                        "version": r.version,
+                        "banner": r.banner,
+                        "cves": cves,
+                        "risk_level": risk.risk_level,
+                        "risk_score": risk.risk_score,
+                        "mitre_techniques": mitre_info,
                     })
-                result_dicts.append({
-                    "port": r.port,
-                    "protocol": r.protocol,
-                    "state": r.state,
-                    "service": r.service,
-                    "version": r.version,
-                    "banner": r.banner,
-                    "cves": cves,
-                    "risk_level": risk.risk_level,
-                    "risk_score": risk.risk_score,
-                    "mitre_techniques": mitre_info,
-                })
+                
+                # Convert to expected format
+                host_results_list = []
+                total_open_ports = 0
+                for target_host, ports in host_results.items():
+                    host_results_list.append({
+                        "target": target_host,
+                        "ip": target_host,  # DB doesn't store resolved IP separately for multi-host
+                        "total_ports_scanned": len(ports),
+                        "open_ports_count": len(ports),
+                        "scan_duration": 0,  # Not tracked separately in DB
+                        "error": None,
+                        "ports": ports
+                    })
+                    total_open_ports += len(ports)
+                
+                return {
+                    "id": str(scan.id),
+                    "targets": scan.target.split(", "),
+                    "scan_type": scan.scan_type,
+                    "status": scan.status,
+                    "port_range": scan.port_range,
+                    "started_at": scan.started_at.isoformat() if scan.started_at else None,
+                    "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+                    "error": (scan.options or {}).get("error"),
+                    "storage": "database",
+                    "host_concurrency_limit": (scan.options or {}).get("host_concurrency_limit", 10),
+                    "total_hosts_scanned": len(host_results_list),
+                    "total_hosts_with_open_ports": len([h for h in host_results_list if h["open_ports_count"] > 0]),
+                    "total_open_ports_found": total_open_ports,
+                    "host_results": host_results_list,
+                    "errors": [],
+                    "results": [port for host_ports in host_results.values() for port in host_ports]  # Flat results
+                }
+            else:
+                # Single-host scan (original logic)
+                result_dicts = []
+                for r in db_results:
+                    cves = r.cves or []
+                    risk = analyzer.analyze(r.port, [])
+                    mitre_info = []
+                    for technique in analyzer.MITRE_MAP.get(r.port, []):
+                        mitre_info.append({
+                            "id": technique,
+                            "name": mitre_names.get(technique, "Unknown Technique"),
+                            "tactics": ["Lateral Movement"] if "T1021" in technique
+                                else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
+                        })
+                    result_dicts.append({
+                        "port": r.port,
+                        "protocol": r.protocol,
+                        "state": r.state,
+                        "service": r.service,
+                        "version": r.version,
+                        "banner": r.banner,
+                        "cves": cves,
+                        "risk_level": risk.risk_level,
+                        "risk_score": risk.risk_score,
+                        "mitre_techniques": mitre_info,
+                    })
 
-            return {
-                "id": str(scan.id),
-                "target": scan.target,
-                "scan_type": scan.scan_type,
-                "status": scan.status,
-                "port_range": scan.port_range,
-                "started_at": scan.started_at.isoformat() if scan.started_at else None,
-                "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
-                "error": (scan.options or {}).get("error"),
-                "storage": "database",
-                "results": result_dicts,
-            }
+                return {
+                    "id": str(scan.id),
+                    "target": scan.target,
+                    "scan_type": scan.scan_type,
+                    "status": scan.status,
+                    "port_range": scan.port_range,
+                    "started_at": scan.started_at.isoformat() if scan.started_at else None,
+                    "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+                    "error": (scan.options or {}).get("error"),
+                    "storage": "database",
+                    "results": result_dicts,
+                }
     except HTTPException:
         raise
     except Exception as e:

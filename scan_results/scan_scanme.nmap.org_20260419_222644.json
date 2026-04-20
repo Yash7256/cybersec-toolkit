@@ -1,0 +1,77 @@
+{
+  "target": "scanme.nmap.org",
+  "ip": "45.33.32.156",
+  "scan_time": {
+    "started_at": "2026-04-19T16:56:43.325365+00:00",
+    "completed_at": "2026-04-19T16:56:44.641517+00:00",
+    "duration_seconds": 1.32,
+    "scan_mode": "connect"
+  },
+  "scan_stats": {
+    "total_ports_scanned": 3,
+    "open_ports_count": 2,
+    "avg_latency_ms": 257.74,
+    "peak_concurrency": 100
+  },
+  "ports": [
+    {
+      "port": 80,
+      "protocol": "tcp",
+      "state": "open",
+      "service": {
+        "name": "http",
+        "version": null,
+        "banner": "HTTP/1.1 200 OK\r\nDate: Sun, 19 Apr 2026 16:56:43 GMT\r\nServer: Apache/2.4.7 (Ubuntu)\r\nAccept-Ranges: bytes\r\nVary: Accept-Encoding\r\nConnection: close\r\nContent-Type: text/html"
+      },
+      "cves": [
+        {
+          "id": "CVE-2021-41773",
+          "severity": "HIGH",
+          "cvss_score": 7.5,
+          "description": "Apache HTTP Server path traversal"
+        }
+      ],
+      "risk": {
+        "risk_level": "HIGH",
+        "risk_score": 0.775
+      },
+      "banner": "HTTP/1.1 200 OK\r\nDate: Sun, 19 Apr 2026 16:56:43 GMT\r\nServer: Apache/2.4.7 (Ubuntu)\r\nAccept-Ranges: bytes\r\nVary: Accept-Encoding\r\nConnection: close\r\nContent-Type: text/html",
+      "latency_ms": 253.91172200033907
+    },
+    {
+      "port": 22,
+      "protocol": "tcp",
+      "state": "open",
+      "service": {
+        "name": "ssh",
+        "version": "2.0",
+        "banner": "SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13\r\nProtocol mismatch."
+      },
+      "cves": [
+        {
+          "id": "CVE-2023-38408",
+          "severity": "CRITICAL",
+          "cvss_score": 9.8,
+          "description": "Remote Code Execution in OpenSSH forwarded ssh-agent"
+        },
+        {
+          "id": "CVE-2021-28041",
+          "severity": "HIGH",
+          "cvss_score": 7.1,
+          "description": "OpenSSH ssh-agent memory exhaustion"
+        }
+      ],
+      "risk": {
+        "risk_level": "CRITICAL",
+        "risk_score": 1.0
+      },
+      "banner": "SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13\r\nProtocol mismatch.",
+      "latency_ms": 261.5681909956038
+    }
+  ],
+  "os_fingerprint": {
+    "os_name": "Linux/Unix",
+    "confidence": 40.0,
+    "method": "port_pattern"
+  }
+}

@@ -2,6 +2,7 @@
 Core utility functions.
 """
 import socket
+import ipaddress
 from urllib.parse import urlparse
 
 def resolve_target(target: str) -> str:
@@ -194,6 +195,140 @@ def parse_ports(port_range: str) -> list[int]:
         if p < 1 or p > 65535:
             raise ValueError("Port out of range")
     return deduped
+
+def expand_target_range(target: str) -> list[str]:
+    """
+    Expand target specifications like CIDR ranges or IP ranges to a list of individual IPs.
+    
+    Supports:
+    - CIDR notation: 192.168.1.0/24
+    - IP ranges: 10.0.0.1-10.0.0.50
+    - Single IPs: 192.168.1.1
+    - Hostnames: example.com (resolves to single IP)
+    
+    Filters out network and broadcast addresses for IPv4 ranges.
+    Applies private range validation and DNS rebinding protection.
+    
+    Args:
+        target: Target specification (CIDR, range, IP, or hostname)
+        
+    Returns:
+        List of valid IP addresses
+        
+    Raises:
+        ValueError: If target is invalid or contains blocked/private ranges
+    """
+    # Strip scheme if provided
+    parsed = urlparse(target)
+    target = parsed.hostname or target
+    
+    # Handle CIDR notation
+    if '/' in target and not target.startswith('/'):
+        try:
+            network = ipaddress.ip_network(target, strict=False)
+            ips = []
+            
+            for ip in network.hosts():
+                ip_str = str(ip)
+                # Apply security validation
+                _validate_target_security(ip_str)
+                ips.append(ip_str)
+            
+            return ips
+        except ValueError as e:
+            raise ValueError(f"Invalid CIDR notation: {target}") from e
+    
+    # Handle IP range (e.g., 10.0.0.1-10.0.0.50)
+    if '-' in target:
+        try:
+            start_ip_str, end_ip_str = target.split('-', 1)
+            start_ip = ipaddress.ip_address(start_ip_str.strip())
+            end_ip = ipaddress.ip_address(end_ip_str.strip())
+            
+            if start_ip.version != end_ip.version:
+                raise ValueError("Start and end IPs must be of the same version")
+            
+            ips = []
+            current = start_ip
+            while current <= end_ip:
+                ip_str = str(current)
+                # Skip network and broadcast addresses for IPv4
+                if isinstance(current, ipaddress.IPv4Address):
+                    if current == ipaddress.IPv4Network(f"{start_ip_str}/24", strict=False).network_address:
+                        current += 1
+                        continue
+                    if current == ipaddress.IPv4Network(f"{start_ip_str}/24", strict=False).broadcast_address:
+                        current += 1
+                        continue
+                
+                # Apply security validation
+                _validate_target_security(ip_str)
+                ips.append(ip_str)
+                current += 1
+            
+            return ips
+        except ValueError as e:
+            raise ValueError(f"Invalid IP range: {target}") from e
+    
+    # Handle single IP or hostname
+    try:
+        # Try to parse as IP first
+        ip = ipaddress.ip_address(target)
+        ip_str = str(ip)
+        _validate_target_security(ip_str)
+        return [ip_str]
+    except ValueError:
+        # Not an IP, try as hostname
+        resolved_ip = resolve_target(target)
+        return [resolved_ip]
+
+
+def _validate_target_security(ip_str: str) -> None:
+    """
+    Apply security validation to a target IP address.
+    Checks against blocked IPs and private ranges with DNS rebinding protection.
+    
+    Args:
+        ip_str: IP address string to validate
+        
+    Raises:
+        ValueError: If IP is blocked or in private range
+    """
+    blocked_ips = {"127.0.0.1", "localhost", "0.0.0.0", "255.255.255.255", "::1"}
+    private_ranges = [
+        ("10.0.0.0", "10.255.255.255"),
+        ("172.16.0.0", "172.31.255.255"), 
+        ("192.168.0.0", "192.168.255.255"),
+        ("169.254.0.0", "169.254.255.255")  # Link-local
+    ]
+    
+    if ip_str in blocked_ips:
+        raise ValueError(f"Blocked target: {ip_str}")
+    
+    # Check for private IP ranges
+    try:
+        ip = socket.inet_aton(ip_str)
+        ip_int = int.from_bytes(ip, 'big')
+        for start, end in private_ranges:
+            start_int = int.from_bytes(socket.inet_aton(start), 'big')
+            end_int = int.from_bytes(socket.inet_aton(end), 'big')
+            if start_int <= ip_int <= end_int:
+                raise ValueError(f"Private IP ranges are not allowed for security reasons: {ip_str}")
+    except socket.error:
+        pass  # Not a valid IPv4, continue
+    
+    # Additional IPv6 validation
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+        if ip_obj.is_private:
+            raise ValueError(f"Private IP ranges are not allowed for security reasons: {ip_str}")
+        if ip_obj.is_link_local:
+            raise ValueError(f"Link-local addresses are not allowed: {ip_str}")
+        if ip_str == "::1":
+            raise ValueError(f"IPv6 localhost is not allowed: {ip_str}")
+    except ValueError:
+        pass  # Not a valid IP, continue
+
 
 def format_duration(seconds: float) -> str:
     secs = int(seconds)
