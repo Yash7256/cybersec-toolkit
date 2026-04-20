@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Literal
 from uuid import UUID, uuid4
 
-router = APIRouter(prefix="/scans", tags=["scans"])
+router = APIRouter(tags=["scans"])
 
 
 @router.get("/health")
