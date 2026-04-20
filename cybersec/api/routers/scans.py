@@ -1,5 +1,25 @@
 """
 Scans router — full implementation.
+
+DB-OPTIONAL: Scans work even when PostgreSQL is unavailable.
+Results are stored in-memory when DB is unreachable.
+"""
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from typing import Optional, List, Literal
+from uuid import UUID, uuid4
+
+router = APIRouter(prefix="/scans", tags=["scans"])
+
+
+@router.get("/health")
+async def health_check():
+    """Health check endpoint - doesn't require DB."""
+    return {"status": "ok", "storage": "database"}
+
+
+"""
 Handles scan creation (runs AsyncPortScanner in background task),
 real-time SSE streaming, status polling, OS fingerprint, and results retrieval.
 
@@ -28,8 +48,6 @@ from cybersec.core.scanner import AsyncPortScanner
 from cybersec.core.utils import resolve_target, expand_target_range
 
 logger = logging.getLogger(__name__)
-
-router = APIRouter()
 
 # ─── In-memory scan stores (used when DB is unavailable) ──────────────────
 # Stores scan metadata keyed by scan_id string
