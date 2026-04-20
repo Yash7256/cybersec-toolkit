@@ -1,14 +1,13 @@
 """
 Scans router — full implementation.
 
-DB-OPTIONAL: Scans work even when PostgreSQL is unavailable.
-Results are stored in-memory when DB is unreachable.
+No DB required - all data stored in-memory.
 """
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket
+from fastapi import APIRouter, BackgroundTasks, WebSocket
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional, List, Literal
-from uuid import UUID, uuid4
+from typing import List, Literal
+from uuid import uuid4
 
 router = APIRouter(tags=["scans"])
 
@@ -1254,47 +1253,12 @@ async def get_scan(scan_id: str, format: str = "html"):
 @router.get("/")
 async def list_scans(
     limit: int = 20,
-    db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
 ):
-    """List recent scans from DB. Falls back to in-memory storage if DB unavailable."""
-    try:
-        q = await db.execute(select(Scan).order_by(Scan.created_at.desc()).limit(limit))
-        scans = q.scalars().all()
-        return {
-            "scans": [
-                {
-                    "id": str(s.id),
-                    "target": s.target,
-                    "scan_type": s.scan_type,
-                    "status": s.status,
-                    "port_range": s.port_range,
-                    "created_at": s.created_at.isoformat() if s.created_at else None,
-                }
-                for s in scans
-            ],
-            "storage": "database",
-        }
-    except Exception:
-        # Return in-memory scans when DB unavailable
-        in_memory_scans = list(_scan_meta.values())[:limit]
-        return {
-            "scans": in_memory_scans,
-            "storage": "in_memory",
-        }
+    """List recent scans from in-memory storage."""
+    in_memory_scans = list(_scan_meta.values())[:limit]
     return {
-        "scans": [
-            {
-                "id": str(s.id),
-                "target": s.target,
-                "scan_type": s.scan_type,
-                "status": s.status,
-                "port_range": s.port_range,
-                "created_at": s.created_at.isoformat() if s.created_at else None,
-            }
-            for s in scans
-        ],
-        "storage": "database",
+        "scans": in_memory_scans,
+        "storage": "in_memory",
     }
 
 
