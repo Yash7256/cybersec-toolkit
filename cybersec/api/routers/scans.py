@@ -1263,7 +1263,9 @@ async def list_scans(
         scans = q.scalars().all()
     except Exception as e:
         logger.warning("List scans failed due to DB error: %s", e)
-        return {"scans": [], "storage": "database_unavailable"}
+        import traceback
+        logger.warning("Trace: %s", traceback.format_exc())
+        return {"scans": [], "storage": "database_unavailable", "error": str(e)}
     return {
         "scans": [
             {
