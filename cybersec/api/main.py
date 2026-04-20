@@ -94,9 +94,9 @@ def create_app() -> FastAPI:
     )
 
     # API Routes
-    app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-    app.include_router(scans.router, prefix="/api/scans", tags=["scans"])
-    app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
+    app.include_router(auth.router, prefix="/api/auth")
+    app.include_router(scans.router, prefix="/api/scans")
+    app.include_router(tools.router, prefix="/api/tools")
     app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
     app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
     app.include_router(webapp.router, prefix="/api/webapp", tags=["webapp"])
