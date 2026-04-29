@@ -549,6 +549,18 @@ async def _run_multi_host_scan(
 
     async def on_host_port_found(target: str, port_result) -> None:
         """Callback for when a port is found on any host."""
+        
+        # Check for duplicate port results
+        port_key = f"{target}:{port_result.port}:{port_result.protocol}"
+        if port_key in progress.get("seen_ports", set()):
+            logger.debug(f"Skipping duplicate host port result: {port_key}")
+            return
+        
+        # Track seen ports to prevent duplicates
+        if "seen_ports" not in progress:
+            progress["seen_ports"] = set()
+        progress["seen_ports"].add(port_key)
+        
         evt = _build_evt(port_result)
         evt["target"] = target  # Add target to event
         results_buffer.append((target, port_result, evt))
@@ -803,6 +815,18 @@ async def _run_scan(
 
     async def on_port_found(port_result) -> None:
         logger.info(f"Port found callback: port={port_result.port}, state={port_result.state}")
+        
+        # Check for duplicate port results
+        port_key = f"{port_result.port}:{port_result.protocol}"
+        if port_key in progress.get("seen_ports", set()):
+            logger.debug(f"Skipping duplicate port result: {port_key}")
+            return
+        
+        # Track seen ports to prevent duplicates
+        if "seen_ports" not in progress:
+            progress["seen_ports"] = set()
+        progress["seen_ports"].add(port_key)
+        
         # Only increment open_ports_found for open ports
         if port_result.state == "open":
             progress["open_ports_found"] += 1
@@ -1198,7 +1222,22 @@ async def get_scan(scan_id: str, format: str = "html"):
     Supports both single-host and multi-host scans.
     """
     meta = _scan_meta.get(scan_id)
-    results = _scan_results.get(scan_id, [])
+    raw_results = _scan_results.get(scan_id, [])
+    
+    # Final deduplication to prevent duplicate port results
+    seen_ports = set()
+    results = []
+    for result in raw_results:
+        port_key = f"{result.get('port', '')}:{result.get('protocol', 'tcp')}"
+        target = result.get('target', '')
+        if target:
+            port_key = f"{target}:{port_key}"
+        
+        if port_key not in seen_ports:
+            seen_ports.add(port_key)
+            results.append(result)
+        else:
+            logger.debug(f"Filtering duplicate result: {port_key}")
 
     if meta is not None:
         response = {
@@ -1726,7 +1765,20 @@ async def get_scan_attack_mapping(scan_id: str):
     
     # Get scan results
     meta = _scan_meta.get(scan_id)
-    results = _scan_results.get(scan_id, [])
+    raw_results = _scan_results.get(scan_id, [])
+    
+    # Deduplicate results for CVE lookup
+    seen_ports = set()
+    results = []
+    for result in raw_results:
+        port_key = f"{result.get('port', '')}:{result.get('protocol', 'tcp')}"
+        target = result.get('target', '')
+        if target:
+            port_key = f"{target}:{port_key}"
+        
+        if port_key not in seen_ports:
+            seen_ports.add(port_key)
+            results.append(result)
     
     if meta is None:
         # Try database
