@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     NVD_CACHE_TTL_HOURS: int = 24
     NVD_MAX_RESULTS_PER_SERVICE: int = 10
     NVD_MIN_CVSS_SCORE: float = 5.0
+    
+    # Scanner timeout settings
+    SCAN_TIMEOUT: float = 10.0
+    OS_FINGERPRINT_TIMEOUT: float = 5.0
+    SERVICE_DETECTION_TIMEOUT: float = 8.0
 
     @property
     def cors_origins_list(self) -> list[str]:

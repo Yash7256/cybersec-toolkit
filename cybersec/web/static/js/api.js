@@ -191,13 +191,7 @@ const api = {
       throw new ApiError('Timeout', 'Port scan timed out');
     },
 
-    async osfp(target) {
-      return api._withTimeout(api.request('/api/scans/os-fingerprint', {
-        method: 'POST',
-        body: JSON.stringify({ target }),
-      }), 20000, 'OS fingerprint timed out');
-    },
-
+    
     async webscan(target, maxPages = 20) {
       return api.request('/api/webapp/scan', {
         method: 'POST',

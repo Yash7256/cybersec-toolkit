@@ -24,7 +24,7 @@ class PortState(str, Enum):
     ERROR = "error"
     UNREACHABLE = "unreachable"
 from cybersec.core.scanner.analysis.service_detect import ServiceDetector, ServiceDetectionResult
-from cybersec.config.settings import settings
+from cybersec.config import settings
 from cybersec.core.security.cve_lookup import CVELookup, CVEEntry
 from cybersec.core.scanner.analysis.port_analyzer import PortAnalyzer, PortRisk
 from cybersec.core.scanner.analysis.os_fingerprint import OSFingerprinter, OSFingerprint
@@ -276,7 +276,7 @@ class AsyncPortScanner:
         ```
     """
     
-    def __init__(self, timeout: float = 3.0, enable_connection_pool: bool = True, scan_id: Optional[str] = None, 
+    def __init__(self, timeout: Optional[float] = None, enable_connection_pool: bool = True, scan_id: Optional[str] = None, 
                  rate_preset: str = "normal", rate_pps: Optional[float] = None, retries: int = 0):
         """Initialize the AsyncPortScanner.
         
@@ -288,7 +288,7 @@ class AsyncPortScanner:
             rate_pps: Custom rate in packets per second (overrides preset)
             retries: Number of retry attempts on timeout/connection failure
         """
-        self.timeout = timeout
+        self.timeout = timeout or settings.SCAN_TIMEOUT
         self.enable_connection_pool = enable_connection_pool
         self.scan_id = scan_id or f"scan_{int(time.time())}"
         self.retries = retries
@@ -914,7 +914,17 @@ class AsyncPortScanner:
                 if port_res.syn_ack_data:
                     self.os_fingerprinter.probe_active(ip, port_res.port)
 
-        os_fingerprint = self.os_fingerprinter.fingerprint(banners, valid_ports, [p.service for p in open_ports_results])
+        # Try active OS fingerprinting first (requires root privileges)
+        try:
+            os_fingerprint = self.os_fingerprinter.fingerprint_active(ip, valid_ports)
+            logger.info(f"Active OS fingerprinting successful for {ip}")
+        except PermissionError as e:
+            logger.warning(f"Active OS fingerprinting requires root privileges: {e}")
+            logger.info(f"Falling back to banner-based OS fingerprinting for {ip}")
+            os_fingerprint = self.os_fingerprinter.fingerprint(banners, valid_ports, [p.service for p in open_ports_results])
+        except Exception as e:
+            logger.warning(f"Active OS fingerprinting failed for {ip}, falling back to banner analysis: {e}")
+            os_fingerprint = self.os_fingerprinter.fingerprint(banners, valid_ports, [p.service for p in open_ports_results])
 
         completed_at = datetime.now(timezone.utc)
         scan_duration = (completed_at - started_at).total_seconds()

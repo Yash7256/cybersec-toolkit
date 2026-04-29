@@ -9,10 +9,7 @@ const toolsModule = {
       case 'portscanner':
         this.renderPortScan(data);
         break;
-      case 'osfp':
-        this.renderOsFp(data);
-        break;
-      case 'webscan':
+            case 'webscan':
         this.renderWebscan(data);
         break;
       case 'dns':
@@ -100,14 +97,7 @@ const toolsModule = {
 
         <div class="next-steps-container">
            <div style="font-weight:700; margin-bottom:15px; font-size:0.9rem"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Suggested Next Move</div>
-           <div class="next-step-item" onclick="document.querySelector('[data-tool=osfp]').click()">
-              <i class="fa-solid fa-microchip" style="color:var(--accent-purple)"></i>
-              <div>
-                 <div style="font-weight:600">Deep OS Fingerprinting</div>
-                 <div style="font-size:0.8rem; color:var(--text-muted)">Use the open port patterns to identify the exact OS and kernel version.</div>
-              </div>
-           </div>
-        </div>
+                   </div>
       `;
 
       setTimeout(async () => {
@@ -216,188 +206,6 @@ const toolsModule = {
                 }
             }
         } catch(e) {}
-    }, 100);
-  },
-
-  renderOsFp(data) {
-    const output = document.getElementById('osfp-output');
-    if (!data || data.error) {
-      output.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i> ${data?.error || 'OS fingerprint failed'}</div>`;
-      document.getElementById('osfp-actions').style.display = 'none';
-      return;
-    }
-
-    let confidencePct = data.confidence_pct || 0;
-    if (confidencePct > 100) {
-      confidencePct = Math.min(Math.round(confidencePct / 100), 100);
-    }
-    
-    const openPorts = data.open_ports_scanned || [];
-    const portsHtml = openPorts.map(p => `<span class="os-port-pill">${p}</span>`).join('');
-
-    let icon = 'fa-solid fa-desktop';
-    const osLower = (data.os_name || '').toLowerCase();
-    if (osLower.includes('linux') || osLower.includes('ubuntu') || osLower.includes('debian') || osLower.includes('unix')) icon = 'fa-brands fa-linux';
-    else if (osLower.includes('windows')) icon = 'fa-brands fa-windows';
-    else if (osLower.includes('mac') || osLower.includes('apple') || osLower.includes('osx')) icon = 'fa-brands fa-apple';
-
-    output.innerHTML = `
-      <div class="os-fingerprint-panel">
-        <div class="os-header-card">
-          <div class="os-header-left">
-            <div class="os-header-icon">
-              <i class="${icon}"></i>
-            </div>
-            <div>
-              <h3 class="os-header-title">${data.os_name || 'Unknown'}</h3>
-              <p class="os-header-subtitle">Detected via unknown</p>
-            </div>
-          </div>
-          <div class="os-confidence-widget">
-            <div class="os-confidence-label">CONFIDENCE</div>
-            <div class="os-confidence-value" data-target="${confidencePct}">0% confident</div>
-            <div class="os-confidence-bar">
-              <div class="os-confidence-fill" style="width: 0%" data-target="${confidencePct}"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="os-info-grid">
-          <div class="os-info-card">
-            <div class="os-info-label">TTL ANALYSIS</div>
-            <div class="os-info-value">Not performed</div>
-          </div>
-          <div class="os-info-card">
-            <div class="os-info-label">TCP WINDOW SIZE</div>
-            <div class="os-info-value">Not detected</div>
-          </div>
-          <div class="os-info-card">
-            <div class="os-info-label">SYN PACKET LOGIC</div>
-            <div class="os-info-value">Standard detection</div>
-          </div>
-          <div class="os-info-card">
-            <div class="os-info-label">DETECTION METHOD</div>
-            <div class="os-info-value">${data.method || 'Port Pattern'}</div>
-          </div>
-          <div class="os-info-card">
-            <div class="os-info-label">SCAN MODE</div>
-            <div class="os-info-value">Common ports</div>
-          </div>
-          <div class="os-info-card">
-            <div class="os-info-label">OBSERVED PORTS</div>
-            <div class="os-info-value">
-              ${openPorts.length > 0 ? portsHtml : 'None'}
-            </div>
-          </div>
-        </div>
-
-        <div class="os-collapsible-row os-tech-details" onclick="this.classList.toggle('open')">
-          <div class="os-collapsible-left">
-            <i class="fa-solid fa-gear os-collapsible-icon"></i>
-            <span class="os-collapsible-label">Technical Details</span>
-          </div>
-          <i class="fa-solid fa-chevron-down os-collapsible-chevron"></i>
-        </div>
-        <div class="os-collapsible-content">
-          <p><strong>TTL Analysis:</strong> Not performed in basic mode</p>
-          <p><strong>TCP Window Size:</strong> Not detected</p>
-          <p><strong>SYN Packet Logic:</strong> Standard detection parameters</p>
-          <p><strong>Detection Method:</strong> ${data.method || 'Port pattern analysis'}</p>
-          <p><strong>Scan Mode:</strong> Common ports fingerprinting</p>
-        </div>
-
-        <div class="os-collapsible-row os-ai-insight" onclick="this.classList.toggle('open')">
-          <div class="os-collapsible-left">
-            <div class="os-ai-dot"></div>
-            <span class="os-ai-label">AI Insight</span>
-          </div>
-          <i class="fa-solid fa-chevron-down os-collapsible-chevron"></i>
-        </div>
-        <div class="os-collapsible-content" id="osfp-ai-container">
-          <div style="color: #9CA3AF; font-style: italic;">AI analysis loading...</div>
-        </div>
-
-        <div class="os-actions">
-          <div class="os-action-buttons">
-            <button class="os-action-btn" onclick="copyToolResult('osfp')">
-              <i class="fa-regular fa-copy"></i> Copy
-            </button>
-            <button class="os-action-btn" onclick="runTool('osfp')">
-              <i class="fa-solid fa-refresh"></i> Re-scan
-            </button>
-          </div>
-          <div class="os-scan-info">
-            Scanned · ${data.target || 'unknown'} · just now
-          </div>
-        </div>
-      </div>
-    `;
-
-    const confidenceEl = output.querySelector('.os-confidence-value');
-    const confidenceFill = output.querySelector('.os-confidence-fill');
-    if (confidenceEl && confidenceFill) {
-      const target = parseFloat(confidenceEl.dataset.target);
-      let current = 0;
-      const startTime = performance.now();
-      const duration = 800;
-      const animate = (now) => {
-        const elapsed = now - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        current = Math.round(target * progress);
-        confidenceEl.textContent = current + '% confident';
-        confidenceFill.style.width = progress * 100 + '%';
-        if (progress < 1) requestAnimationFrame(animate);
-      };
-      requestAnimationFrame(animate);
-    }
-
-    document.getElementById('osfp-actions').style.display = 'none';
-
-    setTimeout(async () => {
-      const aiContainer = document.getElementById('osfp-ai-container');
-      if (!aiContainer) return;
-      try {
-        const analyzeResponse = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
-          body: JSON.stringify({
-            message: "Based on the open ports detected (" + openPorts.join(', ') + "), confirm if the primary OS guess of " + (data.os_name || 'Unknown') + " (" + confidencePct + "% confidence) is accurate. Write a strict 2-3 sentence technical intuition.",
-            scan_id: null,
-            conversation_history: []
-          })
-        });
-        
-        if (analyzeResponse.ok) {
-          const reader = analyzeResponse.body.getReader();
-          const decoder = new TextDecoder("utf-8");
-          let aiText = '';
-          aiContainer.innerHTML = `
-            <div class="osfp-ai-insight">
-              <div class="osfp-ai-header">
-                <span class="osfp-pulse-dot"></span>
-                <span>AI Insight</span>
-              </div>
-              <div class="osfp-ai-content" id="osAiContent"></div>
-            </div>
-          `;
-          const contentBox = document.getElementById('osAiContent');
-          while(true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const text = line.slice(6);
-                if (text !== '[DONE]') {
-                  aiText += text;
-                  contentBox.innerHTML = marked.parse(aiText);
-                }
-              }
-            }
-          }
-        }
-      } catch(e) {}
     }, 100);
   },
 

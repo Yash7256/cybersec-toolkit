@@ -2669,8 +2669,7 @@
             }
         }
 
-        /* OS Fingerprinting Panel Styles */
-        .os-fingerprint-panel {
+                .os-fingerprint-panel {
             background: #0E1016;
             border-radius: 12px;
             padding: 20px;
@@ -3065,76 +3064,7 @@
             </div>
         </div>
 
-        <!-- OS Fingerprinting View -->
-        <div id="osFingerprintView" class="view-section">
-            <div class="control-panel">
-                <div class="input-group">
-                    <label class="input-label">Target Host</label>
-                    <input type="text" id="osTarget" class="control-input" placeholder="Example.com or 192.168.1.1">
-                </div>
-
-                <button id="osStartBtn" class="start-button" onclick="startOsFingerprint()">Start OS
-                    Fingerprinting</button>
-            </div>
-
-            <div class="control-panel-options">
-                <div class="option-toggle">
-                    <input type="checkbox" id="osEnhancedDetection" checked>
-                    <label for="osEnhancedDetection">Enhanced Detection</label>
-                </div>
-                <div class="option-toggle">
-                    <input type="checkbox" id="osServiceDetection" checked>
-                    <label for="osServiceDetection">Service Detection</label>
-                </div>
-            </div>
-
-            <div class="results-window" id="osResultsWindow">
-                <div class="results-panel">
-                    <div id="osEmptyState" class="empty-state">
-                        <h2 class="empty-heading">OS Fingerprinting Tool</h2>
-                        <p class="empty-subtext">Enter a target and click Start OS Fingerprinting to analyze the
-                            operating system</p>
-                        <p class="empty-subtext" style="font-size: 0.85rem; margin-top: 1rem;">Detects: OS Family ·
-                            Vendor · Version · Accuracy · Network Info</p>
-                    </div>
-
-                    <div id="osResultsContainer" class="results-container hidden">
-                        <!-- Dynamic OS Cards will be injected here -->
-                    </div>
-                </div>
-
-                <div id="osChatWindow" class="chat-panel">
-                    <div class="chat-header">
-                        <div class="chat-title">
-                            <i class="fa-solid fa-robot"></i>
-                            <span>OS Analysis Assistant</span>
-                        </div>
-                        <button onclick="clearOsChat()"
-                            style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.8rem">Clear</button>
-                    </div>
-
-                    <div id="osChatMessages" class="chat-messages">
-                        <div class="chat-message ai">
-                            Hello! I'm your OS fingerprinting assistant. I can help analyze the OS detection results for
-                            this target. What would you like to know?
-                        </div>
-                    </div>
-
-                    <div class="chat-input-area">
-                        <input type="text" id="osChatInput" class="chat-input"
-                            placeholder="Ask about OS fingerprinting results..." onkeypress="handleOsChatKey(event)">
-                        <button class="chat-send-btn" onclick="sendOsChatMessage()">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <button id="osChatWidgetBtn" class="chat-widget-btn" onclick="toggleOsChat()">
-                <i class="fa-solid fa-robot"></i>
-            </button>
-        </div>
-
+        
         <!-- Full Scan View -->
         <div id="fullScanView" class="view-section">
             <div class="control-panel">
@@ -3186,14 +3116,7 @@
                                 <span id="fullscan-detail-port" class="fullscan-detail">Not started</span>
                             </div>
                         </div>
-                        <div class="fullscan-card" data-tool="os">
-                            <div class="fullscan-title"><i class="fa-solid fa-desktop"></i> OS Fingerprint</div>
-                            <div class="fullscan-status">
-                                <span id="fullscan-status-os" class="status-pill pending">Pending</span>
-                                <span id="fullscan-detail-os" class="fullscan-detail">Not started</span>
-                            </div>
-                        </div>
-                        <div class="fullscan-card" data-tool="webapp">
+                                                <div class="fullscan-card" data-tool="webapp">
                             <div class="fullscan-title"><i class="fa-solid fa-shield-halved"></i> Web App Check</div>
                             <div class="fullscan-status">
                                 <span id="fullscan-status-webapp" class="status-pill pending">Pending</span>
@@ -3333,10 +3256,7 @@
                     <button class="tool-nav-btn active" data-tool="portscanner" onclick="selectTool('portscanner')">
                         <i class="fa-solid fa-plug"></i> Port Scanner
                     </button>
-                    <button class="tool-nav-btn" data-tool="osfp" onclick="selectTool('osfp')">
-                        <i class="fa-solid fa-desktop"></i> OS Fingerprinting
-                    </button>
-                    <button class="tool-nav-btn" data-tool="webscan" onclick="selectTool('webscan')">
+                                        <button class="tool-nav-btn" data-tool="webscan" onclick="selectTool('webscan')">
                         <i class="fa-solid fa-shield-halved"></i> Web App Scanner
                     </button>
                     <button class="tool-nav-btn" data-tool="dns" onclick="selectTool('dns')">
@@ -3469,11 +3389,7 @@
                                             <input type="checkbox" id="portscanner-service-detect" checked>
                                             <label for="portscanner-service-detect">Service Detection</label>
                                         </div>
-                                        <div class="option-toggle">
-                                            <input type="checkbox" id="portscanner-os-fingerprint">
-                                            <label for="portscanner-os-fingerprint">OS Fingerprinting</label>
-                                        </div>
-                                        <div class="option-toggle">
+                                                                                <div class="option-toggle">
                                             <input type="checkbox" id="portscanner-tls-fingerprint">
                                             <label for="portscanner-tls-fingerprint">TLS/JA3 Fingerprinting</label>
                                         </div>

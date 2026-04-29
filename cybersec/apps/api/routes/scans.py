@@ -417,6 +417,17 @@ def _build_evt(port_result) -> dict:
         "T1190": "Exploit Public-Facing Application",
         "T1210": "Exploitation of Remote Services",
         "T1133": "External Remote Services",
+        "T1110": "Brute Force",
+        "T1078": "Valid Accounts",
+        "T1571": "Non-Standard Port",
+        "T1048.003": "Exfiltration Over Unencrypted Protocol",
+        "T1083": "File and Directory Discovery",
+        "T1566.001": "Spearphishing Attachment",
+        "T1592": "Gather Victim Host Information",
+        "T1071.004": "DNS Application Layer Protocol",
+        "T1059.007": "JavaScript Command and Scripting Interpreter",
+        "T1595.002": "Web Vulnerability Scanning",
+        "T1048.002": "Exfiltration Over C2 Channel",
     }
     mitre_info = []
     if port_result.risk and port_result.risk.mitre_techniques:
@@ -424,8 +435,18 @@ def _build_evt(port_result) -> dict:
             mitre_info.append({
                 "id": technique,
                 "name": mitre_names.get(technique, "Unknown Technique"),
-                "tactics": ["Lateral Movement"] if "T1021" in technique
-                    else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
+                "tactics": (
+                    ["Lateral Movement"] if "T1021" in technique
+                    else (["Initial Access"] if technique == "T1190"
+                    else (["Credential Access"] if technique == "T1110"
+                    else (["Initial Access"] if technique == "T1078"
+                    else (["Defense Evasion"] if technique == "T1571"
+                    else (["Exfiltration"] if technique.startswith("T1048")
+                    else (["Discovery"] if technique in ["T1083", "T1592"]
+                    else (["Reconnaissance"] if technique in ["T1566.001", "T1595.002"]
+                    else (["Command and Control"] if technique.startswith("T1071")
+                    else (["Execution"] if technique == "T1059.007"
+                    else ["Unknown"]))))))))))
             })
     return {
         "port": port_result.port,
@@ -1365,6 +1386,17 @@ async def get_scan(scan_id: str, format: str = "html"):
                 "T1190": "Exploit Public-Facing Application",
                 "T1210": "Exploitation of Remote Services",
                 "T1133": "External Remote Services",
+                "T1110": "Brute Force",
+                "T1078": "Valid Accounts",
+                "T1571": "Non-Standard Port",
+                "T1048.003": "Exfiltration Over Unencrypted Protocol",
+                "T1083": "File and Directory Discovery",
+                "T1566.001": "Spearphishing Attachment",
+                "T1592": "Gather Victim Host Information",
+                "T1071.004": "DNS Application Layer Protocol",
+                "T1059.007": "JavaScript Command and Scripting Interpreter",
+                "T1595.002": "Web Vulnerability Scanning",
+                "T1048.002": "Exfiltration Over C2 Channel",
             }
 
             if scan.scan_type == "multi_host":
@@ -1379,11 +1411,34 @@ async def get_scan(scan_id: str, format: str = "html"):
                     risk = analyzer.analyze(r.port, [])
                     mitre_info = []
                     for technique in analyzer.MITRE_MAP.get(r.port, []):
+                        # Determine tactics based on technique
+                        if "T1021" in technique:
+                            tactics = ["Lateral Movement"]
+                        elif technique == "T1190":
+                            tactics = ["Initial Access"]
+                        elif technique == "T1110":
+                            tactics = ["Credential Access"]
+                        elif technique == "T1078":
+                            tactics = ["Initial Access"]
+                        elif technique == "T1571":
+                            tactics = ["Defense Evasion"]
+                        elif technique.startswith("T1048"):
+                            tactics = ["Exfiltration"]
+                        elif technique in ["T1083", "T1592"]:
+                            tactics = ["Discovery"]
+                        elif technique in ["T1566.001", "T1595.002"]:
+                            tactics = ["Reconnaissance"]
+                        elif technique.startswith("T1071"):
+                            tactics = ["Command and Control"]
+                        elif technique == "T1059.007":
+                            tactics = ["Execution"]
+                        else:
+                            tactics = ["Unknown"]
+                        
                         mitre_info.append({
                             "id": technique,
                             "name": mitre_names.get(technique, "Unknown Technique"),
-                            "tactics": ["Lateral Movement"] if "T1021" in technique
-                                else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
+                            "tactics": tactics
                         })
                     
                     host_results[target_host].append({
@@ -1440,11 +1495,34 @@ async def get_scan(scan_id: str, format: str = "html"):
                     risk = analyzer.analyze(r.port, [])
                     mitre_info = []
                     for technique in analyzer.MITRE_MAP.get(r.port, []):
+                        # Determine tactics based on technique
+                        if "T1021" in technique:
+                            tactics = ["Lateral Movement"]
+                        elif technique == "T1190":
+                            tactics = ["Initial Access"]
+                        elif technique == "T1110":
+                            tactics = ["Credential Access"]
+                        elif technique == "T1078":
+                            tactics = ["Initial Access"]
+                        elif technique == "T1571":
+                            tactics = ["Defense Evasion"]
+                        elif technique.startswith("T1048"):
+                            tactics = ["Exfiltration"]
+                        elif technique in ["T1083", "T1592"]:
+                            tactics = ["Discovery"]
+                        elif technique in ["T1566.001", "T1595.002"]:
+                            tactics = ["Reconnaissance"]
+                        elif technique.startswith("T1071"):
+                            tactics = ["Command and Control"]
+                        elif technique == "T1059.007":
+                            tactics = ["Execution"]
+                        else:
+                            tactics = ["Unknown"]
+                        
                         mitre_info.append({
                             "id": technique,
                             "name": mitre_names.get(technique, "Unknown Technique"),
-                            "tactics": ["Lateral Movement"] if "T1021" in technique
-                                else (["Initial Access"] if technique == "T1190" else ["Command and Control"]),
+                            "tactics": tactics
                         })
                     result_dicts.append({
                         "port": r.port,
@@ -1508,7 +1586,7 @@ async def os_fingerprint(
     except (ValueError, Exception) as e:
         raise HTTPException(status_code=422, detail=f"Cannot resolve target: {e}")
 
-    scanner = AsyncPortScanner(timeout=3.0)
+    scanner = AsyncPortScanner(timeout=10.0)
     report = await scanner.scan(body.target, port_range="22,80,135,139,445")
 
     banners = [
@@ -1516,14 +1594,44 @@ async def os_fingerprint(
         for r in report.open_ports
         if r.service and r.service.banner_snippet
     ]
-
+    
     from cybersec.core.scanner.analysis.os_fingerprint import OSFingerprinter
-    fp = OSFingerprinter().fingerprint(banners, [r.port for r in report.open_ports])
+    fingerprinter = OSFingerprinter()
+    
+    # Try active fingerprinting first (requires root privileges)
+    try:
+        fp = fingerprinter.fingerprint_active(body.target, [r.port for r in report.open_ports])
+        
+        # If active fingerprinting didn't find anything, fall back to banner analysis
+        if fp.os_name == "Unknown" or fp.confidence == 0.0:
+            logger.info("Active OS fingerprinting returned Unknown, falling back to banner analysis")
+            fp = fingerprinter.fingerprint(banners, [r.port for r in report.open_ports])
+        else:
+            logger.info(f"Active OS fingerprinting successful for {body.target}")
+    except PermissionError as e:
+        logger.warning(f"Active OS fingerprinting requires root privileges: {e}")
+        logger.info("Falling back to banner-based OS fingerprinting")
+        fp = fingerprinter.fingerprint(banners, [r.port for r in report.open_ports])
+    except Exception as e:
+        logger.warning(f"Active OS fingerprinting failed, falling back to banner analysis: {e}")
+        fp = fingerprinter.fingerprint(banners, [r.port for r in report.open_ports])
 
     result_data = {
         "os_name": fp.os_name,
         "confidence": fp.confidence,
         "method": fp.method,
+        "vendor": fp.vendor,
+        "os_family": fp.os_family,
+        "version": fp.version,
+        "ambiguous": fp.ambiguous,
+        "signals_used": fp.signals_used,
+        "hop_count": fp.hop_count,
+        "tech_details": {
+            "ttl": fp.tech_details.ttl,
+            "window_size": fp.tech_details.window_size,
+            "df_flag": fp.tech_details.df_flag,
+            "tcp_options": fp.tech_details.tcp_options
+        },
         "open_ports": [r.port for r in report.open_ports],
         "scan_duration": report.scan_duration,
     }
@@ -1548,9 +1656,23 @@ async def os_fingerprint(
         "ip": report.ip,
         "os_name": fp.os_name,
         "confidence": fp.confidence,
-        "confidence_pct": round(fp.confidence * 100, 1),
+        "confidence_pct": round(fp.confidence, 1),
         "method": fp.method,
-        "open_ports_scanned": [r.port for r in report.open_ports],
+        "vendor": fp.vendor,
+        "os_family": fp.os_family,
+        "version": fp.version,
+        "ambiguous": fp.ambiguous,
+        "signals_used": fp.signals_used,
+        "hop_count": fp.hop_count,
+        "tech_details": {
+            "ttl": fp.tech_details.ttl,
+            "window_size": fp.tech_details.window_size,
+            "df_flag": fp.tech_details.df_flag,
+            "tcp_options": fp.tech_details.tcp_options
+        },
+        "open_ports": [r.port for r in report.open_ports],
+        "open_ports_scanned": [r.port for r in report.open_ports],  # Keep for backward compatibility
+        "scan_duration": report.scan_duration,
         "tool_result_id": tool_result_id,
         "storage": "database" if tool_result_id else "memory",
     }

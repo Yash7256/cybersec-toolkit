@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List
 from cybersec.core.security.cve_lookup import CVEEntry
 from cybersec.core.security.attack_mapping import ATTACK_TECHNIQUE_DB
+from cybersec.core.security.enhanced_attack import EnhancedATTACKMapping
 
 @dataclass
 class PortRisk:
@@ -15,10 +16,13 @@ class PortRisk:
     notes: str
 
 class PortAnalyzer:
-    CRITICAL_SERVICES = {23, 21, 111, 445}
-    HIGH_SERVICES = {22, 3389, 3306, 1433, 5432, 5900, 6379, 27017}
+    CRITICAL_SERVICES = {22, 3389}  # SSH, RDP
+    HIGH_SERVICES = {21, 23, 25, 53, 110, 143, 993, 995}  # FTP, Telnet, SMTP, DNS, POP3, IMAP, POP3S, IMAPS
     MEDIUM_SERVICES = {80, 25, 53, 8080, 443, 587}
     LOW_SERVICES = {123}
+
+    def __init__(self):
+        self.enhanced_attack = EnhancedATTACKMapping('attack.db')
 
     @staticmethod
     def get_port_mitre_techniques(port: int) -> List[str]:
@@ -55,7 +59,13 @@ class PortAnalyzer:
             else:
                 risk_level = "INFO"
                 
-            mitre_techniques = self.get_port_mitre_techniques(port)
+            # Get enhanced MITRE techniques
+            try:
+                enhanced_techniques = self.enhanced_attack.get_port_techniques(port)
+                mitre_techniques = [tech["id"] for tech in enhanced_techniques]
+            except Exception:
+                # Fallback to basic mapping
+                mitre_techniques = self.get_port_mitre_techniques(port)
             
             cve_str = f" with {len(cves)} CVEs" if cves else ""
             notes = f"Service on port {port} has {risk_level} risk{cve_str}."

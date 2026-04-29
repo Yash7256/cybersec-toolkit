@@ -2,6 +2,8 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Any, Dict, TYPE_CHECKING
 
+from cybersec.config import settings
+
 if TYPE_CHECKING:
     from cybersec.core.scanner.analysis.service_detect import ServiceInfo
 
@@ -83,14 +85,21 @@ class OSFingerprinter:
     }
 
     BANNER_OS_PATTERNS = [
-        (re.compile(r"Ubuntu/(\S+)", re.IGNORECASE), "Linux", "Ubuntu", "Linux"),
+        (re.compile(r"Ubuntu[/\s](\S+)", re.IGNORECASE), "Linux", "Ubuntu", "Ubuntu"),
+        (re.compile(r"\(Ubuntu\)", re.IGNORECASE), "Linux", "Ubuntu", "Ubuntu"),
         (re.compile(r"Debian", re.IGNORECASE), "Linux", "Debian", "Linux"),
         (re.compile(r"CentOS|RedHat|RHEL", re.IGNORECASE), "Linux", "RHEL/CentOS", "Linux"),
         (re.compile(r"Windows", re.IGNORECASE), "Windows", "Microsoft", "Windows"),
+        (re.compile(r"Microsoft-IIS", re.IGNORECASE), "Windows", "Microsoft", "Windows"),
+        (re.compile(r"Win32", re.IGNORECASE), "Windows", "Microsoft", "Windows"),
         (re.compile(r"FreeBSD", re.IGNORECASE), "FreeBSD", "FreeBSD", "FreeBSD"),
         (re.compile(r"OpenBSD", re.IGNORECASE), "OpenBSD", "OpenBSD", "OpenBSD"),
         (re.compile(r"Darwin|macOS", re.IGNORECASE), "macOS", "Apple", "macOS"),
         (re.compile(r"Cisco", re.IGNORECASE), "Cisco IOS", "Cisco", "Cisco IOS"),
+        (re.compile(r"OpenSSH.*Ubuntu", re.IGNORECASE), "Linux", "Ubuntu", "Ubuntu"),
+        (re.compile(r"Apache", re.IGNORECASE), "Linux", "Unknown", "Linux"),  # Generic Linux
+        (re.compile(r"nginx", re.IGNORECASE), "Linux", "Unknown", "Linux"),   # Generic Linux
+        (re.compile(r"OpenSSH", re.IGNORECASE), "Linux", "Unknown", "Linux"), # Generic Unix
     ]
 
     def analyze_ttl(self, ttl_observed: int) -> tuple[str, float]:
@@ -198,11 +207,16 @@ class OSFingerprinter:
             from scapy.all import IP, TCP, ICMP, sr1, send
             import time
             
+            # Check for root privileges
+            import os
+            if os.geteuid() != 0:
+                raise PermissionError("Active OS fingerprinting requires root privileges for raw sockets")
+            
             results = {"ttl": None, "window": None, "options": [], "ip_id_list": [], "icmp_ttl": None}
             
             # Send SYN packet
             syn = IP(dst=target_ip)/TCP(dport=port, flags="S")
-            syn_ack = sr1(syn, timeout=2, verbose=0)
+            syn_ack = sr1(syn, timeout=settings.OS_FINGERPRINT_TIMEOUT, verbose=0)
             
             if syn_ack:
                 results["ttl"] = syn_ack[IP].ttl
@@ -216,7 +230,7 @@ class OSFingerprinter:
             
             # Send ICMP echo for TTL
             icmp_req = IP(dst=target_ip)/ICMP()
-            icmp_reply = sr1(icmp_req, timeout=2, verbose=0)
+            icmp_reply = sr1(icmp_req, timeout=settings.OS_FINGERPRINT_TIMEOUT, verbose=0)
             if icmp_reply:
                 results["icmp_ttl"] = icmp_reply[IP].ttl
             
@@ -224,7 +238,7 @@ class OSFingerprinter:
             for _ in range(3):
                 time.sleep(0.1)
                 probe = IP(dst=target_ip)/TCP(dport=port, flags="S")
-                resp = sr1(probe, timeout=1, verbose=0)
+                resp = sr1(probe, timeout=settings.OS_FINGERPRINT_TIMEOUT, verbose=0)
                 if resp:
                     results["ip_id_list"].append(resp[IP].id)
                     # Send RST

@@ -492,13 +492,15 @@
   color: var(--text-secondary);
 }
 
-/* OS Fingerprint UI */
 .os-hero-card {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 24px;
   margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 .os-hero-header {

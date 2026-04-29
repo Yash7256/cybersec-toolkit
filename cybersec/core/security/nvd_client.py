@@ -234,9 +234,13 @@ class NVDClient:
         
         This method combines keyword search with filtering and caching.
         """
-        # Skip unknown services
-        if not service_name or service_name.lower() in ["unknown", ""]:
-            return []
+        # Skip unknown and overly generic services
+        if not service_name or service_name.lower() in ["unknown", "", "http", "http-alt", "https"]:
+            # For generic HTTP services, only do CVE lookup if we have a version
+            if service_name.lower() in ["http", "http-alt", "https"] and not service_version:
+                return []
+            elif service_name.lower() in ["unknown", ""]:
+                return []
         
         # Build search keyword
         keyword = f"{service_name} {service_version}".strip()
@@ -244,13 +248,22 @@ class NVDClient:
         # Search NVD
         cves = await self.search_cves_by_keyword(keyword, max_results=50)
         
-        # Filter by CVSS score
+        # Filter by CVSS score and recency
         min_score = settings.NVD_MIN_CVSS_SCORE
+        min_date = datetime.now() - timedelta(days=365 * 10)  # 10 years ago
         filtered_cves = []
         for cve in cves:
             score = cve.cvss_v3_score or cve.cvss_v2_score or 0.0
             if score >= min_score:
-                filtered_cves.append(cve)
+                # Filter out very old CVEs (unless they have very high CVSS)
+                try:
+                    published_date = datetime.fromisoformat(cve.published.replace('Z', '+00:00'))
+                    if published_date >= min_date or score >= 9.0:  # Keep critical CVEs regardless of age
+                        filtered_cves.append(cve)
+                except (ValueError, AttributeError):
+                    # If date parsing fails, include if high score
+                    if score >= 7.0:
+                        filtered_cves.append(cve)
         
         # Sort by CVSS v3 score (highest first), fallback to v2
         filtered_cves.sort(

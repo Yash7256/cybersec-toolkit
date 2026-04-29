@@ -22,7 +22,7 @@ class ServiceDetector:
         21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns", 80: "http",
         110: "pop3", 143: "imap", 443: "https", 445: "smb", 3306: "mysql",
         3389: "rdp", 5432: "postgresql", 5900: "vnc", 6379: "redis",
-        8080: "http", 8443: "https", 27017: "mongodb", 9200: "elasticsearch",
+        8080: "http-alt",  # More specific than generic "http" 8443: "https", 27017: "mongodb", 9200: "elasticsearch",
         11211: "memcached", 8000: "http-alt", 9000: "http-alt", 8008: "http",
         8888: "http-alt"
     }
@@ -40,6 +40,14 @@ class ServiceDetector:
         ("mysql", re.compile(r"mysql_native_password", re.IGNORECASE)),
         ("mongodb", re.compile(r"mongod|MongoDB", re.IGNORECASE)),
         ("telnet", re.compile(r"^\xff[\xfb-\xfe]", re.IGNORECASE)),
+        # Port 8080 specific patterns
+        ("tomcat", re.compile(r"Apache-Coyote|Tomcat|JSP|javax\.servlet", re.IGNORECASE)),
+        ("jboss", re.compile(r"JBoss|WildFly|jboss-as", re.IGNORECASE)),
+        ("glassfish", re.compile(r"GlassFish|Sun.*System|Oracle.*GlassFish", re.IGNORECASE)),
+        ("spring-boot", re.compile(r"Spring.*Boot|Whitelabel.*Error", re.IGNORECASE)),
+        ("jetty", re.compile(r"Jetty|org\.eclipse\.jetty", re.IGNORECASE)),
+        ("squid", re.compile(r"squid|Squid.*Cache|X-Squid-Error", re.IGNORECASE)),
+        ("haproxy", re.compile(r"HAProxy|haproxy", re.IGNORECASE)),
     ]
 
     # Stage 3 probes
