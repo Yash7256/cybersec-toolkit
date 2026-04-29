@@ -5,7 +5,7 @@ Tests all 19+ services with various banner formats.
 import pytest
 from unittest.mock import Mock, patch
 
-from cybersec.core.service_detect import ServiceDetector, ServiceInfo
+from cybersec.core.scanner.analysis.service_detect import ServiceDetector, ServiceInfo
 
 
 @pytest.fixture

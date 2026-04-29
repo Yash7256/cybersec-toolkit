@@ -1,0 +1,21 @@
+{
+  "target": "172.23.0.4",
+  "ip": "172.23.0.4",
+  "total_ports_scanned": 1,
+  "open_ports": [
+    {
+      "port": 8000,
+      "protocol": "tcp",
+      "state": "open",
+      "service": {
+        "name": "http",
+        "confidence": 79.0,
+        "product": null,
+        "version": null,
+        "banner": "HTTP/1.0 200 OK\r\nServer: SimpleHTTP/0.6 Python/3.11.15\r\nDate: Fri, 24 Apr 2026 09:45:46 GMT\r\nContent-type: text/html; charset=utf-8\r\nContent-Length: 877\r\n\r\n"
+      }
+    }
+  ],
+  "scan_duration": 0.001988,
+  "avg_latency_ms": 0.38
+}

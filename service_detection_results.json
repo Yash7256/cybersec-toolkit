@@ -1,0 +1,34 @@
+{
+  "overall_accuracy": 100.0,
+  "overall_avg_confidence": 62.5,
+  "overall_min_confidence": 30,
+  "service_metrics": {
+    "redis": {
+      "accuracy": 100.0,
+      "avg_confidence": 30.0,
+      "min_confidence": 30,
+      "runs": 3
+    },
+    "postgresql": {
+      "accuracy": 100.0,
+      "avg_confidence": 30.0,
+      "min_confidence": 30,
+      "runs": 3
+    },
+    "ssh": {
+      "accuracy": 100.0,
+      "avg_confidence": 100.0,
+      "min_confidence": 100,
+      "runs": 3
+    },
+    "http": {
+      "accuracy": 100.0,
+      "avg_confidence": 90.0,
+      "min_confidence": 90,
+      "runs": 3
+    }
+  },
+  "non_standard_port_accuracy": 100.0,
+  "total_runs": 12,
+  "targets_tested": 4
+}

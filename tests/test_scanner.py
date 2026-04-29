@@ -19,8 +19,8 @@ from cybersec.core.scanner import (
     RetryStats,
     HostScanReport
 )
-from cybersec.core.service_detect import ServiceInfo
-from cybersec.core.port_analyzer import PortRisk
+from cybersec.core.scanner.analysis.service_detect import ServiceInfo
+from cybersec.core.scanner.analysis.port_analyzer import PortRisk
 
 
 @pytest.fixture
@@ -198,8 +198,8 @@ class TestAsyncPortScanner:
     async def test_scan_report_serialization(self, mock_scanner, event_loop):
         """Test scan report JSON/CSV serialization."""
         # Create a mock report
-        from cybersec.core.cve_lookup import CVEEntry
-        from cybersec.core.os_fingerprint import OSFingerprint
+        from cybersec.core.security.cve_lookup import CVEEntry
+        from cybersec.core.scanner.analysis.os_fingerprint import OSFingerprint
         
         mock_service = ServiceInfo(name="http", version="Apache/2.4.41")
         mock_cve = CVEEntry(

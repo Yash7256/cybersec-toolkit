@@ -5,7 +5,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from cybersec.core.udp_scan import UDPScanner, UDPResult, RetryStats, RetryConfig
+from cybersec.core.scanner.scans.udp import UDPScanner, UDPResult, RetryStats, RetryConfig
 
 
 class TestUDPScanner:

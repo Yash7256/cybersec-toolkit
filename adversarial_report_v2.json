@@ -1,0 +1,320 @@
+{
+  "summary": {
+    "total_cases": 17496,
+    "overall_accuracy": 60.73,
+    "correct": 10626,
+    "incorrect": 6870,
+    "timestamp": "2026-04-24T10:07:55.366739"
+  },
+  "per_scenario": {
+    "filtered_closed": {
+      "accuracy": 100.0,
+      "total": 370,
+      "correct": 370,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "unknown_classification_rate": 0.0,
+      "confidence": {
+        "mean": 5.0,
+        "std": 0.0,
+        "low_confidence_rate": 100.0
+      },
+      "top_misclassifications": {}
+    },
+    "nonstandard_port": {
+      "accuracy": 23.53,
+      "total": 680,
+      "correct": 160,
+      "false_positives": 0,
+      "false_negatives": 440,
+      "unknown_classification_rate": 64.71,
+      "confidence": {
+        "mean": 41.12,
+        "std": 23.54,
+        "low_confidence_rate": 64.71
+      },
+      "top_misclassifications": {
+        "unknown": 440,
+        "http": 80
+      }
+    },
+    "partial_banner": {
+      "accuracy": 66.16,
+      "total": 7928,
+      "correct": 5245,
+      "false_positives": 302,
+      "false_negatives": 2119,
+      "unknown_classification_rate": 83.32,
+      "confidence": {
+        "mean": 25.65,
+        "std": 15.44,
+        "low_confidence_rate": 87.73
+      },
+      "top_misclassifications": {
+        "unknown": 2119,
+        "closed": 337,
+        "ftp": 181,
+        "http": 22,
+        "ssh": 17
+      }
+    },
+    "honeypot": {
+      "accuracy": 77.5,
+      "total": 400,
+      "correct": 310,
+      "false_positives": 0,
+      "false_negatives": 90,
+      "unknown_classification_rate": 100.0,
+      "confidence": {
+        "mean": 22.75,
+        "std": 2.49,
+        "low_confidence_rate": 100.0
+      },
+      "top_misclassifications": {
+        "unknown": 90
+      }
+    },
+    "protocol_confusion": {
+      "accuracy": 11.67,
+      "total": 480,
+      "correct": 56,
+      "false_positives": 200,
+      "false_negatives": 131,
+      "unknown_classification_rate": 37.71,
+      "confidence": {
+        "mean": 56.31,
+        "std": 27.01,
+        "low_confidence_rate": 38.96
+      },
+      "top_misclassifications": {
+        "ssh": 135,
+        "unknown": 131,
+        "http": 88,
+        "redis": 70
+      }
+    },
+    "mass_scaling": {
+      "accuracy": 65.87,
+      "total": 4998,
+      "correct": 3292,
+      "false_positives": 2,
+      "false_negatives": 1704,
+      "unknown_classification_rate": 50.72,
+      "confidence": {
+        "mean": 48.52,
+        "std": 27.66,
+        "low_confidence_rate": 50.76
+      },
+      "top_misclassifications": {
+        "unknown": 1704,
+        "vnc": 1,
+        "cpanel": 1
+      }
+    },
+    "realworld_chaos": {
+      "accuracy": 56.25,
+      "total": 400,
+      "correct": 225,
+      "false_positives": 80,
+      "false_negatives": 0,
+      "unknown_classification_rate": 31.5,
+      "confidence": {
+        "mean": 31.78,
+        "std": 27.06,
+        "low_confidence_rate": 71.25
+      },
+      "top_misclassifications": {
+        "closed": 150,
+        "http": 11,
+        "ssh": 7,
+        "redis": 6,
+        "https": 1
+      }
+    },
+    "garbage_noise": {
+      "accuracy": 100.0,
+      "total": 650,
+      "correct": 650,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "unknown_classification_rate": 53.85,
+      "confidence": {
+        "mean": 42.33,
+        "std": 23.98,
+        "low_confidence_rate": 53.85
+      },
+      "top_misclassifications": {}
+    },
+    "timing_attack": {
+      "accuracy": 2.8,
+      "total": 500,
+      "correct": 14,
+      "false_positives": 75,
+      "false_negatives": 0,
+      "unknown_classification_rate": 0.0,
+      "confidence": {
+        "mean": 19.11,
+        "std": 23.36,
+        "low_confidence_rate": 86.8
+      },
+      "top_misclassifications": {
+        "closed": 434,
+        "http": 52
+      }
+    },
+    "stateful_protocol": {
+      "accuracy": 30.69,
+      "total": 290,
+      "correct": 89,
+      "false_positives": 80,
+      "false_negatives": 121,
+      "unknown_classification_rate": 41.72,
+      "confidence": {
+        "mean": 20.94,
+        "std": 7.77,
+        "low_confidence_rate": 90.0
+      },
+      "top_misclassifications": {
+        "unknown": 121,
+        "closed": 80
+      }
+    },
+    "confidence_breaking": {
+      "accuracy": 23.0,
+      "total": 500,
+      "correct": 115,
+      "false_positives": 85,
+      "false_negatives": 300,
+      "unknown_classification_rate": 83.0,
+      "confidence": {
+        "mean": 30.92,
+        "std": 18.68,
+        "low_confidence_rate": 83.0
+      },
+      "top_misclassifications": {
+        "unknown": 300,
+        "http": 64,
+        "ssh": 21
+      }
+    },
+    "edge_port": {
+      "accuracy": 33.33,
+      "total": 300,
+      "correct": 100,
+      "false_positives": 200,
+      "false_negatives": 0,
+      "unknown_classification_rate": 0.0,
+      "confidence": {
+        "mean": 8.33,
+        "std": 2.36,
+        "low_confidence_rate": 100.0
+      },
+      "top_misclassifications": {
+        "closed": 200
+      }
+    }
+  },
+  "confusion_matrix": {
+    "filtered": {
+      "filtered": 470
+    },
+    "postgresql": {
+      "unknown": 1205,
+      "closed": 79,
+      "http": 16,
+      "postgresql": 29,
+      "telnet": 1,
+      "redis": 11
+    },
+    "smtp": {
+      "smtp": 111,
+      "unknown": 524,
+      "ftp": 180,
+      "closed": 20,
+      "smb": 1,
+      "dns": 1,
+      "redis": 2
+    },
+    "unknown": {
+      "unknown": 6269,
+      "http": 149,
+      "ssh": 145,
+      "redis": 58,
+      "closed": 670,
+      "vnc": 1,
+      "cpanel": 1
+    },
+    "ftp": {
+      "ftp": 1014,
+      "unknown": 277,
+      "closed": 71,
+      "http": 14,
+      "ssh": 3
+    },
+    "http": {
+      "unknown": 669,
+      "http": 1595,
+      "https": 1,
+      "closed": 128,
+      "dns": 1,
+      "ssh": 19
+    },
+    "ssh": {
+      "unknown": 857,
+      "ssh": 1028,
+      "closed": 138,
+      "http": 12,
+      "redis": 7
+    },
+    "redis": {
+      "unknown": 1265,
+      "redis": 110,
+      "closed": 95,
+      "http": 43,
+      "ssh": 4,
+      "postgresql": 1,
+      "ftp": 1
+    },
+    "honeypot": {
+      "unknown": 90
+    },
+    "https": {
+      "http": 80,
+      "unknown": 11,
+      "ssh": 9
+    },
+    "telnet": {
+      "unknown": 7,
+      "http": 3
+    }
+  },
+  "high_confidence_failures": {
+    "count": 545,
+    "rate": 3.11
+  },
+  "confidence_distribution": {
+    "mean": 33.47
+  },
+  "difficulty_breakdown": {
+    "hard": {
+      "accuracy": 50.13,
+      "total": 3369,
+      "correct": 1689
+    },
+    "evil": {
+      "accuracy": 63.12,
+      "total": 11207,
+      "correct": 7074
+    },
+    "medium": {
+      "accuracy": 62.9,
+      "total": 1644,
+      "correct": 1034
+    },
+    "easy": {
+      "accuracy": 64.97,
+      "total": 1276,
+      "correct": 829
+    }
+  }
+}

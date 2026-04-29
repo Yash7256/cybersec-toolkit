@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  docker_nginx:
+    image: nginx:alpine
+    container_name: docker_nginx
+
+  docker_redis:
+    image: redis:alpine
+    container_name: docker_redis
+
+  docker_postgres:
+    image: postgres:15-alpine
+    container_name: docker_postgres
+    environment:
+      POSTGRES_PASSWORD: benchpassword
+
+  docker_api:
+    image: python:3.11-slim
+    container_name: docker_api
+    command: python -m http.server 8000
+
+  docker_tarpit:
+    image: python:3.11-slim
+    container_name: docker_tarpit
+    command: |
+      python -c "import socket, time; s = socket.socket(); s.bind(('0.0.0.0', 9999)); s.listen(5);
+      print('Tarpit on 9999');
+      while True:
+          c, a = s.accept()
+          time.sleep(3)
+          c.close()"
+
+  docker_filtered:
+    image: alpine:latest
+    container_name: docker_filtered
+    cap_add:
+      - NET_ADMIN
+    command: >
+      /bin/sh -c "apk add --no-cache iptables && 
+      iptables -A INPUT -p tcp --dport 8888 -j DROP && 
+      while true; do nc -l -p 8889; done"

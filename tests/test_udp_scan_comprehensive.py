@@ -6,7 +6,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
 
-from cybersec.core.udp_scan import UDPScanner, UDPResult
+from cybersec.core.scanner.scans.udp import UDPScanner, UDPResult
 
 
 class TestUDPScanner:

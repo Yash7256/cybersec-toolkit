@@ -55,4 +55,12 @@ class Report(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     format = Column(Enum('json', 'csv', 'pdf', name='report_format_enum'), nullable=False)
     file_path = Column(String(500), nullable=True)
 
+class NVDCveCache(Base):
+    __tablename__ = "nvd_cve_cache"
+    
+    cve_id = Column(String(20), primary_key=True)  # CVE-YYYY-NNNNN format
+    data = Column(JSONB, nullable=False)          # full CVEResult as JSON
+    fetched_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
+
 # TODO: implement relationships and other columns if needed

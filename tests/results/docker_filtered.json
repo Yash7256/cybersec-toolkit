@@ -1,0 +1,21 @@
+{
+  "target": "172.23.0.5",
+  "ip": "172.23.0.5",
+  "total_ports_scanned": 2,
+  "open_ports": [
+    {
+      "port": 8889,
+      "protocol": "tcp",
+      "state": "open",
+      "service": {
+        "name": "closed",
+        "confidence": 10,
+        "product": null,
+        "version": null,
+        "banner": null
+      }
+    }
+  ],
+  "scan_duration": 3.002507,
+  "avg_latency_ms": 0.5
+}

@@ -1,0 +1,21 @@
+{
+  "target": "172.23.0.7",
+  "ip": "172.23.0.7",
+  "total_ports_scanned": 1,
+  "open_ports": [
+    {
+      "port": 6379,
+      "protocol": "tcp",
+      "state": "open",
+      "service": {
+        "name": "redis",
+        "confidence": 57.0,
+        "product": null,
+        "version": null,
+        "banner": "+PONG\r\n"
+      }
+    }
+  ],
+  "scan_duration": 0.001959,
+  "avg_latency_ms": 0.49
+}

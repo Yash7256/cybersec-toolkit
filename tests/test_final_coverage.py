@@ -4,8 +4,8 @@ Final comprehensive tests to reach 80%+ coverage based on actual class structure
 import pytest
 from unittest.mock import patch, MagicMock
 
-from cybersec.core.cve_lookup import CVELookup, CVEEntry
-from cybersec.core.port_analyzer import PortAnalyzer, PortRisk
+from cybersec.core.security.cve_lookup import CVELookup, CVEEntry
+from cybersec.core.scanner.analysis.port_analyzer import PortAnalyzer, PortRisk
 
 
 class TestCVELookupFinal:

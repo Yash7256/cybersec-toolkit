@@ -4,7 +4,7 @@ Tests TLS fingerprinting against google.com:443 and validates JA3 hash and certi
 """
 import pytest
 import asyncio
-from cybersec.core.tls_fingerprint import TLSFingerprinter, TLSInfo
+from cybersec.core.scanner.analysis.tls_fingerprint import TLSFingerprinter, TLSInfo
 
 
 class TestTLSFingerprintingIntegration:

@@ -5,7 +5,7 @@ Tests the core pattern matching functionality without network calls.
 import pytest
 from unittest.mock import patch
 
-from cybersec.core.service_detect import ServiceDetector
+from cybersec.core.scanner.analysis.service_detect import ServiceDetector
 
 
 @pytest.fixture

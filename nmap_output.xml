@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.98 scan initiated Fri Apr 24 15:22:48 2026 as: /usr/lib/nmap/nmap -&#45;privileged -sS -sV -p- -T4 -oX nmap_output.xml scanme.nmap.org -->
+<nmaprun scanner="nmap" args="/usr/lib/nmap/nmap -&#45;privileged -sS -sV -p- -T4 -oX nmap_output.xml scanme.nmap.org" start="1777024368" startstr="Fri Apr 24 15:22:48 2026" version="7.98" xmloutputversion="1.05">
+<scaninfo type="syn" protocol="tcp" numservices="65535" services="1-65535"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="45.33.32.156" addrtype="ipv4"/>
+<hostnames>
+<hostname name="scanme.nmap.org" type="user"/>
+</hostnames>
+</hosthint>

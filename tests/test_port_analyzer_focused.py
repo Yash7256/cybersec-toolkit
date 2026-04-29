@@ -4,7 +4,7 @@ Focused unit tests for PortAnalyzer functionality to improve coverage.
 import pytest
 from unittest.mock import patch, MagicMock
 
-from cybersec.core.port_analyzer import PortAnalyzer, PortRisk
+from cybersec.core.scanner.analysis.port_analyzer import PortAnalyzer, PortRisk
 
 
 class TestPortAnalyzer:

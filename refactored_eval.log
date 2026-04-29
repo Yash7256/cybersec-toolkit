@@ -1,0 +1,90 @@
+Loading dataset: adversarial_dataset_v2.json
+  Loaded 17496 test cases
+
+Testing 17496 cases (concurrency: 100)
+
+  500/17496 (3%) - 3011 tests/sec
+  1000/17496 (6%) - 3884 tests/sec
+  1500/17496 (9%) - 5000 tests/sec
+  2000/17496 (11%) - 5585 tests/sec
+  2500/17496 (14%) - 6016 tests/sec
+  3000/17496 (17%) - 6339 tests/sec
+  3500/17496 (20%) - 6442 tests/sec
+  4000/17496 (23%) - 6642 tests/sec
+  4500/17496 (26%) - 6321 tests/sec
+  5000/17496 (29%) - 6472 tests/sec
+  5500/17496 (31%) - 6625 tests/sec
+  6000/17496 (34%) - 6820 tests/sec
+  6500/17496 (37%) - 6979 tests/sec
+  7000/17496 (40%) - 7038 tests/sec
+  7500/17496 (43%) - 7134 tests/sec
+  8000/17496 (46%) - 7234 tests/sec
+  8500/17496 (49%) - 7276 tests/sec
+  9000/17496 (51%) - 7366 tests/sec
+  9500/17496 (54%) - 7410 tests/sec
+  10000/17496 (57%) - 7493 tests/sec
+  10500/17496 (60%) - 7536 tests/sec
+  11000/17496 (63%) - 7589 tests/sec
+  11500/17496 (66%) - 7600 tests/sec
+  12000/17496 (69%) - 7598 tests/sec
+  12500/17496 (71%) - 7679 tests/sec
+  13000/17496 (74%) - 7651 tests/sec
+  13500/17496 (77%) - 7658 tests/sec
+  14000/17496 (80%) - 7686 tests/sec
+  14500/17496 (83%) - 7739 tests/sec
+  15000/17496 (86%) - 7761 tests/sec
+  15500/17496 (89%) - 7784 tests/sec
+  16000/17496 (91%) - 7856 tests/sec
+  16500/17496 (94%) - 7890 tests/sec
+  17000/17496 (97%) - 7933 tests/sec
+
+Complete: 17496 tests in 5.5s (3192 tests/sec)
+
+Computing metrics...
+Identifying failures...
+
+Saving outputs...
+✓ Saved: adversarial_report_v2.json
+✓ Saved: failure_cases_v2.json
+✓ Saved: adversarial_results_v2.csv
+
+====================================================================================================
+SCENARIO SUMMARY TABLE
+====================================================================================================
+Scenario                            |   Accuracy |   Avg Conf | Failure Mode              |  Total
+----------------------------------------------------------------------------------------------------
+filtered_closed                     |       0.0% |        0.3 | Critical failure          |    370
+nonstandard_port                    |       5.6% |        4.3 | Critical failure          |    680
+timing_attack                       |      16.4% |       10.2 | Critical failure          |    500
+mass_scaling                        |      16.7% |        0.0 | Critical failure          |   4998
+stateful_protocol                   |      27.6% |        0.0 | Critical failure          |    290
+confidence_breaking                 |      41.0% |        4.3 | Low accuracy              |    500
+realworld_chaos                     |      51.5% |        0.0 | High FN rate              |    400
+protocol_confusion                  |      54.2% |        1.6 | High FN rate              |    480
+garbage_noise                       |      58.9% |        3.9 | High FN rate              |    650
+partial_banner                      |      60.4% |        0.1 | High FN rate              |   7928
+edge_port                           |      66.7% |        0.0 | Stable                    |    300
+honeypot                            |      77.5% |        0.0 | High FN rate              |    400
+====================================================================================================
+
+====================================================================================================
+KEY FINDINGS
+====================================================================================================
+
+Overall Accuracy: 42.2% (7386/17496)
+High-Confidence Failures: 82 (0.5%) ❗
+
+Total Failure Cases: 82
+  CRITICAL: 82
+  HIGH: 0
+
+Top 5 Worst Scenarios:
+  filtered_closed: 0.0% (370 cases)
+  nonstandard_port: 5.6% (680 cases)
+  timing_attack: 16.4% (500 cases)
+  mass_scaling: 16.7% (4998 cases)
+  stateful_protocol: 27.6% (290 cases)
+
+====================================================================================================
+EVALUATION COMPLETE
+====================================================================================================

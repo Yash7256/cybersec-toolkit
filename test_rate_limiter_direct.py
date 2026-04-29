@@ -4,7 +4,7 @@ Direct test of the rate limiter without concurrency controller.
 """
 import asyncio
 import time
-from cybersec.core.rate_limiter import RateLimiter
+from cybersec.core.security.rate_limiter import RateLimiter
 
 async def test_rate_limiter_direct():
     """Test rate limiter directly."""

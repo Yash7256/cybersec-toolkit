@@ -130,3 +130,6 @@ websockets==16.0 ; python_version >= "3.11" and python_version < "4.0"
 win32-setctime==1.2.0 ; python_version >= "3.11" and python_version < "4.0" and sys_platform == "win32"
 wrapt==2.1.2 ; python_version >= "3.11" and python_version < "4.0"
 xlsxwriter==3.2.9 ; python_version >= "3.11" and python_version < "4.0"
+matplotlib>=3.7.0
+docker>=6.1.0
+python-nmap>=0.7.1

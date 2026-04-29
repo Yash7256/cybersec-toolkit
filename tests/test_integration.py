@@ -61,7 +61,7 @@ class TestIntegrationScanning:
         
         try:
             # Scan localhost CIDR range
-            from cybersec.core.utils import expand_target_range
+            from cybersec.core.scanner.utils import expand_target_range
             targets = expand_target_range("127.0.0.0/30")
             localhost_targets = [t for t in targets if t.startswith("127.0.0.")]
             
@@ -258,10 +258,10 @@ class TestIntegrationScanning:
     def _create_mock_report(self):
         """Create a mock scan report for testing."""
         from cybersec.core.scanner import ScanReport
-        from cybersec.core.service_detect import ServiceInfo
-        from cybersec.core.port_analyzer import PortRisk
-        from cybersec.core.cve_lookup import CVEEntry
-        from cybersec.core.os_fingerprint import OSFingerprint
+        from cybersec.core.scanner.analysis.service_detect import ServiceInfo
+        from cybersec.core.scanner.analysis.port_analyzer import PortRisk
+        from cybersec.core.security.cve_lookup import CVEEntry
+        from cybersec.core.scanner.analysis.os_fingerprint import OSFingerprint
         from datetime import datetime, timezone
         
         mock_service = ServiceInfo(name="http", version="Test/1.0")
@@ -354,7 +354,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_empty_banner_response(self):
         """Test service detection fallback with empty banner."""
-        from cybersec.core.service_detect import ServiceDetector
+        from cybersec.core.scanner.analysis.service_detect import ServiceDetector
         
         detector = ServiceDetector()
         

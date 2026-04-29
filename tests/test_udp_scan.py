@@ -6,7 +6,7 @@ import asyncio
 import time
 from unittest.mock import Mock, patch, MagicMock
 
-from cybersec.core.udp_scan import UDPScanner, UDPResult, RetryConfig, RetryStats
+from cybersec.core.scanner.scans.udp import UDPScanner, UDPResult, RetryConfig, RetryStats
 
 
 @pytest.fixture
@@ -152,13 +152,13 @@ class TestUDPScanner:
 
     def test_is_available_root_check(self):
         """Test availability check for root privileges."""
-        with patch('cybersec.core.udp_scan.is_root') as mock_is_root:
-            with patch('cybersec.core.udp_scan.SCAPY_AVAILABLE', False):
+        with patch('cybersec.core.scanner.scans.udp.is_root') as mock_is_root:
+            with patch('cybersec.core.scanner.scans.udp.SCAPY_AVAILABLE', False):
                 # Test without Scapy
                 scanner = UDPScanner()
                 assert not scanner.is_available()
             
-            with patch('cybersec.core.udp_scan.SCAPY_AVAILABLE', True):
+            with patch('cybersec.core.scanner.scans.udp.SCAPY_AVAILABLE', True):
                 # Test without root
                 mock_is_root.return_value = False
                 scanner = UDPScanner()

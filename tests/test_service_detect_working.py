@@ -6,7 +6,7 @@ import pytest
 import asyncio
 from unittest.mock import patch, Mock, AsyncMock
 
-from cybersec.core.service_detect import ServiceDetector, ServiceInfo
+from cybersec.core.scanner.analysis.service_detect import ServiceDetector, ServiceInfo
 
 
 @pytest.fixture

@@ -44,11 +44,11 @@ EXPECTED_OPEN_PORTS = {
 
 # ─── Our Scanner ───────────────────────────────────────────────────────────────
 
-async def run_our_scanner(target: str, port_range: str = "common") -> dict:
+async def run_our_scanner(target: str, port_range: str = "common", retries: int = 0) -> dict:
     """Run our AsyncPortScanner against the target."""
     from cybersec.core.scanner import AsyncPortScanner
 
-    scanner = AsyncPortScanner(timeout=3.0)
+    scanner = AsyncPortScanner(timeout=3.0, retries=retries)
     report = await scanner.scan(target, port_range=port_range)
 
     results = []
@@ -183,6 +183,42 @@ def _parse_nmap_xml(xml_output: str) -> dict:
 
 # ─── Comparison Engine ────────────────────────────────────────────────────────
 
+def service_accuracy(gt: dict, pred: dict) -> float:
+    """Compute service name accuracy for open ports only."""
+    correct = total = 0
+    for port in gt:
+        if gt[port].get("state") == "open":
+            total += 1
+            if (gt[port].get("service") or "").lower() == (pred.get(port, {}).get("service") or "").lower():
+                correct += 1
+    return correct / (total + 1e-9)
+
+
+def version_accuracy(gt: dict, pred: dict) -> float:
+    """Compute version match accuracy (prefix matching)."""
+    correct = total = 0
+    for port in gt:
+        if gt[port].get("state") == "open":
+            gt_ver = gt[port].get("version")
+            pred_ver = pred.get(port, {}).get("version")
+            if gt_ver and pred_ver:
+                total += 1
+                if str(pred_ver).startswith(str(gt_ver)):
+                    correct += 1
+    return correct / (total + 1e-9)
+
+
+def product_accuracy(gt: dict, pred: dict) -> float:
+    """Compute product name accuracy for open ports only."""
+    correct = total = 0
+    for port in gt:
+        if gt[port].get("state") == "open":
+            total += 1
+            if (gt[port].get("product") or "").lower() == (pred.get(port, {}).get("product") or "").lower():
+                correct += 1
+    return correct / (total + 1e-9)
+
+
 def compare_results(ours: dict, nmap: Optional[dict]) -> dict:
     """Compare our scanner results against nmap (or expected results)."""
 
@@ -242,27 +278,31 @@ def compare_results(ours: dict, nmap: Optional[dict]) -> dict:
                 "nmap_version": nmap_r.get("version"),
             })
 
-    # Accuracy metrics
-    total_compared = len(matches)
-    state_accuracy = 0
-    service_accuracy = 0
-    if total_compared > 0:
-        state_matches = sum(1 for m in matches if m["states_match"])
-        service_matches = sum(1 for m in matches if m["services_match"])
-        state_accuracy = round(state_matches / total_compared * 100, 1)
-        service_accuracy = round(service_matches / total_compared * 100, 1)
+    # Build dicts for metric functions
+    gt_dict = {}
+    pred_dict = {}
+    for m in matches:
+        gt_dict[m["port"]] = {
+            "state": m["nmap_state"],
+            "service": m["nmap_service"],
+            "product": m.get("nmap_product"),
+            "version": m.get("nmap_version"),
+        }
+        pred_dict[m["port"]] = {
+            "state": m["our_state"],
+            "service": m["our_service"],
+            "product": m.get("our_product"),
+            "version": m["our_version"],
+        }
 
-    # Version detection accuracy
-    version_matches = sum(
-        1 for m in matches
-        if m.get("our_version") and m.get("nmap_version")
-        and m["our_version"] == m["nmap_version"]
-    )
-    version_comparable = sum(
-        1 for m in matches
-        if m.get("our_version") or m.get("nmap_version")
-    )
-    version_accuracy = round(version_matches / version_comparable * 100, 1) if version_comparable > 0 else 0
+    total_compared = len(matches)
+    svc_acc = round(service_accuracy(gt_dict, pred_dict) * 100, 1)
+    ver_acc = round(version_accuracy(gt_dict, pred_dict) * 100, 1)
+    prod_acc = round(product_accuracy(gt_dict, pred_dict) * 100, 1)
+
+    # State accuracy - count matches where both agree on state
+    state_matches = sum(1 for m in matches if m["states_match"])
+    state_acc = round(state_matches / total_compared * 100, 1) if total_compared > 0 else 0
 
     return {
         "metadata": {
@@ -288,9 +328,10 @@ def compare_results(ours: dict, nmap: Optional[dict]) -> dict:
         },
         "accuracy": {
             "total_ports_compared": total_compared,
-            "state_accuracy_pct": state_accuracy,
-            "service_accuracy_pct": service_accuracy,
-            "version_accuracy_pct": version_accuracy,
+            "state_accuracy_pct": state_acc,
+            "service_accuracy_pct": svc_acc,
+            "product_accuracy_pct": prod_acc,
+            "version_accuracy_pct": ver_acc,
             "ports_matched": len(matches),
             "our_false_positives": len(our_misses),
             "our_false_negatives": len(nmap_misses),
@@ -404,6 +445,7 @@ def _print_summary(comp: dict, ours: dict, nmap_res: Optional[dict]):
     print(f"{'─'*60}")
     print(f"  State Detection Accuracy : {acc['state_accuracy_pct']}%")
     print(f"  Service Match Accuracy  : {acc['service_accuracy_pct']}%")
+    print(f"  Product Match Accuracy  : {acc['product_accuracy_pct']}%")
     print(f"  Version Match Accuracy  : {acc['version_accuracy_pct']}%")
     print(f"  Ports Compared         : {acc['total_ports_compared']}")
     print(f"  Our False Positives    : {acc['our_false_positives']}")
@@ -452,10 +494,13 @@ def _print_table(comp: dict, ours: dict, nmap_res: Optional[dict]):
         for e in comp["nmap_extras"]:
             print(f"    Port {e['port']}: {e['nmap_state']} ({e.get('nmap_service')})")
 
+    acc = comp["accuracy"]
     print(f"\n{'─'*80}")
-    print(f"  Accuracy: State={comp['accuracy']['state_accuracy_pct']}%  "
-          f"Service={comp['accuracy']['service_accuracy_pct']}%  "
-          f"Version={comp['accuracy']['version_accuracy_pct']}%\n")
+    print(f"  Accuracy Summary:")
+    print(f"    State Detection : {acc['state_accuracy_pct']}%")
+    print(f"    Service Match  : {acc['service_accuracy_pct']}%")
+    print(f"    Product Match  : {acc['product_accuracy_pct']}%")
+    print(f"    Version Match  : {acc['version_accuracy_pct']}%\n")
 
 
 if __name__ == "__main__":

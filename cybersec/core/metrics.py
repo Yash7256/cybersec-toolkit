@@ -7,6 +7,18 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 
+# ADDED: Optional psutil for system metrics
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    psutil = None
+
+# ADDED: asyncio for async-safe operations
+import asyncio
+import os
+
 
 @dataclass
 class ScanMetrics:
@@ -332,3 +344,331 @@ class MetricsCollector:
 
 # Global metrics collector instance
 metrics_collector = MetricsCollector()
+
+
+# ADDED: Stress testing metrics with asyncio-safe operations
+import asyncio
+import os
+from typing import Dict, Any, Optional
+
+# Try to import psutil, but make it optional
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    psutil = None
+
+
+class StressTestMetrics:
+    """
+    High-accuracy stress testing metrics collection.
+    asyncio-safe counter operations for concurrent scanning.
+    Designed for minimal overhead inside scanner loop.
+    """
+    
+    # ADDED: Connection counters
+    _total_ports_scanned: int = 0
+    _successful_connections: int = 0
+    _failed_connections: int = 0
+    _timeouts: int = 0
+    _retries: int = 0
+    
+    # ADDED: Port state breakdown
+    _port_states: dict = None
+    
+    # ADDED: Timing
+    _scan_start_time: float = 0.0
+    _scan_end_time: float = 0.0
+    
+    # ADDED: System metrics
+    _cpu_percent: float = 0.0
+    _memory_mb: float = 0.0
+    _open_file_descriptors: int = 0
+    
+    def __init__(self):
+        # ADDED: Initialize counters
+        self._total_ports_scanned = 0
+        self._successful_connections = 0
+        self._failed_connections = 0
+        self._timeouts = 0
+        self._retries = 0
+        self._port_states = {
+            "open": 0,
+            "closed": 0,
+            "filtered": 0,
+            "timeout": 0,
+            "error": 0,
+            "unreachable": 0
+        }
+        self._scan_start_time = 0.0
+        self._scan_end_time = 0.0
+        self._cpu_percent = 0.0
+        self._memory_mb = 0.0
+        self._open_file_descriptors = 0
+        self._cpu_baseline = 0.0
+        
+        # ADDED: Asyncio lock for thread-safe operations
+        self._lock = asyncio.Lock()
+        
+        # ADDED: Process reference for psutil
+        self._process = None
+        if PSUTIL_AVAILABLE:
+            try:
+                self._process = psutil.Process(os.getpid())
+                # FIX: Prime CPU baseline on init
+                # First call to psutil.cpu_percent() returns 0, serves as baseline
+                psutil.cpu_percent(interval=0.1)
+            except Exception:
+                pass
+    
+    # ADDED: Start/end scan (non-blocking, no lock needed for single assignment)
+    def start_scan(self) -> None:
+        """Record scan start time (monotonic, asyncio-safe)."""
+        self._scan_start_time = time.monotonic()
+    
+    def end_scan(self) -> None:
+        """Record scan end time and compute final metrics."""
+        self._scan_end_time = time.monotonic()
+        self._update_system_metrics()
+    
+    # ADDED: Non-blocking increment methods (use asyncio atomic pattern)
+    # These methods avoid await to prevent blocking the event loop
+    # For true atomicity, the caller should hold the lock externally if needed
+    def increment_total_ports_scanned(self, value: int = 1) -> None:
+        """Increment total ports scanned counter."""
+        self._total_ports_scanned += value
+    
+    def increment_successful_connections(self, value: int = 1) -> None:
+        """Increment successful connections counter."""
+        self._successful_connections += value
+    
+    def increment_failed_connections(self, value: int = 1) -> None:
+        """Increment failed connections counter."""
+        self._failed_connections += value
+    
+    def increment_timeouts(self, value: int = 1) -> None:
+        """Increment timeout counter."""
+        self._timeouts += value
+    
+    def increment_retries(self, value: int = 1) -> None:
+        """Increment retry counter."""
+        self._retries += value
+    
+    def increment_port_state(self, state: str, value: int = 1) -> None:
+        """Increment port state counter."""
+        if state in self._port_states:
+            self._port_states[state] += value
+    
+    def get_port_states(self) -> dict:
+        """Get port state breakdown."""
+        return dict(self._port_states)
+    
+    # ADDED: Async-safe increment methods (with lock)
+    async def async_increment_successful(self) -> None:
+        """Async-safe increment successful connections."""
+        async with self._lock:
+            self._successful_connections += 1
+    
+    async def async_increment_failed(self) -> None:
+        """Async-safe increment failed connections."""
+        async with self._lock:
+            self._failed_connections += 1
+    
+    async def async_increment_timeouts(self) -> None:
+        """Async-safe increment timeouts."""
+        async with self._lock:
+            self._timeouts += 1
+    
+    async def async_increment_retries(self) -> None:
+        """Async-safe increment retries."""
+        async with self._lock:
+            self._retries += 1
+    
+    async def async_increment_ports_scanned(self, count: int = 1) -> None:
+        """Async-safe increment ports scanned."""
+        async with self._lock:
+            self._total_ports_scanned += count
+    
+    # ADDED: System metrics collection
+    _cpu_baseline: float = 0.0  # ADDED: Track if baseline was taken
+    
+    def _update_system_metrics(self) -> None:
+        """Update system resource metrics."""
+        if PSUTIL_AVAILABLE:
+            try:
+                # FIX: Get system CPU, first call gives baseline, second gives delta
+                if self._cpu_baseline == 0:
+                    # First call - store baseline
+                    self._cpu_baseline = psutil.cpu_percent(interval=0.1)
+                    self._cpu_percent = 0.0
+                else:
+                    # Subsequent calls return actual CPU %
+                    self._cpu_percent = psutil.cpu_percent(interval=0.1)
+                
+                # Memory - can still use process-specific
+                if self._process:
+                    mem_info = self._process.memory_info()
+                    self._memory_mb = mem_info.rss / (1024 * 1024)
+                
+                # Open file descriptors (Linux only)
+                try:
+                    fd_dir = f"/proc/{os.getpid()}/fd"
+                    self._open_file_descriptors = len(os.listdir(fd_dir))
+                except Exception:
+                    self._open_file_descriptors = 0
+            except Exception:
+                pass
+    
+    def get_system_metrics(self) -> Dict[str, float]:
+        """Get current system metrics snapshot."""
+        self._update_system_metrics()
+        return {
+            "cpu_percent": self._cpu_percent,
+            "memory_mb": self._memory_mb,
+            "open_file_descriptors": self._open_file_descriptors
+        }
+    
+    # ADDED: Computed metrics
+    @property
+    def duration_seconds(self) -> float:
+        """Calculate scan duration in seconds."""
+        if self._scan_start_time > 0 and self._scan_end_time > 0:
+            return self._scan_end_time - self._scan_start_time
+        elif self._scan_start_time > 0:
+            return time.monotonic() - self._scan_start_time
+        return 0.0
+    
+    @property
+    def ports_per_second(self) -> float:
+        """Calculate ports scanned per second."""
+        dur = self.duration_seconds
+        if dur > 0:
+            return self._total_ports_scanned / dur
+        return 0.0
+    
+    @property
+    def connection_success_rate(self) -> float:
+        """Calculate connection success rate (0-100)."""
+        total_conn = self._successful_connections + self._failed_connections
+        if total_conn > 0:
+            return (self._successful_connections / total_conn) * 100
+        return 0.0
+    
+    @property
+    def error_rate(self) -> float:
+        """Calculate error rate (0-100)."""
+        total = self._total_ports_scanned
+        if total > 0:
+            failed = self._failed_connections + self._timeouts
+            return (failed / total) * 100
+        return 0.0
+    
+    # ADDED: Export metrics as dict
+    def export_metrics(self) -> Dict[str, Any]:
+        """Export all metrics as dictionary."""
+        self._update_system_metrics()
+        
+        return {
+            # Timing
+            "timing": {
+                "scan_start_time": self._scan_start_time,
+                "scan_end_time": self._scan_end_time,
+                "duration_seconds": self.duration_seconds,
+            },
+            # Port state breakdown
+            "port_states": self.get_port_states(),
+            # Counters
+            "counters": {
+                "total_ports_scanned": self._total_ports_scanned,
+                "successful_connections": self._successful_connections,
+                "failed_connections": self._failed_connections,
+                "timeouts": self._timeouts,
+                "retries": self._retries,
+            },
+            # Computed metrics
+            "computed": {
+                "ports_per_second": self.ports_per_second,
+                "connection_success_rate": self.connection_success_rate,
+                "error_rate": self.error_rate,
+            },
+            # System metrics
+            "system": {
+                "cpu_percent": self._cpu_percent,
+                "memory_mb": self._memory_mb,
+                "open_file_descriptors": self._open_file_descriptors,
+            },
+        }
+    
+    # ADDED: Reset metrics for reuse
+    def reset(self) -> None:
+        """Reset all counters for reuse."""
+        self._total_ports_scanned = 0
+        self._successful_connections = 0
+        self._failed_connections = 0
+        self._timeouts = 0
+        self._retries = 0
+        self._port_states = {
+            "open": 0,
+            "closed": 0,
+            "filtered": 0,
+            "timeout": 0,
+            "error": 0,
+            "unreachable": 0
+        }
+        self._scan_start_time = 0.0
+        self._scan_end_time = 0.0
+
+
+class StressTestCollector:
+    """
+    Collector for managing multiple stress test metric instances.
+    Thread-safe access to stress metrics.
+    """
+    
+    def __init__(self, max_instances: int = 100):
+        self._max_instances = max_instances
+        self._metrics: Dict[str, StressTestMetrics] = {}
+        self._lock = asyncio.Lock()
+    
+    async def create_metrics(self, test_id: str) -> StressTestMetrics:
+        """Create new stress test metrics instance."""
+        async with self._lock:
+            if len(self._metrics) >= self._max_instances:
+                # Remove oldest
+                oldest_key = next(iter(self._metrics))
+                del self._metrics[oldest_key]
+            
+            metrics = StressTestMetrics()
+            self._metrics[test_id] = metrics
+            return metrics
+    
+    async def get_metrics(self, test_id: str) -> Optional[StressTestMetrics]:
+        """Get metrics by test ID."""
+        async with self._lock:
+            return self._metrics.get(test_id)
+    
+    async def delete_metrics(self, test_id: str) -> bool:
+        """Delete metrics by test ID."""
+        async with self._lock:
+            if test_id in self._metrics:
+                del self._metrics[test_id]
+                return True
+            return False
+    
+    async def list_tests(self) -> list:
+        """List all active test IDs."""
+        async with self._lock:
+            return list(self._metrics.keys())
+    
+    async def get_all_metrics(self) -> Dict[str, Dict[str, Any]]:
+        """Get all metrics as dict."""
+        async with self._lock:
+            return {
+                test_id: metrics.export_metrics()
+                for test_id, metrics in self._metrics.items()
+            }
+
+
+# ADDED: Global stress test collector
+stress_test_collector = StressTestCollector()

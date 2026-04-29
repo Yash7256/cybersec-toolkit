@@ -1,0 +1,46 @@
+Loading dataset: adversarial_dataset_v2.json
+  Loaded 17496 test cases
+
+Testing 3000 cases (concurrency: 50)
+
+  500/3000 (17%) - 2717 tests/sec
+  1000/3000 (33%) - 2913 tests/sec
+  1500/3000 (50%) - 2848 tests/sec
+  2000/3000 (67%) - 2818 tests/sec
+  2500/3000 (83%) - 2798 tests/sec
+  3000/3000 (100%) - 1240 tests/sec
+
+Complete: 3000 tests in 2.4s (1240 tests/sec)
+
+Computing metrics...
+Identifying failures...
+
+Saving outputs...
+✓ Saved: adversarial_report_v2.json
+✓ Saved: failure_cases_v2.json
+Traceback (most recent call last):
+  File "/home/yash/cybersec/run_adversarial_eval.py", line 324, in <module>
+    asyncio.run(main())
+    ~~~~~~~~~~~^^^^^^^^
+  File "/usr/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/yash/cybersec/run_adversarial_eval.py", line 301, in main
+    evaluator.save_all(metrics, failures, results)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/yash/cybersec/run_adversarial_eval.py", line 252, in save_all
+    writer.writerows(results)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/usr/lib/python3.14/csv.py", line 228, in writerows
+    return self.writer.writerows(map(self._dict_to_list, rowdicts))
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/csv.py", line 220, in _dict_to_list
+    raise ValueError("dict contains fields not in fieldnames: "
+                     + ", ".join([repr(x) for x in wrong_fields]))
+ValueError: dict contains fields not in fieldnames: 'scenario_subtype'

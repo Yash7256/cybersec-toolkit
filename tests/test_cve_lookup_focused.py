@@ -4,7 +4,7 @@ Focused unit tests for CVE lookup functionality to improve coverage.
 import pytest
 from unittest.mock import patch, MagicMock
 
-from cybersec.core.cve_lookup import CVELookup, CVEEntry
+from cybersec.core.security.cve_lookup import CVELookup, CVEEntry
 
 
 class TestCVELookup:

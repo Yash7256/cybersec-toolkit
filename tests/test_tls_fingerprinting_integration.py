@@ -8,7 +8,7 @@ import ssl
 import socket
 from unittest.mock import patch, MagicMock
 
-from cybersec.core.tls_fingerprint import TLSFingerprinter, TLSInfo
+from cybersec.core.scanner.analysis.tls_fingerprint import TLSFingerprinter, TLSInfo
 
 
 class TestTLSFingerprintingIntegration:

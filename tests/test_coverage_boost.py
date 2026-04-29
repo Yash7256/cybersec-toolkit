@@ -6,9 +6,9 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
 
 from cybersec.core.scanner import AsyncPortScanner, ScanReport, PortResult, AdaptiveConcurrencyController
-from cybersec.core.cve_lookup import CVELookup, CVEEntry
-from cybersec.core.port_analyzer import PortAnalyzer, PortRisk
-from cybersec.core.udp_scan import UDPScanner, UDPResult, RetryStats, RetryConfig
+from cybersec.core.security.cve_lookup import CVELookup, CVEEntry
+from cybersec.core.scanner.analysis.port_analyzer import PortAnalyzer, PortRisk
+from cybersec.core.scanner.scans.udp import UDPScanner, UDPResult, RetryStats, RetryConfig
 
 
 class TestScannerCoverageBoost:

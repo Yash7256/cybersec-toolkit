@@ -7,8 +7,8 @@ import asyncio
 from unittest.mock import patch, Mock
 
 from cybersec.core.scanner import AsyncPortScanner, RetryConfig
-from cybersec.core.service_detect import ServiceDetector
-from cybersec.core.utils import expand_target_range, parse_ports
+from cybersec.core.scanner.analysis.service_detect import ServiceDetector
+from cybersec.core.scanner.utils import expand_target_range, parse_ports
 
 
 @pytest.mark.unit

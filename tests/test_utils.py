@@ -6,7 +6,7 @@ import pytest
 import ipaddress
 from unittest.mock import patch
 
-from cybersec.core.utils import (
+from cybersec.core.scanner.utils import (
     expand_target_range, 
     resolve_target, 
     parse_ports,

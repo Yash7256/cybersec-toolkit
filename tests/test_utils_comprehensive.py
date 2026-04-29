@@ -5,7 +5,7 @@ import pytest
 import socket
 from unittest.mock import patch, MagicMock
 
-from cybersec.core.utils import (
+from cybersec.core.scanner.utils import (
     resolve_target, parse_ports, expand_target_range,
     _validate_target_security, format_duration
 )

@@ -1,0 +1,59 @@
+{
+  "overall_accuracy": 75.0,
+  "total_tested": 4,
+  "correct_count": 3,
+  "per_service_accuracy": {
+    "ssh": {
+      "accuracy": 100.0,
+      "correct": 1,
+      "total": 1,
+      "misidentified_as": []
+    },
+    "http": {
+      "accuracy": 100.0,
+      "correct": 1,
+      "total": 1,
+      "misidentified_as": []
+    },
+    "https": {
+      "accuracy": 100.0,
+      "correct": 1,
+      "total": 1,
+      "misidentified_as": []
+    },
+    "nping-echo": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "total": 1,
+      "misidentified_as": []
+    }
+  },
+  "confusion_matrix": {
+    "ssh": {
+      "ssh": 1
+    },
+    "http": {
+      "http": 1
+    },
+    "https": {
+      "https": 1
+    },
+    "nping-echo": {
+      "unknown": 1
+    }
+  },
+  "low_confidence_warnings": [
+    {
+      "host": "scanme.nmap.org",
+      "port": 443,
+      "confidence": 0.3
+    }
+  ],
+  "unknown_detections": [
+    {
+      "host": "scanme.nmap.org",
+      "port": 9929,
+      "expected": "nping-echo"
+    }
+  ]
+}

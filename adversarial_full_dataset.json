@@ -1,0 +1,5180 @@
+[
+  {
+    "host": "127.0.0.1",
+    "port": 206,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 206",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8447,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8447",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15429,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15429",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15418,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15418",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 89,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 89",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3008,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3008",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 36379,
+    "expected_service": "redis",
+    "scenario_type": "protocol_confusion",
+    "description": "Redis returning HTTP headers (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a5365727665723a2052656469730d0a436f6e74656e742d547970653a20746578742f68746d6c0d0a0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59192,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49192 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 32022,
+    "expected_service": "ssh",
+    "scenario_type": "nonstandard",
+    "description": "ssh on non-standard port 22022 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3032,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3032",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "example.com",
+    "port": 443,
+    "expected_service": "https",
+    "scenario_type": "realworld",
+    "description": "CDN returning inconsistent certificates",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2207,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 2207",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "redis",
+    "scenario_type": "protocol_confusion",
+    "description": "Redis returning HTTP headers (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a5365727665723a2052656469730d0a436f6e74656e742d547970653a20746578742f68746d6c0d0a0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5430,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5430",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15403,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15403",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 26379,
+    "expected_service": "redis",
+    "scenario_type": "nonstandard",
+    "description": "redis on non-standard port 26379",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "485454502f312e3120323030204f4b00ff00febabe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "localhost",
+    "port": 21,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 81,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 81",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 2000ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 2000
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15432,
+    "expected_service": "postgresql",
+    "scenario_type": "protocol_confusion",
+    "description": "PostgreSQL with TLS handshake (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "16030100010100"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6374,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6374",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 809,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 809",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol",
+    "difficulty": "hard",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "485454502f312e3120323030204f4b00ff00febabe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19991,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST) (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "localhost",
+    "port": 2222,
+    "expected_service": "ssh",
+    "scenario_type": "honeypot",
+    "description": "Cowrie SSH honeypot",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d382e35310d0a"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5459,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5459",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15432,
+    "expected_service": "postgresql",
+    "scenario_type": "nonstandard",
+    "description": "postgresql on non-standard port 15432",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 6379,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10001,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST) (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3028,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3028",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 29992,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Silent port (timeout) (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d322e302d4f70656e53534800fffecafe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59162,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49162 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6384,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6384",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15432,
+    "expected_service": "postgresql",
+    "scenario_type": "stateful",
+    "description": "PostgreSQL requiring startup handshake",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "0000001000030000757365720000"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 18080,
+    "expected_service": "http",
+    "scenario_type": "garbage_noise",
+    "description": "HTTP + Redis interleaved (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e31203230300d0a2b504f4e470d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2204,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 2204",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3021,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3021",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3043,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3043",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "expected_service": "postgresql",
+    "scenario_type": "stateful",
+    "description": "PostgreSQL requiring startup handshake",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "0000001000030000757365720000"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3018,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3018",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3046,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3046",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 203,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 203",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8452,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8452",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 63790,
+    "expected_service": "redis",
+    "scenario_type": "nonstandard",
+    "description": "redis on non-standard port 63790",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 449,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 449",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 21,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH-",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3023,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3023",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16394,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16394",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5444,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5444",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "confidence",
+    "description": "Could be POP3 or Redis",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "2b4f4b"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3037,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3037",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3000,
+    "expected_service": "http",
+    "scenario_type": "confidence",
+    "description": "HTTP on unusual port - correct but low conf",
+    "difficulty": "evil",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 445,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 445",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15432,
+    "expected_service": "postgresql",
+    "scenario_type": "protocol_confusion",
+    "description": "PostgreSQL with TLS handshake",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "16030100010100"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 202,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 202",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 21,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH-",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "redis",
+    "scenario_type": "protocol_confusion",
+    "description": "Redis returning HTTP headers",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a5365727665723a2052656469730d0a436f6e74656e742d547970653a20746578742f68746d6c0d0a0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3047,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3047",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 12222,
+    "expected_service": "ssh",
+    "scenario_type": "nonstandard",
+    "description": "ssh on non-standard port 2222 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 18080,
+    "expected_service": "http",
+    "scenario_type": "garbage_noise",
+    "description": "HTTP + Redis interleaved (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e31203230300d0a2b504f4e470d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59162,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49162 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2209,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 2209",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2200,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 2200",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 12049,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port likely filtered by firewall (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH-",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5442,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5442",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3019,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3019",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 800,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 800",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 209,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 209",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 100ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 100
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16386,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16386",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59242,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49242 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15428,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15428",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6376,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6376",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d322e302d4f70656e53534800fffecafe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 26379,
+    "expected_service": "redis",
+    "scenario_type": "protocol_confusion",
+    "description": "Redis returning HTTP headers",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a5365727665723a2052656469730d0a436f6e74656e742d547970653a20746578742f68746d6c0d0a0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3041,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3041",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 111,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port likely filtered by firewall",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8888,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 8888",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 18080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP on alt port returning Redis response (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "2b504f4e470d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 443,
+    "expected_service": "https",
+    "scenario_type": "stateful",
+    "description": "HTTPS requiring TLS handshake",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "160301"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 801,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 801",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16391,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16391",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3029,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3029",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 9991,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15415,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15415",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5447,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5447",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3036,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3036",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6396,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6396",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6375,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6375",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16399,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16399",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16387,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16387",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16382,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16382",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15410,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15410",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 21,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6391,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6391",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5431,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5431",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22022,
+    "expected_service": "ssh",
+    "scenario_type": "nonstandard",
+    "description": "ssh on non-standard port 22022",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3024,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3024",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15400,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15400",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5445,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5445",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 200,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 200",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2222,
+    "expected_service": "ssh",
+    "scenario_type": "nonstandard",
+    "description": "ssh on non-standard port 2222",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15427,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15427",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP on alt port returning Redis response",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "2b504f4e470d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 12222,
+    "expected_service": "ssh",
+    "scenario_type": "nonstandard",
+    "description": "ssh on non-standard port 2222 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 447,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 447",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 802,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 802",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6370,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6370",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 803,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 803",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59192,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49192 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6381,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6381",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15426,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15426",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3031,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3031",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3030,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3030",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2049,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port likely filtered by firewall",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3013,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3013",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 82,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 82",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 6379,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol",
+    "difficulty": "hard",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49152,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49152",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "localhost",
+    "port": 21,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16396,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16396",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 208,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 208",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19994,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Silent port (timeout)",
+    "difficulty": "hard",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3027,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3027",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15401,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15401",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10021,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH-",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5451,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5451",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15408,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15408",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49172,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49172",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol",
+    "difficulty": "hard",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 29990,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Silent port (timeout) (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49242,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49242",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6398,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6398",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 450,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 450",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59232,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49232 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 20,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 20",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 805,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 805",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59242,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49242 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6372,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6372",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10001,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST) (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59182,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49182 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 65535,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8443,
+    "expected_service": "https",
+    "scenario_type": "realworld",
+    "description": "WAF stripping Server headers",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22222,
+    "expected_service": "ssh",
+    "scenario_type": "nonstandard",
+    "description": "ssh on non-standard port 22222",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 2222,
+    "expected_service": "unknown",
+    "scenario_type": "honeypot",
+    "description": "Rotating banners per request",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP server returning SSH banner (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d4170616368650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59232,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49232 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2203,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 2203",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 8080,
+    "expected_service": "unknown",
+    "scenario_type": "honeypot",
+    "description": "Rotating banners per request",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "expected_service": "http",
+    "scenario_type": "garbage_noise",
+    "description": "HTTP + Redis interleaved",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e31203230300d0a2b504f4e470d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 500ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 500
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15420,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15420",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 18888,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 8888 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5000,
+    "expected_service": "http",
+    "scenario_type": "confidence",
+    "description": "HTTP on unusual port - correct but low conf",
+    "difficulty": "evil",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 13000,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 3000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP server returning SSH banner (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d4170616368650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15419,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15419",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 23,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 23",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8443,
+    "expected_service": "https",
+    "scenario_type": "stateful",
+    "description": "HTTPS requiring TLS handshake",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "160301"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15406,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15406",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16393,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16393",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 6379,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6378,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6378",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 26379,
+    "expected_service": "redis",
+    "scenario_type": "protocol_confusion",
+    "description": "Redis returning HTTP headers (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a5365727665723a2052656469730d0a436f6e74656e742d547970653a20746578742f68746d6c0d0a0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6371,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6371",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 25432,
+    "expected_service": "postgresql",
+    "scenario_type": "protocol_confusion",
+    "description": "PostgreSQL with TLS handshake (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "16030100010100"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 205,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 205",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5433,
+    "expected_service": "postgresql",
+    "scenario_type": "nonstandard",
+    "description": "postgresql on non-standard port 5433",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10021,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP server returning SSH banner",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d4170616368650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59212,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49212 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 443,
+    "expected_service": "http",
+    "scenario_type": "realworld",
+    "description": "Behind reverse proxy (X-Forwarded-For)",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5433,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5433",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "ssh",
+    "scenario_type": "protocol_confusion",
+    "description": "SSH sending HTTP-like header (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8449,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8449",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8888,
+    "expected_service": "http",
+    "scenario_type": "confidence",
+    "description": "HTTP on unusual port - correct but low conf",
+    "difficulty": "evil",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 12222,
+    "expected_service": "telnet",
+    "scenario_type": "protocol_confusion",
+    "description": "Telnet echoing SSH banner (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d536572766963650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49162,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49162",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP server returning SSH banner",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d4170616368650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5454,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5454",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6385,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6385",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "expected_service": "unknown",
+    "scenario_type": "honeypot",
+    "description": "Rotating banners per request",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5455,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5455",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 12222,
+    "expected_service": "telnet",
+    "scenario_type": "protocol_confusion",
+    "description": "Telnet echoing SSH banner (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d536572766963650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 12222,
+    "expected_service": "telnet",
+    "scenario_type": "protocol_confusion",
+    "description": "Telnet echoing SSH banner (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d536572766963650d0a"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "localhost",
+    "port": 9999,
+    "expected_service": "unknown",
+    "scenario_type": "honeypot",
+    "description": "Returning SSH then HTTP",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49232,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49232",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 26379,
+    "expected_service": "redis",
+    "scenario_type": "protocol_confusion",
+    "description": "Redis returning HTTP headers (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a5365727665723a2052656469730d0a436f6e74656e742d547970653a20746578742f68746d6c0d0a0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16390,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16390",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3048,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3048",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "expected_service": "postgresql",
+    "scenario_type": "protocol_confusion",
+    "description": "PostgreSQL with TLS handshake",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "16030100010100"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15412,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15412",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3017,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3017",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16379",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 9000,
+    "expected_service": "unknown",
+    "scenario_type": "honeypot",
+    "description": "Rotating banners per request",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 808,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 808",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15402,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15402",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16389,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16389",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 4500ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 4500
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8443,
+    "expected_service": "https",
+    "scenario_type": "nonstandard",
+    "description": "https on non-standard port 8443",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 443,
+    "expected_service": "https",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 443",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5452,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5452",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 18080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP on alt port returning Redis response (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "2b504f4e470d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 3500ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 3500
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 65535,
+    "expected_service": "unknown",
+    "scenario_type": "edge_port",
+    "description": "Edge port 65535",
+    "difficulty": "medium",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6386,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6386",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8443,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8443",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5437,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5437",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5441,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5441",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15000,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 5000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49222,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49222",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3035,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3035",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 9990,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10021,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 9000,
+    "expected_service": "unknown",
+    "scenario_type": "honeypot",
+    "description": "Rotating banners per request",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59202,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49202 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "localhost",
+    "port": 6379,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 4500ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 4500
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10021,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3002,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3002",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16392,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16392",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3006,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3006",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "2b504f4e47cafebabe00ff"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15424,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15424",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3015,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3015",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "485454502f312e3120323030204f4b00ff00febabe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3011,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3011",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19000,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 9000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2222,
+    "expected_service": "ssh",
+    "scenario_type": "honeypot",
+    "description": "Cowrie SSH honeypot",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d382e35310d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "expected_service": "telnet",
+    "scenario_type": "confidence",
+    "description": "Telnet on HTTP port with SSH banner - wrong high conf",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5448,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5448",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 1,
+    "expected_service": "filtered",
+    "scenario_type": "edge_port",
+    "description": "Edge port 1",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19990,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST) (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3033,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3033",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "localhost",
+    "port": 21,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8444,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8444",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3039,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3039",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "http",
+    "scenario_type": "edge_port",
+    "description": "Edge port 80",
+    "difficulty": "medium",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "localhost",
+    "port": 2222,
+    "expected_service": "telnet",
+    "scenario_type": "protocol_confusion",
+    "description": "Telnet echoing SSH banner",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d536572766963650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49182,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49182",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3016,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3016",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6377,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6377",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3000,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3000",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5450,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5450",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d322e302d4f70656e53534800fffecafe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3009,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3009",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 65534,
+    "expected_service": "unknown",
+    "scenario_type": "edge_port",
+    "description": "Edge port 65534",
+    "difficulty": "medium",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2222,
+    "expected_service": "unknown",
+    "scenario_type": "honeypot",
+    "description": "Rotating banners per request",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 18080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP on alt port returning Redis response (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "2b504f4e470d0a"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15422,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15422",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15407,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15407",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 443,
+    "expected_service": "https",
+    "scenario_type": "edge_port",
+    "description": "Edge port 443",
+    "difficulty": "medium",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49212,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49212",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10021,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3044,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3044",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8888,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 8888",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6389,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6389",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10111,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port likely filtered by firewall (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 32022,
+    "expected_service": "ssh",
+    "scenario_type": "nonstandard",
+    "description": "ssh on non-standard port 22022 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 29990,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Silent port (timeout) (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 2000ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 2000
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6373,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6373",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5449,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5449",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 6379,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 500ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 500
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d322e302d4f70656e53534800fffecafe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2208,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 2208",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP server returning SSH banner (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d4170616368650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59172,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49172 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15423,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15423",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH-",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3022,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3022",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5458,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5458",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5453,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5453",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3040,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3040",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 29994,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Silent port (timeout) (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "localhost",
+    "port": 6379,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH-",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 88,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 88",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6390,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6390",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 4433,
+    "expected_service": "https",
+    "scenario_type": "nonstandard",
+    "description": "https on non-standard port 4433",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10021,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 84,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 84",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 83,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 83",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH-",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5456,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5456",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6397,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6397",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19991,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST) (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 204,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 204",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 24,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 24",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 806,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 806",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15417,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15417",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16397,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16397",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "redis",
+    "scenario_type": "nonstandard",
+    "description": "redis on non-standard port 16379",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5443,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5443",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3045,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3045",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6395,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6395",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH-",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59152,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49152 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 29994,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Silent port (timeout) (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "localhost",
+    "port": 8080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP on alt port returning Redis response",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "2b504f4e470d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3001,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3001",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3003,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3003",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8445,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8445",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 18080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP on alt port returning Redis response (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "2b504f4e470d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16395,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16395",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16380,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16380",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15413,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15413",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5434,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5434",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 1,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "redis",
+    "scenario_type": "protocol_confusion",
+    "description": "Redis returning HTTP headers",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a5365727665723a2052656469730d0a436f6e74656e742d547970653a20746578742f68746d6c0d0a0d0a"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "ssh",
+    "scenario_type": "protocol_confusion",
+    "description": "SSH sending HTTP-like header (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10111,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port likely filtered by firewall (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8450,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8450",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2205,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 2205",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3020,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3020",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "2b504f4e47cafebabe00ff"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2202,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 2202",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 12049,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port likely filtered by firewall (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19990,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST) (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3004,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3004",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "ssh",
+    "scenario_type": "protocol_confusion",
+    "description": "SSH sending HTTP-like header",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "http",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 80",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3010,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3010",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8446,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8446",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 21,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15405,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15405",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 807,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 807",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 2222,
+    "expected_service": "telnet",
+    "scenario_type": "protocol_confusion",
+    "description": "Telnet echoing SSH banner",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d536572766963650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3025,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3025",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15411,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15411",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 65535,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Port closed (RST) (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 9999,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 9999",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59222,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49222 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "localhost",
+    "port": 10021,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 443,
+    "expected_service": "https",
+    "scenario_type": "realworld",
+    "description": "WAF stripping Server headers",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "redis",
+    "scenario_type": "stateful",
+    "description": "Redis requiring AUTH before response",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "41555448"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5435,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5435",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d322e302d4f70656e53534800fffecafe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "redis",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6379",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8451,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8451",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "http",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: HTT (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "485454"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 9999,
+    "expected_service": "unknown",
+    "scenario_type": "honeypot",
+    "description": "Returning SSH then HTTP",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 21,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 21",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6399,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6399",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15000,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 5000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "scanme.nmap.org",
+    "port": 443,
+    "expected_service": "https",
+    "scenario_type": "realworld",
+    "description": "CDN returning inconsistent certificates",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5446,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5446",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "http",
+    "scenario_type": "realworld",
+    "description": "Behind reverse proxy (X-Forwarded-For)",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15414,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15414",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "http",
+    "scenario_type": "protocol_confusion",
+    "description": "HTTP server returning SSH banner (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d4170616368650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3026,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3026",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 86,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 86",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19992,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Silent port (timeout)",
+    "difficulty": "hard",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3038,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3038",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3012,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3012",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16388,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16388",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6392,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6392",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "2b504f4e47cafebabe00ff"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 85,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 85",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol",
+    "difficulty": "hard",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5434,
+    "expected_service": "postgresql",
+    "scenario_type": "nonstandard",
+    "description": "postgresql on non-standard port 5434",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "2b504f4e47cafebabe00ff"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19999,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 9999 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15416,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15416",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3007,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3007",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15409,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15409",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "redis",
+    "scenario_type": "protocol_confusion",
+    "description": "Redis returning HTTP headers (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a5365727665723a2052656469730d0a436f6e74656e742d547970653a20746578742f68746d6c0d0a0d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 804,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 804",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 8448,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 8448",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3049,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3049",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19990,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Silent port (timeout)",
+    "difficulty": "hard",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3005,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3005",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "485454502f312e3120323030204f4b00ff00febabe"
+  },
+  {
+    "host": "localhost",
+    "port": 6379,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "unknown",
+    "scenario_type": "confidence",
+    "description": "Could be SSH or honeypot",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "http",
+    "scenario_type": "realworld",
+    "description": "Load balancer with 503",
+    "difficulty": "medium",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120353033205365727669636520556e617661696c61626c650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 444,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 444",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59182,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49182 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10021,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 87,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 87",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 1000ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 1000
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59152,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49152 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 21,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6394,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6394",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 36379,
+    "expected_service": "redis",
+    "scenario_type": "protocol_confusion",
+    "description": "Redis returning HTTP headers (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a5365727665723a2052656469730d0a436f6e74656e742d547970653a20746578742f68746d6c0d0a0d0a"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "http",
+    "scenario_type": "timing_attack",
+    "description": "Random jitter response",
+    "difficulty": "hard",
+    "expected_behavior": "ambiguous",
+    "delay_ms": 573
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "expected_service": "postgresql",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5432",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10021,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59212,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49212 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5440,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5440",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49192,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49192",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 100ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 100
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15425,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15425",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 49202,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49202",
+    "difficulty": "hard",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 201,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "ssh on scaled port 201",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "confidence",
+    "description": "Could be FTP or SMTP",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "32323020"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 9000,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 9000",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6380,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6380",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59222,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49222 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5000,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 5000",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19999,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 9999 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "redis",
+    "scenario_type": "stateful",
+    "description": "Redis requiring AUTH before response",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "41555448"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 19000,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 9000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 25432,
+    "expected_service": "postgresql",
+    "scenario_type": "protocol_confusion",
+    "description": "PostgreSQL with TLS handshake (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "16030100010100"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3000,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 3000",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5439,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5439",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10021,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16383,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16383",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 13000,
+    "expected_service": "http",
+    "scenario_type": "nonstandard",
+    "description": "http on non-standard port 3000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 29992,
+    "expected_service": "filtered",
+    "scenario_type": "filtered",
+    "description": "Silent port (timeout) (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "filtered"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "postgresql",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: R\u0000 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5200"
+  },
+  {
+    "host": "localhost",
+    "port": 6379,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "redis",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: +P (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "2b50"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 3042,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "http on scaled port 3042",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 6382,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 6382",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "ssh",
+    "scenario_type": "protocol_confusion",
+    "description": "SSH sending HTTP-like header (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59202,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49202 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "2b504f4e47cafebabe00ff"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5438,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5438",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16385,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16385",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 16379,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 5436,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 5436",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "unknown",
+    "scenario_type": "partial_response",
+    "description": "Truncated banner response (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5061727469616c"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 15421,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "postgresql on scaled port 15421",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 6379,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 3500ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 3500
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16379,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "localhost",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "timing_attack",
+    "description": "Delayed response 1000ms",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "delay_ms": 1000
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 59172,
+    "expected_service": "unknown",
+    "scenario_type": "nonstandard",
+    "description": "Service on random high port 49172 (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol",
+    "difficulty": "hard",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 9443,
+    "expected_service": "https",
+    "scenario_type": "nonstandard",
+    "description": "https on non-standard port 9443",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "localhost",
+    "port": 12222,
+    "expected_service": "telnet",
+    "scenario_type": "protocol_confusion",
+    "description": "Telnet echoing SSH banner (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "5353482d322e302d536572766963650d0a"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "ssh",
+    "scenario_type": "protocol_confusion",
+    "description": "SSH sending HTTP-like header (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "485454502f312e3120323030204f4b00ff00febabe"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "485454502f312e3120323030204f4b00ff00febabe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 32222,
+    "expected_service": "ssh",
+    "scenario_type": "nonstandard",
+    "description": "ssh on non-standard port 22222 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 446,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 446",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16384,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16384",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d322e302d4f70656e53534800fffecafe"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10080,
+    "expected_service": "ssh",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: SSH- (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "5353482d"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 22,
+    "expected_service": "ssh",
+    "scenario_type": "protocol_confusion",
+    "description": "SSH sending HTTP-like header",
+    "difficulty": "evil",
+    "expected_behavior": "ambiguous",
+    "probe_data": "485454502f312e3120323030204f4b0d0a"
+  },
+  {
+    "host": "localhost",
+    "port": 80,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Random prefix before protocol",
+    "difficulty": "hard",
+    "expected_behavior": "unknown",
+    "probe_data": "aabbccdd5353482d322e302d4f70656e5353485f382e327031"
+  },
+  {
+    "host": "localhost",
+    "port": 10022,
+    "expected_service": "unknown",
+    "scenario_type": "garbage_noise",
+    "description": "Valid signature + garbage suffix (variant)",
+    "difficulty": "evil",
+    "expected_behavior": "unknown",
+    "probe_data": "2b504f4e47cafebabe00ff"
+  },
+  {
+    "host": "localhost",
+    "port": 10080,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 16398,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "redis on scaled port 16398",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 10022,
+    "expected_service": "ftp",
+    "scenario_type": "partial_response",
+    "description": "Partial signature: 220 (variant)",
+    "difficulty": "medium",
+    "expected_behavior": "unknown",
+    "probe_data": "323230"
+  },
+  {
+    "host": "127.0.0.1",
+    "port": 448,
+    "expected_service": "unknown",
+    "scenario_type": "mass_scaled",
+    "description": "https on scaled port 448",
+    "difficulty": "easy",
+    "expected_behavior": "correct"
+  }
+]
