@@ -1,4 +1,0 @@
-"""
-Tests initialization.
-"""
-# TODO: implement

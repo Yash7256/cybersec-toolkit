@@ -43,7 +43,7 @@ services:
       - ./cybersec:/app/cybersec
     command: >
       sh -c "poetry run alembic upgrade head &&
-             poetry run uvicorn cybersec.api.main:app
+             poetry run uvicorn cybersec.apps.api.main:app
              --host 0.0.0.0 --port 8000 --workers 1"
 
   celery_worker:
@@ -61,7 +61,7 @@ services:
         condition: service_started
     volumes:
       - ./cybersec:/app/cybersec
-    command: poetry run celery -A cybersec.core.tasks worker --loglevel=info
+    command: poetry run celery -A cybersec.runtime.tasks worker --loglevel=info
 
 volumes:
   postgres_data:

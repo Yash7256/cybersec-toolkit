@@ -21,11 +21,21 @@ class Scan(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     user_id = Column(ForeignKey("users.id"), nullable=True)
     target = Column(String(255), nullable=False)
     scan_type = Column(String(50), nullable=False)
-    status = Column(Enum('pending', 'running', 'completed', 'failed', name='scan_status_enum'), default='pending')
+    status = Column(
+        Enum('pending', 'running', 'completed', 'failed', 'cancelled', 'timed_out',
+             name='scan_status_enum'),
+        default='pending',
+    )
     port_range = Column(String(100), nullable=True)
     options = Column(JSONB, nullable=True)
     started_at = Column(TIMESTAMP(timezone=True), nullable=True)
     completed_at = Column(TIMESTAMP(timezone=True), nullable=True)
+
+    # Distributed state tracking
+    heartbeat_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    worker_id = Column(String(100), nullable=True)
+    progress_pct = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
 
 class ScanResult(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "scan_results"
@@ -54,6 +64,17 @@ class Report(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     user_id = Column(ForeignKey("users.id"), nullable=True)
     format = Column(Enum('json', 'csv', 'pdf', name='report_format_enum'), nullable=False)
     file_path = Column(String(500), nullable=True)
+
+class WorkerHeartbeat(Base):
+    """Tracks worker process liveness for scan ownership recovery."""
+    __tablename__ = "worker_heartbeats"
+
+    worker_id = Column(String(100), primary_key=True)
+    hostname = Column(String(255), nullable=True)
+    pid = Column(Integer, nullable=True)
+    active_scans = Column(Integer, default=0)
+    last_heartbeat = Column(TIMESTAMP(timezone=True), nullable=False)
+
 
 class NVDCveCache(Base):
     __tablename__ = "nvd_cve_cache"

@@ -1,4 +1,4 @@
-from cybersec.core.scanner.engine import AsyncPortScanner, ScanReport, PortResult, AdaptiveConcurrencyController, PortState
+from cybersec.core.scanner.engine import AsyncPortScanner, ScanReport, PortResult, SystemAdaptiveConcurrency, PortState
 from cybersec.core.scanner.scans import SYNScanner, UDPScanner, StealthScanner, ZombieScanner
 from cybersec.core.scanner.analysis import ServiceDetector, ServiceInfo, PortAnalyzer, PortRisk, OSFingerprinter, OSFingerprint, TLSFingerprinter, TLSInfo, CVELookup, CVEEntry
 from cybersec.core.security import RateLimiter
@@ -10,7 +10,7 @@ __all__ = [
     "ScanReport", 
     "PortResult",
     "PortState",
-    "AdaptiveConcurrencyController",
+    "SystemAdaptiveConcurrency",
     "SYNScanner",
     "UDPScanner",
     "StealthScanner",

@@ -1,12 +1,25 @@
 """
 Core utility functions.
 """
+import asyncio
 import socket
 import ipaddress
 from urllib.parse import urlparse
 
-def resolve_target(target: str) -> str:
-    # Strip scheme if provided (e.g., http://example.com)
+def resolve_target(target: str, family: int = 0) -> str:
+    """Resolve a target to an IP address.
+
+    Args:
+        target: Hostname or IP string.
+        family: Socket family — 0 (any, prefer v4), socket.AF_INET (force v4),
+                or socket.AF_INET6 (force v6).
+
+    Returns:
+        Resolved IP address string.
+
+    Raises:
+        ValueError: If resolution fails or target is blocked.
+    """
     parsed = urlparse(target)
     host = parsed.hostname or target
 
@@ -15,74 +28,122 @@ def resolve_target(target: str) -> str:
         ("10.0.0.0", "10.255.255.255"),
         ("172.16.0.0", "172.31.255.255"), 
         ("192.168.0.0", "192.168.255.255"),
-        ("169.254.0.0", "169.254.255.255")  # Link-local
+        ("169.254.0.0", "169.254.255.255"),
     ]
-    
+
     if host in blocked_ips:
         raise ValueError("Invalid or blocked target")
-    
-    # Check for private IP ranges
-    try:
-        ip = socket.inet_aton(host)
-        ip_int = int.from_bytes(ip, 'big')
-        for start, end in private_ranges:
-            start_int = int.from_bytes(socket.inet_aton(start), 'big')
-            end_int = int.from_bytes(socket.inet_aton(end), 'big')
-            if start_int <= ip_int <= end_int:
-                pass # disabled for benchmark
-    except socket.error:
-        pass  # Not an IP, continue with hostname resolution
-    
-    # DNS rebinding protection: resolve and check if it resolves to private
-    try:
-        resolved_ip = socket.gethostbyname(host)
-        resolved_int = int.from_bytes(socket.inet_aton(resolved_ip), 'big')
-        for start, end in private_ranges:
-            start_int = int.from_bytes(socket.inet_aton(start), 'big')
-            end_int = int.from_bytes(socket.inet_aton(end), 'big')
-            if start_int <= resolved_int <= end_int:
-                pass # disabled for benchmark
-    except socket.error:
-        pass
 
+    if family == socket.AF_INET6:
+        return _resolve_v6(host)
+
+    if family == socket.AF_INET:
+        return _resolve_v4(host)
+
+    # family == 0: auto — prefer IPv4, fall back to IPv6
     try:
-        # Prefer IPv4 but fall back to IPv6 if needed
-        addr_info = socket.getaddrinfo(host, None)
-        ipv4 = next((info[4][0] for info in addr_info if info[0] == socket.AF_INET), None)
-        if ipv4:
-            return ipv4
-        ipv6 = next((info[4][0] for info in addr_info if info[0] == socket.AF_INET6), None)
-        if ipv6:
-            return ipv6
-        raise ValueError("Could not resolve target")
+        return _resolve_v4(host)
+    except ValueError:
+        return _resolve_v6(host)
+
+
+async def _resolve_v4_async(host: str) -> str:
+    """Force IPv4 resolution (async, non-blocking)."""
+    loop = asyncio.get_running_loop()
+    try:
+        addr_info = await loop.getaddrinfo(host, None, family=socket.AF_INET)
+        ip = next((info[4][0] for info in addr_info if info[0] == socket.AF_INET), None)
+        if ip:
+            return ip
     except socket.gaierror:
-        raise ValueError("Could not resolve target")
+        pass
+    raise ValueError(f"Could not resolve {host} to IPv4")
 
-def resolve_target_ipv6(target: str) -> str:
-    parsed = urlparse(target)
-    host = parsed.hostname or target
-    
-    blocked_ips = {"::1", "localhost", "0.0.0.0"}
-    if host in blocked_ips:
-        raise ValueError("Invalid or blocked target")
-    
+
+async def _resolve_v6_async(host: str) -> str:
+    """Force IPv6 resolution (async, non-blocking)."""
+    loop = asyncio.get_running_loop()
+    try:
+        addr_info = await loop.getaddrinfo(host, None, family=socket.AF_INET6)
+        ip = next((info[4][0] for info in addr_info if info[0] == socket.AF_INET6), None)
+        if ip:
+            return ip
+    except socket.gaierror:
+        pass
+    raise ValueError(f"Could not resolve {host} to IPv6")
+
+
+def _resolve_v4(host: str) -> str:
+    """Sync fallback — blocks the event loop. Prefer async version."""
+    try:
+        addr_info = socket.getaddrinfo(host, None, socket.AF_INET)
+        ip = next((info[4][0] for info in addr_info if info[0] == socket.AF_INET), None)
+        if ip:
+            return ip
+    except socket.gaierror:
+        pass
+    raise ValueError(f"Could not resolve {host} to IPv4")
+
+
+def _resolve_v6(host: str) -> str:
+    """Sync fallback — blocks the event loop. Prefer async version."""
     try:
         addr_info = socket.getaddrinfo(host, None, socket.AF_INET6)
-        ipv6 = next((info[4][0] for info in addr_info if info[0] == socket.AF_INET6), None)
-        if ipv6:
-            return ipv6
+        ip = next((info[4][0] for info in addr_info if info[0] == socket.AF_INET6), None)
+        if ip:
+            return ip
     except socket.gaierror:
         pass
-    
+    raise ValueError(f"Could not resolve {host} to IPv6")
+
+
+async def resolve_target_async(target: str, family: int = 0) -> str:
+    """Async version — never blocks the event loop.
+
+    Args:
+        target: Hostname or IP string.
+        family: 0 (auto, prefer v4), socket.AF_INET, or socket.AF_INET6.
+    """
+    parsed = urlparse(target)
+    host = parsed.hostname or target
+
+    if host in {"127.0.0.1", "localhost", "0.0.0.0", "255.255.255.255", "::1"}:
+        raise ValueError("Invalid or blocked target")
+
+    if family == socket.AF_INET6:
+        return await _resolve_v6_async(host)
+    if family == socket.AF_INET:
+        return await _resolve_v4_async(host)
+
     try:
-        resolved = socket.getaddrinfo(host, None)
-        ipv6 = next((info[4][0] for info in resolved if info[0] == socket.AF_INET6), None)
-        if ipv6:
-            return ipv6
-    except socket.gaierror:
-        pass
-    
-    raise ValueError("Could not resolve target to IPv6")
+        return await _resolve_v4_async(host)
+    except ValueError:
+        return await _resolve_v6_async(host)
+
+
+def resolve_target(target: str, family: int = 0) -> str:
+    """Sync version — blocks the event loop if called from async code.
+    Prefer resolve_target_async when inside a coroutine."""
+    parsed = urlparse(target)
+    host = parsed.hostname or target
+
+    if host in {"127.0.0.1", "localhost", "0.0.0.0", "255.255.255.255", "::1"}:
+        raise ValueError("Invalid or blocked target")
+
+    if family == socket.AF_INET6:
+        return _resolve_v6(host)
+    if family == socket.AF_INET:
+        return _resolve_v4(host)
+
+    try:
+        return _resolve_v4(host)
+    except ValueError:
+        return _resolve_v6(host)
+
+
+def resolve_target_ipv6(target: str) -> str:
+    """Legacy — resolves to IPv6 only."""
+    return _resolve_v6(target)
 
 
 COMMON_PORTS = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 5432, 6379, 8080, 8443, 27017]
@@ -165,6 +226,14 @@ def parse_ports(port_range: str) -> list[int]:
                 f"Invalid top-ports format. Use top-N (e.g. top-100, top-250, top-1000) or top-{len(TOP_100_PORTS)} max for top-ports. Error: {e}"
             ) from e
     else:
+        # Check if it's a named profile
+        try:
+            from cybersec.core.profiles import resolve_profile
+            profile = resolve_profile(port_range)
+            return list(dict.fromkeys(profile.ports))
+        except ValueError:
+            pass
+
         ports = []
         parts = port_range.split(",")
         for part in parts:
@@ -278,7 +347,6 @@ def expand_target_range(target: str) -> list[str]:
         _validate_target_security(ip_str)
         return [ip_str]
     except ValueError:
-        # Not an IP, try as hostname
         resolved_ip = resolve_target(target)
         return [resolved_ip]
 

@@ -62,7 +62,7 @@ async def generate_webscan_events(
         "error": None,
         "vulnerabilities": [],
     }
-    _wapp_scan_events[scan_id] = asyncio.Queue()
+    _wapp_scan_events[scan_id] = asyncio.Queue(maxsize=1000)
 
     async def _heartbeat_loop() -> None:
         """Send heartbeat every 10s to keep Azure LB connection alive."""

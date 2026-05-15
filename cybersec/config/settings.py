@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     ENABLE_SERVICE_DETECTION: bool = True
     ENABLE_ATTACK_MAPPING: bool = True
+    SERVICE_DETECTION_CONCURRENCY: int = 25
     
     # Groq API Keys (multiple for rotation)
     GROQ_API_KEY: str = ""

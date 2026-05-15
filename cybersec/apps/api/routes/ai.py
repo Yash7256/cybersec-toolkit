@@ -9,15 +9,15 @@ import json
 
 from cybersec.database.models import Scan, ScanResult, ToolResult
 from cybersec.apps.api.deps import get_db, get_optional_user
-from cybersec.core.ai.groq_client import groq_client
-from cybersec.core.ai.context_builder import build_scan_context
-from cybersec.core.ai.prompts import SCAN_ANALYST_PROMPT
+from cybersec.integrations.ai.groq_client import groq_client
+from cybersec.integrations.ai.context_builder import build_scan_context
+from cybersec.integrations.ai.prompts import SCAN_ANALYST_PROMPT
 from cybersec.config import settings
 
-from cybersec.core.ai.prompts import SCAN_ANALYST_PROMPT
-from cybersec.core.ai.context_builder import build_scan_context, build_tool_context, select_system_prompt
-from cybersec.core.ai.groq_client import groq_client
-from cybersec.core.ai.groq_key_manager import groq_key_manager
+from cybersec.integrations.ai.prompts import SCAN_ANALYST_PROMPT
+from cybersec.integrations.ai.context_builder import build_scan_context, build_tool_context, select_system_prompt
+from cybersec.integrations.ai.groq_client import groq_client
+from cybersec.integrations.ai.groq_key_manager import groq_key_manager
 
 router = APIRouter()
 

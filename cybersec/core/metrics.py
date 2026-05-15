@@ -18,6 +18,7 @@ except ImportError:
 # ADDED: asyncio for async-safe operations
 import asyncio
 import os
+from cybersec.core.metrics_registry import port_state_count
 
 
 @dataclass
@@ -456,9 +457,11 @@ class StressTestMetrics:
         self._retries += value
     
     def increment_port_state(self, state: str, value: int = 1) -> None:
-        """Increment port state counter."""
-        if state in self._port_states:
-            self._port_states[state] += value
+        """Increment port state counter and update Prometheus gauge."""
+        if state not in self._port_states:
+            self._port_states[state] = 0
+        self._port_states[state] += value
+        port_state_count(state).set(self._port_states[state])
     
     def get_port_states(self) -> dict:
         """Get port state breakdown."""

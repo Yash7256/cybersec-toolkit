@@ -31,7 +31,7 @@ def download_attack_data():
 
 def create_sqlite_db():
     """Create SQLite database from ATT&CK data."""
-    conn = sqlite3.connect('attack.db')
+    conn = sqlite3.connect('data/attack.db')
     cursor = conn.cursor()
     
     # Create tables
@@ -270,6 +270,6 @@ if __name__ == "__main__":
     
     print("\n✅ Enhanced ATT&CK database ready!")
     print("Files created:")
-    print("  - attack.db (SQLite database)")
+    print("  - data/attack.db (SQLite database)")
     print("  - enhanced_attack_mapping.json")
     print("  - attack_data/ (raw JSON files)")

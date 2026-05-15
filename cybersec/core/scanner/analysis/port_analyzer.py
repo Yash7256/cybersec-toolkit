@@ -22,7 +22,7 @@ class PortAnalyzer:
     LOW_SERVICES = {123}
 
     def __init__(self):
-        self.enhanced_attack = EnhancedATTACKMapping('attack.db')
+        self.enhanced_attack = EnhancedATTACKMapping('data/attack.db')
 
     @staticmethod
     def get_port_mitre_techniques(port: int) -> List[str]:

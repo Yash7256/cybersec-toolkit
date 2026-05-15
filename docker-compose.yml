@@ -1,0 +1,114 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cybersec
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/cybersec
+      REDIS_URL: redis://redis:6379/0
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      SCAN_TIMEOUT: 15.0
+      OS_FINGERPRINT_TIMEOUT: 8.0
+      SERVICE_DETECTION_TIMEOUT: 10.0
+    sysctls:
+      - net.ipv4.ip_local_port_range=10000 65535
+      - net.ipv4.tcp_fin_timeout=15
+      - net.ipv4.tcp_tw_reuse=1
+      - net.core.somaxconn=65535
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build: .
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/cybersec
+      REDIS_URL: redis://redis:6379/0
+      SCAN_TIMEOUT: 15.0
+    sysctls:
+      - net.ipv4.ip_local_port_range=10000 65535
+      - net.ipv4.tcp_fin_timeout=15
+      - net.ipv4.tcp_tw_reuse=1
+      - net.core.somaxconn=65535
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    command: >
+      python -m cybersec.apps.worker.main --workers 4
+    deploy:
+      replicas: 2
+
+  arq_worker:
+    build: .
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      SCAN_TIMEOUT: 15.0
+    sysctls:
+      - net.ipv4.ip_local_port_range=10000 65535
+      - net.ipv4.tcp_fin_timeout=15
+      - net.ipv4.tcp_tw_reuse=1
+      - net.core.somaxconn=65535
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    command: arq cybersec.core.arq_queue.WorkerSettings
+    deploy:
+      replicas: 3
+
+volumes:
+  postgres_data:
+  redis_data:

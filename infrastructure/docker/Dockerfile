@@ -22,5 +22,5 @@ RUN poetry install --only=main
 
 EXPOSE 8000
 
-CMD ["poetry", "run", "uvicorn", "cybersec.api.main:app", \
+CMD ["poetry", "run", "uvicorn", "cybersec.apps.api.main:app", \
      "--host", "0.0.0.0", "--port", "8000"]

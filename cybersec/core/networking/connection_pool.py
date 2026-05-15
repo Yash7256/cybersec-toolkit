@@ -1,88 +1,109 @@
 """
-Async TCP connection pool for reusing connections to the same host.
-Reduces connection overhead and improves scan performance.
+Async TCP connection pool for reusing connections to the same host:port.
+
+Used primarily by the enrichment pipeline (service detection, banner
+grabbing, TLS probes) where multiple probes may hit the same port.
+
+Connections use SO_REUSEADDR + SO_LINGER abortive close for fast recycling.
 """
 import asyncio
+import socket
+import struct
 import time
-from typing import Optional, Tuple
+from typing import Optional
+
+from cybersec.config.settings import settings
+
+
+def _make_socket() -> socket.socket:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    except AttributeError:
+        pass
+    linger = struct.pack("ii", 1, 0)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, linger)
+    except OSError:
+        pass
+    sock.settimeout(None)
+    return sock
 
 
 class AsyncConnectionPool:
+    """Connection pool keyed by (host, port).
+
+    Connections are created with SO_REUSEADDR + SO_LINGER for fast
+    recycling and are validated before reuse.
+    """
+
     def __init__(self, max_size: int = 100, max_idle_time: float = 30.0):
         self.max_size = max_size
         self.max_idle_time = max_idle_time
-        self._pool = asyncio.Queue(maxsize=max_size)
-        self._active_connections = {}
+        self._pool: asyncio.Queue = asyncio.Queue(maxsize=max_size)
         self._lock = asyncio.Lock()
-        self._connection_id_counter = 0
-        
-    async def get_connection(self, host: str, port: int, timeout: float) -> Tuple[Tuple, bool]:
-        connection_key = f"{host}:{port}"
-        
+
+    async def acquire(self, host: str, port: int, timeout: float = 3.0):
+        """Get a cached or new connection to (host, port).
+
+        Returns (reader, writer, reused) where reused=True if pulled from pool.
+        """
+        # Try pool first
         try:
             conn_info = self._pool.get_nowait()
-            conn, created_time = conn_info
-            
-            if (time.monotonic() - created_time) < self.max_idle_time:
+            reader, writer, created = conn_info
+            age = time.monotonic() - created
+            if age < self.max_idle_time:
                 try:
-                    conn.writer.write(b"")
-                    await conn.writer.drain()
-                    return conn, False
+                    writer.write(b"")
+                    await writer.drain()
+                    return reader, writer, True
                 except Exception:
                     pass
         except asyncio.QueueEmpty:
             pass
-        
-        conn_id = self._connection_id_counter
-        self._connection_id_counter += 1
-        
+
+        # Create new connection with tuning
+        loop = asyncio.get_running_loop()
+        sock = _make_socket()
         try:
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(host, port), timeout=timeout
+            await asyncio.wait_for(
+                loop.sock_connect(sock, (host, port)),
+                timeout=timeout,
             )
-            
-            async with self._lock:
-                self._active_connections[conn_id] = (reader, writer, time.monotonic())
-            
-            return (reader, writer, conn_id), True
-            
-        except Exception as e:
-            raise e
-    
-    async def return_connection(self, connection_id: int):
-        async with self._lock:
-            if connection_id in self._active_connections:
-                reader, writer, created_time = self._active_connections[connection_id]
-                
-                if (time.monotonic() - created_time) < self.max_idle_time:
-                    try:
-                        conn_info = (reader, writer, created_time)
-                        self._pool.put_nowait(conn_info)
-                    except asyncio.QueueFull:
-                        pass
-                
-                del self._active_connections[connection_id]
-    
-    async def cleanup(self):
-        current_time = time.monotonic()
-        expired_connections = []
-        
-        async with self._lock:
-            for conn_id, (reader, writer, created_time) in list(self._active_connections.items()):
-                if (current_time - created_time) > self.max_idle_time:
-                    expired_connections.append(conn_id)
-                    del self._active_connections[conn_id]
-                    
-                    try:
-                        conn_info = (reader, writer, created_time)
-                        self._pool.put_nowait(conn_info)
-                    except asyncio.QueueFull:
-                        pass
-        
-        for conn_id in expired_connections:
-            if conn_id in self._active_connections:
-                reader, writer, _ = self._active_connections[conn_id]
+            reader = asyncio.StreamReader()
+            protocol = asyncio.StreamReaderProtocol(reader)
+            transport, _ = await loop.create_connection(
+                lambda: protocol, sock=sock,
+            )
+            writer = asyncio.StreamWriter(transport, protocol, reader, loop)
+            return reader, writer, False
+        except BaseException:
+            sock.close()
+            raise
+
+    async def release(self, reader, writer) -> None:
+        """Return a connection to the pool for reuse."""
+        try:
+            conn_info = (reader, writer, time.monotonic())
+            self._pool.put_nowait(conn_info)
+        except asyncio.QueueFull:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass
+
+    async def cleanup(self) -> None:
+        """Close all idle connections."""
+        while not self._pool.empty():
+            try:
+                _, writer, _ = self._pool.get_nowait()
                 try:
                     writer.close()
+                    await writer.wait_closed()
                 except Exception:
                     pass
+            except asyncio.QueueEmpty:
+                break

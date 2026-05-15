@@ -1,12 +1,8 @@
 try:
-    from cybersec.core.scanner.analysis.service_detect import ServiceDetector, ServiceDetectionResult
+    from cybersec.core.scanner.analysis.service_detect import ServiceDetector, ServiceDetectionResult, ServiceInfo
 except ImportError:
     ServiceDetector = None
     ServiceDetectionResult = None
-
-try:
-    from cybersec.core.scanner.analysis.service_detect_v2 import ServiceInfo
-except ImportError:
     ServiceInfo = None
 
 try:

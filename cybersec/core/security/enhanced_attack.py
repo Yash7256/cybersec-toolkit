@@ -28,7 +28,7 @@ class ATTACKTechnique:
 class EnhancedATTACKClient:
     """Enhanced ATT&CK client with SQLite database support."""
     
-    def __init__(self, db_path: str = "attack.db"):
+    def __init__(self, db_path: str = "data/attack.db"):
         self.db_path = db_path
         self.conn = None
         self._init_db()
@@ -184,7 +184,7 @@ class EnhancedATTACKClient:
 class EnhancedATTACKMapping:
     """Enhanced ATT&CK mapping with database support."""
     
-    def __init__(self, db_path: str = "attack.db"):
+    def __init__(self, db_path: str = "data/attack.db"):
         self.client = EnhancedATTACKClient(db_path)
         self.enhanced_mapping = self._load_enhanced_mapping()
     

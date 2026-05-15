@@ -31,7 +31,7 @@ mitreattack-python = "^1.0"
 scapy = "^2.5"
 
 [tool.poetry.scripts]
-cybersec = "cybersec.cli.main:cli"
+cybersec = "cybersec.apps.cli.main:cli"
 
 [build-system]
 requires = ["poetry-core"]

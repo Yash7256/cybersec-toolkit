@@ -185,6 +185,8 @@ const api = {
         const status = await api.scans.get(scanId);
         if (status.status === 'completed') return { ...status, target };
         if (status.status === 'failed') throw new ApiError('Scan failed', status.error || 'Scan failed');
+        if (status.status === 'cancelled') throw new ApiError('Scan cancelled', 'Scan was cancelled');
+        if (status.status === 'timed_out') throw new ApiError('Scan timed out', status.error || 'Scan worker lost');
         await new Promise(r => setTimeout(r, 1500));
         attempts += 1;
       }

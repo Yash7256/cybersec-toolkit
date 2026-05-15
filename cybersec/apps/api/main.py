@@ -13,26 +13,93 @@ from slowapi.middleware import SlowAPIMiddleware
 from cybersec.config import settings
 
 # Import routers
-from cybersec.apps.api.routes import auth, scans, tools, ai, reports, webapp
+from cybersec.apps.api.routes import auth, scan_jobs, scan_results, scan_security, scans, tools, ai, reports, webapp
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from cybersec.core.scan_workers import start_workers, stop_workers
+    from cybersec.runtime.scan_workers import start_workers, stop_workers
     from cybersec.database.session import init_db
+    import logging
+    
+    logger = logging.getLogger("lifespan")
+
+    # ── Event loop stall detector ─────────────────────────────────────
+    async def _loop_monitor():
+        from cybersec.core.metrics_registry import event_loop_lag_ms
+        loop = asyncio.get_running_loop()
+        while True:
+            start = loop.time()
+            await asyncio.sleep(1)
+            lag = loop.time() - start - 1.0
+            lag_ms = lag * 1000
+            event_loop_lag_ms().set(lag_ms)
+            if lag > 0.1:
+                logger.warning("Event loop lag: %.0fms", lag_ms)
+            if lag > 0.5:
+                logger.error("Event loop severely stalled: %.0fms", lag_ms)
+
+    monitor_task = asyncio.create_task(_loop_monitor())
     
     try:
         await init_db()
-        print("Database tables initialized successfully")
+        logger.info("Database tables initialized")
     except Exception as e:
-        print(f"Database init warning: {e}")
+        logger.warning("Database init: %s", e)
+    
+    # ── Worker heartbeat + reaper ─────────────────────────────────
+    import os
+    worker_id = f"api-{os.getpid()}"
+    try:
+        from cybersec.core.recovery import (
+            register_worker, start_reaper, reap_stale_workers,
+            unregister_worker, worker_heartbeat,
+        )
+        await register_worker(worker_id)
+        await reap_stale_workers()
+        reaper_task = await start_reaper()
+
+        # Worker heartbeat loop (updates own liveness every 30s)
+        async def _worker_hb():
+            while True:
+                await asyncio.sleep(30)
+                await worker_heartbeat(worker_id)
+    except Exception as e:
+        logger.warning("Recovery setup skipped: %s", e)
+        reaper_task = None
+        _worker_hb = None
+
+    hb_task = asyncio.create_task(_worker_hb()) if _worker_hb else None
     
     await start_workers()
-    print("Scan workers started")
+    logger.info("Scan workers started")
     
     yield
     
+    if hb_task:
+        hb_task.cancel()
+        try:
+            await hb_task
+        except asyncio.CancelledError:
+            pass
+    if reaper_task:
+        reaper_task.cancel()
+        try:
+            await reaper_task
+        except asyncio.CancelledError:
+            pass
+    try:
+        await unregister_worker(worker_id)
+    except Exception:
+        pass
+    
+    monitor_task.cancel()
+    try:
+        await monitor_task
+    except asyncio.CancelledError:
+        pass
+    
     await stop_workers()
-    print("Scan workers stopped")
+    logger.info("Scan workers stopped")
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -104,6 +171,9 @@ def create_app() -> FastAPI:
 
     # API Routes
     app.include_router(auth.router, prefix="/api/auth")
+    app.include_router(scan_jobs.router, prefix="/api/scans")
+    app.include_router(scan_security.router, prefix="/api/scans")
+    app.include_router(scan_results.router, prefix="/api/scans")
     app.include_router(scans.router, prefix="/api/scans")
     app.include_router(tools.router, prefix="/api/tools")
     app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
@@ -113,6 +183,12 @@ def create_app() -> FastAPI:
     @app.get("/api/health", tags=["health"])
     async def health_check():
         return {"status": "ok", "app": settings.APP_NAME}
+
+    @app.get("/api/metrics", tags=["observability"])
+    async def prometheus_metrics():
+        from cybersec.core.metrics_registry import registry
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(registry().dump_prometheus())
 
     # Mount static files at /static/ path
     # Note: the directory 'cybersec/web/static' handles the static site

@@ -55,7 +55,7 @@ if [ ! -z "$DB_URL" ]; then
 fi
 
 # Set startup command
-az webapp config set --name $APP_NAME --resource-group $RESOURCE_GROUP --startup-file "gunicorn cybersec.api.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:\$PORT"
+az webapp config set --name $APP_NAME --resource-group $RESOURCE_GROUP --startup-file "gunicorn cybersec.apps.api.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:\$PORT"
 
 echo "✅ Deployment complete!"
 echo "Your app will be available at: https://$APP_NAME.azurewebsites.net"

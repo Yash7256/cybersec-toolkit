@@ -1,11 +1,12 @@
 const scannerModule = {
   currentScanId: null,
   pollInterval: null,
+  cancelled: false,
 
   async runScan() {
-    const target = document.getElementById('scanner-target')?.value;
+    const target = document.getElementById('portscanner-target')?.value;
     const scanType = document.getElementById('scanner-type')?.value || 'port';
-    const portRange = document.getElementById('scanner-ports')?.value || 'common';
+    const portRange = document.getElementById('port-range')?.value || 'quick';
 
     if (!target) {
       app.showError('scanner', 'Please enter a target');
@@ -15,7 +16,9 @@ const scannerModule = {
     const runBtn = document.getElementById('run-scan-btn');
     runBtn.disabled = true;
     runBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scanning...';
+    this.cancelled = false;
 
+    document.getElementById('cancel-scan-btn').style.display = 'inline-block';
     document.getElementById('scan-progress').style.display = 'block';
     document.getElementById('scan-progress-fill').style.width = '0%';
     document.getElementById('scan-status-text').textContent = 'Creating scan...';
@@ -30,6 +33,17 @@ const scannerModule = {
     } catch (error) {
       app.showError('scanner', error.message);
       this.resetScanButton();
+    }
+  },
+
+  async cancelScan() {
+    if (!this.currentScanId) return;
+    this.cancelled = true;
+    try {
+      await api.scans.delete(this.currentScanId);
+      document.getElementById('scan-status-text').textContent = 'Cancelling...';
+    } catch (e) {
+      console.error('Cancel failed:', e);
     }
   },
 
@@ -52,7 +66,7 @@ const scannerModule = {
       const status = await api.scans.getStatus(this.currentScanId);
       this.updateProgress(status);
 
-      if (status.status === 'completed' || status.status === 'failed') {
+      if (['completed', 'failed', 'cancelled', 'timed_out'].includes(status.status)) {
         this.stopPolling();
         this.fetchResults();
       }
@@ -68,6 +82,7 @@ const scannerModule = {
 
     let progress = 0;
     switch (status.status) {
+      case 'queued':
       case 'pending':
         progress = 5;
         statusText.textContent = 'Waiting in queue...';
@@ -82,12 +97,20 @@ const scannerModule = {
         break;
       case 'failed':
         progress = 100;
-        statusText.textContent = 'Scan failed';
+        statusText.textContent = 'Scan failed: ' + (status.error || 'unknown error');
+        break;
+      case 'cancelled':
+        progress = 100;
+        statusText.textContent = 'Scan cancelled';
+        break;
+      case 'timed_out':
+        progress = 100;
+        statusText.textContent = 'Scan timed out (worker lost)';
         break;
     }
 
     progressFill.style.width = `${progress}%`;
-    portsFound.textContent = `${status.open_ports_found} ports found`;
+    portsFound.textContent = `${status.open_ports_found || 0} ports found`;
   },
 
   async fetchResults() {
@@ -183,6 +206,7 @@ const scannerModule = {
       runBtn.disabled = false;
       runBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start Scan';
     }
+    document.getElementById('cancel-scan-btn').style.display = 'none';
   },
 
   copyResults() {

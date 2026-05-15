@@ -160,8 +160,8 @@ const app = {
 
     switch (tool) {
       case 'portscanner':
-        params.target = document.getElementById('portscan-target')?.value;
-        params.portRange = document.getElementById('portscan-ports')?.value || 'common';
+        params.target = document.getElementById('portscanner-target')?.value;
+        params.portRange = document.getElementById('port-range')?.value || 'quick';
         break;
             case 'webscan':
         params.target = document.getElementById('webscan-target')?.value;

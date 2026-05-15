@@ -3310,11 +3310,13 @@
                             <input type="text" id="portscanner-target" class="control-input"
                                 placeholder="Target IP or domain (e.g., 192.168.1.1, example.com)" style="flex: 1; min-width: 250px;">
                             <select id="port-range" class="form-select" style="width: 140px;">
-                                <option value="80,443,22,8080">Common</option>
-                                <option value="1-100">Quick</option>
-                                <option value="1-1000">1-1000</option>
-                                <option value="1-5000">1-5000</option>
-                                <option value="all">All</option>
+                                <option value="quick">Quick Scan</option>
+                                <option value="common">Common</option>
+                                <option value="web-audit">Web Audit</option>
+                                <option value="database">Database Exposure</option>
+                                <option value="remote-access">Remote Access</option>
+                                <option value="full-tcp">Full TCP Audit</option>
+                                <option value="stealth">Stealth</option>
                             </select>
                             <select id="scanner-type" class="form-select" style="width: 140px;">
                                 <option value="connect">TCP Connect</option>
@@ -3451,6 +3453,11 @@
                         <div id="portscanner-actions" class="tool-actions" style="display: none;">
                             <button class="btn-secondary" onclick="copyToolResult('portscanner')"><i
                                     class="fa-solid fa-copy"></i> Copy</button>
+                            <button class="btn-secondary" id="cancel-scan-btn"
+                                onclick="api.scans.delete(scannerModule.currentScanId || '')"
+                                style="display:none; color:#EF4444; border-color:#EF4444;">
+                                <i class="fa-solid fa-ban"></i> Cancel
+                            </button>
                         </div>
                     </div>
 

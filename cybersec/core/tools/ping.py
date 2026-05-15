@@ -20,7 +20,8 @@ class PingResult:
 async def ping_host(target: str, count: int = 4) -> PingResult:
     count = max(1, min(100, count))
     try:
-        ip = socket.gethostbyname(target)
+        loop = asyncio.get_running_loop()
+        ip = (await loop.getaddrinfo(target, None, family=socket.AF_INET))[0][4][0]
     except Exception as e:
         return PingResult(target, None, 0, 0, 0.0, None, None, None, f"DNS resolution failed: {e}")
 

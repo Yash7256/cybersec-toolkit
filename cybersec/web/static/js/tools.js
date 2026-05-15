@@ -45,8 +45,10 @@ const toolsModule = {
   renderPortScan(data) {
     const output = document.getElementById('portscanner-output');
     const actions = document.getElementById('portscanner-actions');
-    if (!data || data.status === 'failed') {
-      output.innerHTML = `<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i> ${data?.error || 'Scan failed'}</div>`;
+    if (!data || data.status === 'failed' || data.status === 'cancelled' || data.status === 'timed_out') {
+      const icon = data?.status === 'cancelled' ? 'fa-ban' : data?.status === 'timed_out' ? 'fa-clock' : 'fa-circle-exclamation';
+      const label = data?.status === 'cancelled' ? 'Scan cancelled' : data?.status === 'timed_out' ? 'Scan timed out' : 'Scan failed';
+      output.innerHTML = `<div class="alert alert-error"><i class="fa-solid ${icon}"></i> ${data?.error || label}</div>`;
       if (actions) actions.style.display = 'none';
       return;
     }

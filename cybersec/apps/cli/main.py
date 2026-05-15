@@ -128,15 +128,16 @@ def scan():
 
 @scan.command("run")
 @click.argument("target")
-@click.option("--ports", default="common", help="Port range: common|top1000|all|1-1000|80,443")
+@click.option("--ports", default="quick", help="Scan profile (quick, web-audit, database, remote-access, full-tcp, stealth) or port range (common, top1000, 1-1000, 80,443)")
 @click.option("--timeout", default=3.0, type=float, help="Connection timeout in seconds")
 @click.option("--concurrency", default=500, type=int, help="Max concurrent connections")
 @click.option("--rate", default="normal", type=click.Choice(["stealth", "normal", "aggressive"]), help="Rate preset: stealth (100 pps), normal (1000 pps), aggressive (5000 pps)")
 @click.option("--rate-pps", type=float, help="Custom rate in packets per second")
+@click.option("--ip-version", default="auto", type=click.Choice(["auto", "ipv4", "ipv6"]), help="IP version: auto (prefer v4), ipv4, or ipv6")
 @click.option("--output", default="table", type=click.Choice(["table", "json", "csv"]), help="Output format")
 @click.option("--save-file", is_flag=True, help="Save results to file with auto-generated filename")
 @click.option("--save", is_flag=True, help="Save results to database")
-def scan_run(target, ports, timeout, concurrency, rate, rate_pps, output, save, save_file):
+def scan_run(target, ports, timeout, concurrency, rate, rate_pps, ip_version, output, save, save_file):
     """Run a port scan against TARGET"""
     from cybersec.core.scanner import AsyncPortScanner
 
@@ -159,7 +160,7 @@ def scan_run(target, ports, timeout, concurrency, rate, rate_pps, output, save, 
                 rate_pps=rate_pps
             )
             progress.update(task, description=f"Scanning {target}...")
-            report = asyncio.run(scanner.scan(target, ports))
+            report = asyncio.run(scanner.scan(target, ports, ip_version=ip_version))
             progress.update(task, description="Scan complete.")
         except Exception as e:
             console.print(f"[bold red]✗ Scan failed:[/bold red] {e}")
