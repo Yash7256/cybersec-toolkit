@@ -199,9 +199,12 @@ def create_app() -> FastAPI:
     os.makedirs(SCREENSHOT_DIR, exist_ok=True)
     app.mount("/screenshots", StaticFiles(directory=SCREENSHOT_DIR), name="screenshots")
 
-    react_dist = "cybersec/web/ui/dist"
+    from pathlib import Path
+    
+    current_dir = Path(__file__).resolve().parent
+    react_dist = current_dir.parent.parent / "web" / "ui" / "dist"
 
-    if not os.path.isdir(react_dist):
+    if not react_dist.is_dir():
         import logging
         logging.getLogger("startup").warning(
             "React dist not found at %s — run `npm run build` inside cybersec/web/ui", react_dist
@@ -210,13 +213,13 @@ def create_app() -> FastAPI:
         # Serve all static assets (JS/CSS/images) under /assets
         app.mount(
             "/assets",
-            StaticFiles(directory=os.path.join(react_dist, "assets")),
+            StaticFiles(directory=str(react_dist / "assets")),
             name="assets",
         )
         # Serve the React SPA index.html for every non-API route
         @app.get("/{full_path:path}", include_in_schema=False)
         async def serve_react(full_path: str):
-            index = os.path.join(react_dist, "index.html")
+            index = str(react_dist / "index.html")
             return FileResponse(index)
 
     return app
