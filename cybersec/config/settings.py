@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     OS_FINGERPRINT_TIMEOUT: float = 5.0
     SERVICE_DETECTION_TIMEOUT: float = 8.0
 
+    # GeoIP provider configuration
+    GEOIP_PROVIDER: str = "ipwhois"
+    GEOIP_TIMEOUT: float = 5.0
+    GEOIP_CACHE_TTL_SECONDS: int = 3600
+    GEOIP_ALLOW_PRIVATE_TARGETS: bool = False
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]

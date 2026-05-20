@@ -11,7 +11,7 @@ venv/
 *.md
 tests/
 benchmarks/
-infrastructure/
+# infrastructure/  -- needed by Dockerfile COPY
 scripts/
 attack.db
 data/*.db
@@ -19,3 +19,5 @@ data/*.db
 *.csv
 *.json
 scan_results/
+cybersec/web/ui/node_modules/
+cybersec/web/ui/dist/

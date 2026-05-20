@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     libpcap-dev \
     procps \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Kernel tuning (applied at runtime via docker --sysctl or docker-compose sysctls)
@@ -26,9 +28,12 @@ RUN poetry install --only=main --no-root --no-interaction --no-ansi || \
     pip install fastapi uvicorn sqlalchemy asyncpg alembic python-jose[cryptography] \
                 passlib[bcrypt] click rich httpx dnspython python-whois cryptography \
                 reportlab pydantic-settings email-validator slowapi scapy groq \
-                mitreattack-python
+                mitreattack-python arq python-multipart
 
 COPY . .
+
+# Build the React frontend
+RUN cd cybersec/web/ui && npm install && npm run build
 
 EXPOSE 8000
 

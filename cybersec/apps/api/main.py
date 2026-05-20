@@ -13,14 +13,15 @@ from slowapi.middleware import SlowAPIMiddleware
 from cybersec.config import settings
 
 # Import routers
-from cybersec.apps.api.routes import auth, scan_jobs, scan_results, scan_security, scans, tools, ai, reports, webapp
+from cybersec.apps.api.routes import auth, tools, ai, reports, webapp
+from cybersec.runtime.scan_workers import start_workers, stop_workers
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from cybersec.runtime.scan_workers import start_workers, stop_workers
     from cybersec.database.session import init_db
+    import asyncio
     import logging
-    
+
     logger = logging.getLogger("lifespan")
 
     # ── Event loop stall detector ─────────────────────────────────────
@@ -171,10 +172,6 @@ def create_app() -> FastAPI:
 
     # API Routes
     app.include_router(auth.router, prefix="/api/auth")
-    app.include_router(scan_jobs.router, prefix="/api/scans")
-    app.include_router(scan_security.router, prefix="/api/scans")
-    app.include_router(scan_results.router, prefix="/api/scans")
-    app.include_router(scans.router, prefix="/api/scans")
     app.include_router(tools.router, prefix="/api/tools")
     app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
     app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
@@ -190,22 +187,40 @@ def create_app() -> FastAPI:
         from fastapi.responses import PlainTextResponse
         return PlainTextResponse(registry().dump_prometheus())
 
-    # Mount static files at /static/ path
-    # Note: the directory 'cybersec/web/static' handles the static site
-    # This must be mounted last so it doesn't mask API routes
-    try:
-        app.mount("/static", StaticFiles(directory="cybersec/web/static", html=True), name="static")
-        # Serve index.html at root
-        from fastapi.responses import FileResponse
-        import os
-        
-        @app.get("/", include_in_schema=False)
-        async def read_index():
-            return FileResponse("cybersec/web/static/index.html")
-    except RuntimeError:
-        pass # Handle case where directory may not exist yet in tests/init
+    # Mount React frontend (Vite build output).
+    # Run `npm run build` inside cybersec/web/ui before starting, or let
+    # the Dockerfile handle it via `RUN cd cybersec/web/ui && npm run build`.
+    import os
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    from cybersec.core.tools.subdomain import SCREENSHOT_DIR
+
+    os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+    app.mount("/screenshots", StaticFiles(directory=SCREENSHOT_DIR), name="screenshots")
+
+    react_dist = "cybersec/web/ui/dist"
+
+    if not os.path.isdir(react_dist):
+        import logging
+        logging.getLogger("startup").warning(
+            "React dist not found at %s — run `npm run build` inside cybersec/web/ui", react_dist
+        )
+    else:
+        # Serve all static assets (JS/CSS/images) under /assets
+        app.mount(
+            "/assets",
+            StaticFiles(directory=os.path.join(react_dist, "assets")),
+            name="assets",
+        )
+        # Serve the React SPA index.html for every non-API route
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_react(full_path: str):
+            index = os.path.join(react_dist, "index.html")
+            return FileResponse(index)
 
     return app
+
 
 app = create_app()
 

@@ -576,28 +576,93 @@ def tools_headers(url, path):
 
 # ── SUBDOMAINS ────────────────────────────────────────────────────────────────
 
+def _format_records(records: dict) -> str:
+    parts = []
+    for rtype in ("A", "AAAA", "CNAME", "MX", "TXT", "NS"):
+        vals = records.get(rtype, [])
+        if vals:
+            if rtype == "TXT":
+                parts.append(f"[yellow]TXT[/yellow]: {len(vals)}")
+            else:
+                items = ", ".join(v.replace(",", "\\,") for v in vals)
+                parts.append(f"[yellow]{rtype}[/yellow]: {items}")
+    return " | ".join(parts) if parts else "[dim]—[/dim]"
+
+
+def _format_http(http: dict) -> str:
+    if not http or not http.get("alive"):
+        return "[dim]not responding[/dim]"
+    parts = []
+    parts.append(f"[green]{http.get('status', '?')}[/green]")
+    if t := http.get("title"):
+        parts.append(f"[white]{t}[/white]")
+    if s := http.get("server"):
+        parts.append(f"[cyan]{s}[/cyan]")
+    if r := http.get("redirect_to"):
+        parts.append(f"[yellow]→ {r}[/yellow]")
+    if rt := http.get("response_time_ms"):
+        parts.append(f"[dim]{rt}ms[/dim]")
+    if techs := http.get("technologies"):
+        parts.append(f"[magenta]{', '.join(techs)}[/magenta]")
+    return " | ".join(parts)
+
+
+def _format_risk(risk: dict | None) -> str:
+    if not risk:
+        return "[dim]—[/dim]"
+    level = risk.get("level", "LOW")
+    color = {"HIGH": "red", "MEDIUM": "yellow", "LOW": "dim"}.get(level, "dim")
+    return f"[{color}]{level}[/{color}]"
+
+
 def _render_subdomains(result) -> None:
     if result.error:
         console.print(f"[bold red]✗ Subdomain Error:[/bold red] {result.error}")
         return
+
+    if result.wildcard_detected:
+        ips = ", ".join(result.wildcard_ips)
+        console.print(f"[yellow]⚠ Wildcard DNS detected[/yellow] — resolves random subdomains to [bold]{ips}[/bold]")
+        console.print("[dim]Results matching wildcard IPs were excluded (use --strictness low to include all)[/dim]")
+        console.print()
+
     table = Table(title=f"Subdomains — {result.domain}", show_lines=True)
     table.add_column("Subdomain", style="cyan")
-    table.add_column("IP Address")
+    table.add_column("A Record")
+    table.add_column("Records")
+    table.add_column("HTTP")
+    table.add_column("Risk")
+    table.add_column("Status")
     for sub in result.found:
-        # sub is a dict with 'subdomain' and 'ip'
-        table.add_row(sub.get("subdomain", ""), sub.get("ip", ""))
+        records = sub.get("records", {})
+        a_recs = ", ".join(records.get("A", [])) or "[dim]—[/dim]"
+        other = _format_records(records)
+        http_str = _format_http(sub.get("http"))
+        risk_str = _format_risk(sub.get("risk"))
+        status = "[green]OK[/green]" if sub.get("resolved") else f"[red]{sub.get('error', 'unknown')}[/red]"
+        table.add_row(sub.get("subdomain", ""), a_recs, other, http_str, risk_str, status)
     console.print(table)
-    console.print(f"[dim]Found {result.total_found} / {result.total_checked} checked[/dim]")
+    resolved = sum(1 for s in result.found if s.get("resolved"))
+    failed = len(result.found) - resolved
+    console.print(f"[dim]Resolved {resolved} / {result.total_checked} checked ({failed} failed)[/dim]")
+    if result.scan_time_ms:
+        parts = [f"[dim]Total [bold]{result.scan_time_ms}ms[/bold][/dim]"]
+        if result.dns_time_ms:
+            parts.append(f"[dim]DNS {result.dns_time_ms}ms[/dim]")
+        if result.http_time_ms:
+            parts.append(f"[dim]HTTP {result.http_time_ms}ms[/dim]")
+        console.print(" ┃ ".join(parts))
 
 
 @tools.command("subdomains")
 @click.argument("domain")
 @click.option("--size", default="small", type=click.Choice(["small", "medium", "large"]))
-def tools_subdomains(domain, size):
+@click.option("--strictness", default="medium", type=click.Choice(["off", "low", "medium", "high"]))
+def tools_subdomains(domain, size, strictness):
     """Enumerate subdomains via DNS brute-force"""
     from cybersec.core.tools.subdomain import find_subdomains
     try:
-        result = asyncio.run(find_subdomains(domain, size))
+        result = asyncio.run(find_subdomains(domain, size, strictness))
         _render_subdomains(result)
     except Exception as e:
         console.print(f"[bold red]✗ Error:[/bold red] {e}")

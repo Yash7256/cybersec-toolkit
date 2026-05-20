@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from cybersec.core.metrics_registry import (
-    registry as _registry,
+    _registry,
     scan_active,
     scan_queue_depth,
     scan_total,

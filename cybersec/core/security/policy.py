@@ -140,7 +140,7 @@ def validate_port_count(n: int) -> None:
         )
 
 
-def _check_ip(ip: ipaddress.IPAddress, original: str) -> str:
+def _check_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, original: str) -> str:
     """Check a single IP against all restriction rules."""
     if str(ip) in BLOCKED_IPS:
         raise ValueError(f"Blocked target: {original}")

@@ -2,7 +2,7 @@
 Tools router implementation.
 """
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from cybersec.apps.api.deps import get_db, get_optional_user
 from cybersec.database.models import User, ToolResult
@@ -11,7 +11,7 @@ import dataclasses
 from cybersec.apps.api.schemas.tool import (
     DnsRequest, WhoisRequest, PingRequest, TracerouteRequest,
     SslRequest, HttpHeadersRequest, SubdomainRequest, GeoipRequest,
-    ToolResultOut
+    PortScanRequest, ToolResultOut
 )
 
 from cybersec.core.tools.dns import dns_lookup
@@ -22,6 +22,7 @@ from cybersec.core.tools.ssl import ssl_audit
 from cybersec.core.tools.http_headers import check_http_headers
 from cybersec.core.tools.subdomain import find_subdomains
 from cybersec.core.tools.geoip import geoip_lookup
+from cybersec.core.tools.port_scanner import scan_ports, scan_port_range
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -68,6 +69,18 @@ async def run_whois(
     result = await whois_lookup(body.target)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "whois", body.target, result_dict)
+    return {"tool_result_id": tool_result_id, "data": result_dict}
+
+
+@router.get("/whois")
+async def run_whois_get(
+    target: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user)
+):
+    result = await whois_lookup(target)
+    result_dict = dataclasses.asdict(result)
+    tool_result_id = await _save_tool_result(db, current_user, "whois", target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
 
 @router.post("/ping")
@@ -143,7 +156,7 @@ async def run_subdomain(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user)
 ):
-    result = await find_subdomains(body.domain, body.wordlist)
+    result = await find_subdomains(body.domain, body.wordlist, body.strictness)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "subdomain", body.domain, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
@@ -157,4 +170,53 @@ async def run_geoip(
     result = await geoip_lookup(body.target)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "geoip", body.target, result_dict)
+    return {"tool_result_id": tool_result_id, "data": result_dict}
+
+
+@router.get("/geoip")
+@router.get("/geo")
+async def run_geoip_legacy_get(
+    target: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user)
+):
+    result = await geoip_lookup(target)
+    result_dict = dataclasses.asdict(result)
+    tool_result_id = await _save_tool_result(db, current_user, "geoip", target, result_dict)
+    return {"tool_result_id": tool_result_id, "data": result_dict}
+
+@router.post("/port_scan")
+async def run_port_scan(
+    body: PortScanRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user)
+):
+    # Determine scan type based on parameters
+    if body.ports:
+        # Scan specific ports
+        result = await scan_ports(
+            body.target, 
+            ports=body.ports,
+            timeout=body.timeout,
+            max_concurrent=body.max_concurrent
+        )
+    elif body.start_port is not None and body.end_port is not None:
+        # Scan port range
+        result = await scan_port_range(
+            body.target,
+            start_port=body.start_port,
+            end_port=body.end_port,
+            timeout=body.timeout,
+            max_concurrent=body.max_concurrent
+        )
+    else:
+        # Scan common ports by default
+        result = await scan_ports(
+            body.target,
+            timeout=body.timeout,
+            max_concurrent=body.max_concurrent
+        )
+    
+    result_dict = dataclasses.asdict(result)
+    tool_result_id = await _save_tool_result(db, current_user, "port_scan", body.target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}

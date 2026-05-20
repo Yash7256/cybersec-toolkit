@@ -1,0 +1,3912 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberSec-CLI Web</title>
+    <link rel="icon" type="image/svg+xml" href="/static/assets/favicon.svg">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/tools.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        :root {
+            --border-color: var(--border-default, #232736);
+            --input-bg: rgba(255, 255, 255, 0.03);
+            --input-border: rgba(255, 255, 255, 0.1);
+            --purple-gradient-start: var(--accent-secondary, #8B5CF6);
+            --purple-gradient-end: var(--accent-secondary, #8B5CF6);
+            --button-text: var(--text-primary, #ECEFF6);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #0E0914 !important;
+            background-image: radial-gradient(ellipse at top, #2C184D 0%, #0E0914 50%) !important;
+            color: var(--text-primary);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            padding-top: 56px;
+        }
+
+        .top-nav {
+            height: 80px;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2.5rem;
+        }
+
+        .top-nav .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .top-nav .logo-image {
+            width: 40px !important;
+            height: 40px !important;
+            max-width: 40px !important;
+            max-height: 40px !important;
+        }
+
+        .top-nav .logo-text {
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, var(--purple-gradient-start), var(--purple-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-menu {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-menu a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-menu a:hover,
+        .nav-menu a.active {
+            color: white;
+        }
+
+        .export-btn {
+            height: 42px;
+            padding: 0 1.5rem;
+            background: linear-gradient(135deg, var(--purple-gradient-start), var(--purple-gradient-end));
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .export-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .navbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: transparent;
+            border-bottom: none;
+            height: 80px;
+            padding: 0 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-icon {
+            width: 18px;
+            height: 18px;
+            color: #8B5CF6;
+        }
+
+        .logo-text {
+            font-family: monospace;
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .logo-cli {
+            color: #EAB308;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 8px 24px;
+            border-radius: 24px;
+            transition: all 0.2s;
+        }
+
+        .nav-btn-login {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            margin-right: 12px;
+        }
+
+        .nav-btn-login:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-btn-signup {
+            background: #EAEAEA;
+            border: none;
+            color: #111;
+            font-weight: 500;
+        }
+
+        .nav-btn-signup:hover {
+            background: #FFFFFF;
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 56px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .view-section {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            padding: 2rem 3rem;
+            gap: 2rem;
+            overflow-y: auto;
+        }
+
+        .view-section.active {
+            display: flex;
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 1.5rem;
+            align-items: flex-end;
+            margin-bottom: 2rem;
+        }
+
+        .control-panel-options {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .option-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .option-toggle input {
+            accent-color: var(--purple-gradient-start);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .input-label {
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .control-input,
+        .form-input {
+            width: 100%;
+            height: 52px;
+            padding: 0 1.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .control-input:focus,
+        .form-input:focus {
+            border-color: #8B5CF6;
+        }
+
+        .form-select:focus {
+            border-color: #8B5CF6;
+            outline: none;
+        }
+
+        .start-button,
+        .cancel-button {
+            background: #EAB308;
+            border: none;
+            border-radius: 8px;
+            color: #0E1016;
+            font-weight: 700;
+            font-family: monospace;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 10px 24px;
+            transition: all 0.2s;
+        }
+
+        .start-button:hover {
+            filter: brightness(1.1);
+        }
+
+        .cancel-button {
+            background: linear-gradient(135deg, #EF4444, #DC2626);
+            color: white;
+        }
+
+        .cancel-button:hover {
+            filter: brightness(1.1);
+        }
+
+        .button-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .results-window {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .results-window::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .results-panel {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 2;
+        }
+
+        .results-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            gap: 0.5rem;
+        }
+
+        .empty-heading {
+            font-size: 2.2rem;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .empty-subtext {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.1);
+        }
+
+        .scan-progress {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .progress-text {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--purple-gradient-start), var(--purple-gradient-end));
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .status-scanning {
+            color: #F59E0B;
+        }
+
+        .status-complete {
+            color: #10B981;
+        }
+
+        .status-error {
+            color: #EF4444;
+        }
+
+        .status-warning {
+            color: #F59E0B;
+        }
+
+        .scan-tips {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 4px solid #F59E0B;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+        }
+
+        .tip-item {
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .tip-item i {
+            margin-top: 0.25rem;
+            color: #F59E0B;
+        }
+
+        .port-item {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 1.25rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .port-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            border-color: rgba(139, 127, 235, 0.3);
+        }
+
+        .port-item.open {
+            border-color: rgba(139, 127, 235, 0.45);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        }
+
+        .port-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .port-info-main {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+        }
+
+        .port-number {
+            font-weight: 700;
+            color: white;
+            font-size: 1.1rem;
+        }
+
+        .port-service {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .port-chevron {
+            color: var(--text-secondary);
+            transition: transform 0.2s ease;
+        }
+
+        .port-item.open .port-chevron {
+            transform: rotate(90deg);
+            color: white;
+        }
+
+        .port-risk {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .risk-critical {
+            background: rgba(239, 68, 68, 0.3);
+            color: #F87171;
+        }
+
+        .risk-high {
+            background: rgba(239, 68, 68, 0.2);
+            color: #F87171;
+        }
+
+        .risk-medium {
+            background: rgba(245, 158, 11, 0.2);
+            color: #FBBF24;
+        }
+
+        .risk-low {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10B981;
+        }
+
+        .port-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+
+        .detail-value {
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .status-open {
+            color: #10B981 !important;
+            font-weight: 600;
+        }
+
+        .port-extra {
+            display: none;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            gap: 0.75rem;
+            flex-direction: column;
+        }
+
+        .port-extra .detail-row {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .port-extra .detail-row span:first-child {
+            color: var(--text-secondary);
+            min-width: 90px;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .port-extra pre {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 280px;
+            overflow: auto;
+        }
+
+        .port-item.open .port-extra {
+            display: flex;
+        }
+
+        .results-section {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid;
+        }
+
+        .results-section.critical {
+            border-left-color: #DC2626;
+        }
+
+        .results-section.high {
+            border-left-color: #EF4444;
+        }
+
+        .results-section.medium {
+            border-left-color: #F59E0B;
+        }
+
+        .results-section.low {
+            border-left-color: #10B981;
+        }
+
+        .results-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .mitre-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #1e1e30;
+            border: 1px solid rgba(139, 92, 246, 0.5);
+            color: #c4b5fd;
+            font-size: 0.78rem;
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+
+        .os-detection-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .card-header i {
+            color: var(--purple-gradient-start);
+            font-size: 1.25rem;
+        }
+
+        .card-header h4 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .card-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .info-value {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .webapp-results-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .webapp-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .webapp-stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            text-align: center;
+        }
+
+        .webapp-stat-num {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .webapp-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+
+        .webapp-stat-num.critical {
+            color: #F87171;
+        }
+
+        .webapp-stat-num.high {
+            color: #FB923C;
+        }
+
+        .webapp-stat-num.medium {
+            color: #FBBF24;
+        }
+
+        .webapp-stat-num.safe {
+            color: #34D399;
+        }
+
+        /* Advanced Options Panel */
+        .advanced-panel {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .option-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .option-label {
+            display: block;
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .rate-presets {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.5rem;
+        }
+
+        .rate-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.5);
+            border-radius: 6px;
+            color: #c4b5fd;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .rate-btn:hover,
+        .rate-btn.active {
+            background: rgba(139, 92, 246, 0.3);
+            border-color: #8B5CF6;
+        }
+
+        .feature-toggles {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .option-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .option-toggle input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #8B5CF6;
+        }
+
+        .option-toggle label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        /* CVE and TLS Info Styles */
+        .ps-cve-list {
+            margin-top: 0.25rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+
+        .cve-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .cve-critical {
+            background: rgba(239, 68, 68, 0.3);
+            color: #F87171;
+            border: 1px solid rgba(239, 68, 68, 0.5);
+        }
+
+        .cve-high {
+            background: rgba(251, 146, 60, 0.3);
+            color: #FB923C;
+            border: 1px solid rgba(251, 146, 60, 0.5);
+        }
+
+        .cve-medium {
+            background: rgba(251, 191, 36, 0.3);
+            color: #FBBF24;
+            border: 1px solid rgba(251, 191, 36, 0.5);
+        }
+
+        .cve-low {
+            background: rgba(16, 185, 129, 0.3);
+            color: #10B981;
+            border: 1px solid rgba(16, 185, 129, 0.5);
+        }
+
+        .ps-tls-info {
+            margin-top: 0.25rem;
+            font-size: 0.75rem;
+            color: #8B5CF6;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .ps-banner {
+            margin-top: 0.25rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .ps-bottom-left {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .ps-export-btn {
+            padding: 0.4rem 0.8rem;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.5);
+            border-radius: 6px;
+            color: #c4b5fd;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .ps-export-btn:hover {
+            background: rgba(139, 92, 246, 0.3);
+            border-color: #8B5CF6;
+        }
+
+        /* Scan Progress UI */
+        .scan-progress-container {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .scan-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .scan-progress-header h4 {
+            margin: 0;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .scan-progress-stats {
+            display: flex;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .scan-current-port {
+            margin-top: 0.5rem;
+            color: #8B5CF6;
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+
+        .scan-log {
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0A0D12;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .scan-log-entry {
+            margin-bottom: 4px;
+        }
+
+        .scan-log-time {
+            color: #4B5563;
+            font-size: 12px;
+        }
+
+        .scan-log-info {
+            color: #6B7280;
+        }
+
+        .scan-log-success .port-num {
+            color: #EAB308;
+        }
+
+        .scan-log-success .port-service {
+            color: #9CA3AF;
+        }
+
+        .scan-log-warning {
+            color: #F59E0B;
+        }
+
+        .scan-log-error {
+            color: #EF4444;
+        }
+
+        .risk-bar-wrap {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .risk-bar-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .risk-bar-track {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.07);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .risk-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width .6s ease;
+        }
+
+        .finding-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .finding-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.9rem 1.1rem;
+            cursor: pointer;
+        }
+
+        .finding-header:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .sev-badge {
+            padding: 2px 10px;
+            border-radius: 99px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .sev-badge.critical {
+            background: rgba(248, 113, 113, .15);
+            color: #F87171;
+        }
+
+        .sev-badge.high {
+            background: rgba(251, 146, 60, .15);
+            color: #FB923C;
+        }
+
+        .sev-badge.medium {
+            background: rgba(251, 191, 36, .15);
+            color: #FBBF24;
+        }
+
+        .sev-badge.low {
+            background: rgba(52, 211, 153, .15);
+            color: #34D399;
+        }
+
+        .sev-badge.info {
+            background: rgba(139, 92, 246, .15);
+            color: #8B5CF6;
+        }
+
+        .finding-title {
+            flex: 1;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .finding-path {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .finding-body {
+            display: none;
+            border-top: 1px solid var(--border-color);
+            padding: 1rem 1.1rem;
+        }
+
+        .finding-body.open {
+            display: block;
+        }
+
+        .finding-row {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .finding-row-label {
+            color: var(--text-secondary);
+        }
+
+        .finding-row-val {
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+
+        .tech-tag {
+            display: inline-block;
+            background: rgba(139, 127, 235, .12);
+            color: #8B5CF6;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            margin: 2px;
+        }
+
+        .webapp-section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--text-muted);
+            margin: 1rem 0 0.5rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .chat-widget-btn {
+            position: absolute;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            width: 48px;
+            height: 48px;
+            background: var(--purple-gradient-start);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+            cursor: pointer;
+            z-index: 1000;
+            border: none;
+            transition: all 0.3s;
+        }
+
+        .chat-widget-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .chat-panel {
+            width: 0;
+            background: rgba(255, 255, 255, 0.005);
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s;
+        }
+
+        .results-window.chat-active .chat-panel {
+            width: 380px;
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .chat-header {
+            padding: 1.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-title {
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .chat-message {
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .chat-message.user {
+            align-self: flex-end;
+            background: rgba(139, 127, 235, 0.2);
+            color: #E0E7FF;
+            border-bottom-right-radius: 2px;
+        }
+
+        .chat-message.ai {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border-bottom-left-radius: 2px;
+        }
+
+        .chat-message.ai h1,
+        .chat-message.ai h2,
+        .chat-message.ai h3 {
+            margin: 1rem 0 0.5rem 0;
+            color: white;
+            font-weight: 600;
+        }
+
+        .chat-message.ai h2 {
+            font-size: 1.15rem;
+        }
+
+        .chat-message.ai h3 {
+            font-size: 1rem;
+        }
+
+        .chat-message.ai ul,
+        .chat-message.ai ol {
+            margin: 0.5rem 0 0.5rem 1.25rem;
+        }
+
+        .chat-message.ai li {
+            margin-bottom: 0.25rem;
+        }
+
+        .chat-message.ai p {
+            margin-bottom: 0.5rem;
+        }
+
+        .chat-message.ai strong {
+            color: var(--purple-gradient-start);
+            font-weight: 600;
+        }
+
+        .chat-message.ai code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+
+        .chat-input-area {
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 20px;
+            padding: 0.75rem 1rem;
+            color: white;
+            outline: none;
+            resize: none;
+            height: 44px;
+            font-family: inherit;
+        }
+
+        .chat-send-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--input-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .chat-send-btn:hover {
+            color: var(--purple-gradient-start);
+            background: rgba(139, 127, 235, 0.1);
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 0.5rem;
+            opacity: 0.6;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        .filter-popover {
+            position: absolute;
+            bottom: 4rem;
+            left: 1.5rem;
+            background: #13141f;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(10px) scale(0.95);
+            pointer-events: none;
+            transition: all 0.3s;
+            min-width: 140px;
+        }
+
+        .filter-popover.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: all;
+        }
+
+        .filter-popover-title {
+            padding: 0.25rem 0.5rem 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        .filter-btn {
+            width: 100%;
+            text-align: left;
+            padding: 0.6rem 1rem;
+            border: 1px solid var(--input-border);
+            background: var(--input-bg);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, var(--purple-gradient-start), var(--purple-gradient-end));
+            color: var(--button-text);
+        }
+
+        .bottom-icon-left {
+            position: absolute;
+            bottom: 1.5rem;
+            left: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            opacity: 0.6;
+            cursor: pointer;
+            z-index: 1001;
+            transition: all 0.3s;
+        }
+
+        .bottom-icon-left:hover {
+            opacity: 1;
+            color: var(--purple-gradient-start);
+            transform: scale(1.1);
+        }
+
+        .webapp-mode-toggle {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .webapp-mode-toggle label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .webapp-checkbox {
+            accent-color: #8B5CF6;
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+
+        .error-message {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            color: #ff6b6b;
+            margin: 1rem 0;
+            font-weight: 500;
+        }
+
+        .raw-results {
+            margin-top: 1.5rem;
+        }
+
+        .raw-results h4 {
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        #osRawData {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .form-select {
+            height: 52px;
+            padding: 0 1.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .form-select option {
+            background: var(--bg-primary);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .webapp-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .os-detection-info {
+                grid-template-columns: 1fr;
+            }
+
+            .results-window.chat-active .chat-panel {
+                width: 100%;
+                position: absolute;
+                right: 0;
+            }
+        }
+
+        .tool-nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .tool-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+        }
+
+        .tool-nav-btn.active {
+            background: rgba(139, 127, 235, 0.15);
+            border-color: rgba(139, 127, 235, 0.3);
+            color: white;
+        }
+
+        .tool-nav-btn i {
+            width: 20px;
+            text-align: center;
+        }
+
+        .tool-content {
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tool-output-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .tool-output-box .placeholder {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .tool-output-box .placeholder i {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            display: block;
+            color: var(--purple-gradient-start);
+            opacity: 0.5;
+        }
+
+        .tool-actions {
+            display: flex;
+            gap: 0.75rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tool-actions button {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .tool-actions button:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+        }
+
+        .tool-actions button i {
+            margin-right: 0.5rem;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .data-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.9rem;
+        }
+
+        .data-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-info {
+            background: rgba(139, 127, 235, 0.2);
+            color: #8B5CF6;
+        }
+
+        .badge-low {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60A5FA;
+        }
+
+        .badge-medium {
+            background: rgba(245, 158, 11, 0.2);
+            color: #FBBF24;
+        }
+
+        .badge-high {
+            background: rgba(251, 146, 60, 0.2);
+            color: #FB923C;
+        }
+
+        .badge-critical {
+            background: rgba(248, 113, 113, 0.2);
+            color: #F87171;
+        }
+
+        .badge-green {
+            background: rgba(52, 211, 153, 0.2);
+            color: #34D399;
+        }
+
+        .btn-secondary {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+        }
+
+        /* Full scan status cards */
+        .fullscan-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+
+        .fullscan-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            min-height: 120px;
+        }
+
+        .fullscan-title {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .fullscan-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .fullscan-detail {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .status-pill {
+            padding: 0.2rem 0.7rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .status-pill.pending {
+            color: var(--text-secondary);
+        }
+
+        .status-pill.running {
+            color: #F59E0B;
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .status-pill.success {
+            color: #10B981;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .status-pill.error {
+            color: #EF4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .fullscan-log {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+            color: var(--text-secondary);
+        }
+
+        .webscan-log {
+            background: #0a0a0f;
+            border: 1px solid #1e1e28;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.82rem;
+            max-height: 250px;
+            overflow-y: auto;
+            color: #a0a0b0;
+            margin-bottom: 12px;
+        }
+
+        .webscan-log.hidden {
+            display: none;
+        }
+
+        .webscan-log-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1e1e28;
+            color: #a78bfa;
+            font-weight: 600;
+        }
+
+        .webscan-log-entry {
+            display: flex;
+            gap: 10px;
+            padding: 4px 0;
+            border-bottom: 1px solid #12121a;
+        }
+
+        .webscan-log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .webscan-log-time {
+            color: #4a4a58;
+            min-width: 70px;
+        }
+
+        .webscan-log-stage {
+            color: #a78bfa;
+            min-width: 140px;
+        }
+
+        .webscan-log-msg {
+            color: #b0b0c0;
+            flex: 1;
+        }
+
+        .webscan-log-entry.success .webscan-log-msg {
+            color: #6acf80;
+        }
+
+        .webscan-log-entry.warning .webscan-log-msg {
+            color: #f0b860;
+        }
+
+        .webscan-log-entry.error .webscan-log-msg {
+            color: #f07070;
+        }
+
+        .webscan-log-entry.running .webscan-log-stage {
+            animation: pulse-text 1s infinite;
+        }
+
+        @keyframes pulse-text {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        :root {
+            --bg-primary: #0E1016;
+            --bg-secondary: #151823;
+            --bg-tertiary: #151823;
+            --bg-hover: #1D2130;
+            --accent-secondary: #8B5CF6;
+            --accent-gold: #EAB308;
+            --text-primary: #F6F8FD;
+            --text-secondary: #B3B9CB;
+            --text-muted: #7B839B;
+            --border-default: #232736;
+            --border-color: #232736;
+            --input-bg: #232736;
+            --input-border: #232736;
+            --purple-gradient-start: #5B21B6;
+            --purple-gradient-end: #8B5CF6;
+            --font-sans: 'Space Grotesk', 'Segoe UI', sans-serif;
+            --font-display: 'Oxanium', 'Space Grotesk', sans-serif;
+        }
+
+        html {
+            background: #0E1016;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: #0E1016;
+            color: var(--text-primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        body::before,
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        body::before {
+            background-image:
+                radial-gradient(circle at 18% 24%, rgba(255, 255, 255, 0.16) 0 1px, transparent 1.6px),
+                radial-gradient(circle at 78% 14%, rgba(255, 255, 255, 0.12) 0 1px, transparent 1.6px),
+                radial-gradient(circle at 64% 72%, rgba(255, 255, 255, 0.08) 0 1px, transparent 1.6px),
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(139, 92, 246, 0.035) 1px, transparent 1px);
+            background-size: 260px 260px, 320px 320px, 280px 280px, 100% 4px, 28px 28px;
+            opacity: 0.3;
+            z-index: 0;
+        }
+
+        body::after {
+            background:
+                radial-gradient(circle at center, transparent 52%, rgba(139, 92, 246, 0.08) 100%),
+                radial-gradient(circle at 50% 15%, rgba(255, 255, 255, 0.04), transparent 28%);
+            z-index: 0;
+        }
+
+        .top-nav,
+        .main-container,
+        .view-section {
+            position: relative;
+            z-index: 1;
+        }
+
+        .top-nav {
+            background: rgba(14, 16, 22, 0.9);
+            border-bottom: 1px solid rgba(35, 39, 54, 0.95);
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26);
+            backdrop-filter: blur(16px);
+        }
+
+        .top-nav .logo-text,
+        .input-label,
+        .tool-nav-btn,
+        .start-button,
+        .tool-content>h3,
+        .tool-exec-link {
+            font-family: var(--font-display);
+            letter-spacing: 0.08em;
+        }
+
+        .input-label {
+            color: rgba(246, 248, 253, 0.96);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+        }
+
+        .control-panel .input-group>div {
+            color: var(--text-secondary) !important;
+        }
+
+        .control-input,
+        .form-input,
+        .form-select {
+            background:
+                linear-gradient(180deg, rgba(35, 39, 54, 0.95), rgba(28, 31, 43, 0.92));
+            border: 1px solid rgba(52, 58, 80, 0.95);
+            border-radius: 14px;
+            color: var(--text-primary);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        .control-input::placeholder,
+        .form-input::placeholder {
+            color: rgba(179, 185, 203, 0.5);
+        }
+
+        .control-input:focus,
+        .form-input:focus,
+        .form-select:focus {
+            border-color: rgba(234, 179, 8, 0.78);
+            box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.12), 0 0 24px rgba(234, 179, 8, 0.14);
+            transform: translateY(-1px);
+        }
+
+        .form-select {
+            appearance: none;
+            padding-right: 2.85rem;
+            background-image:
+                linear-gradient(180deg, rgba(35, 39, 54, 0.95), rgba(28, 31, 43, 0.92)),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%238B5CF6' d='M3.1 4.8 7 8.7l3.9-3.9 1.1 1.1L7 10.9.9 5.9z'/%3E%3C/svg%3E");
+            background-position: 0 0, calc(100% - 1rem) center;
+            background-repeat: no-repeat;
+            box-shadow: inset 0 -2px 0 rgba(139, 92, 246, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+        }
+
+        .start-button {
+            position: relative;
+            isolation: isolate;
+            background: linear-gradient(135deg, #F7C948 0%, #EAB308 48%, #C67A12 100%);
+            border: 1px solid rgba(250, 217, 110, 0.4);
+            border-radius: 10px;
+            color: #FFFFFF;
+            text-transform: uppercase;
+            box-shadow: 0 16px 30px rgba(234, 179, 8, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+            overflow: visible;
+        }
+
+        .start-button::before {
+            content: '';
+            position: absolute;
+            inset: -18px;
+            background: radial-gradient(circle, rgba(234, 179, 8, 0.28) 0%, rgba(234, 179, 8, 0.1) 36%, transparent 72%);
+            filter: blur(10px);
+            z-index: -1;
+        }
+
+        .start-button:hover {
+            filter: none;
+            transform: translateY(-1px);
+            box-shadow: 0 20px 36px rgba(234, 179, 8, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+        }
+
+        .cancel-button {
+            border-radius: 10px;
+        }
+
+        .results-window,
+        .tools-sidebar {
+            background: #0E1016;
+            border-right: 1px solid #1A1F2E;
+        }
+
+        .tools-workspace {
+            background: #111318;
+            border: 1px solid #1A1F2E;
+            border-radius: 12px;
+            margin-left: 0;
+            padding: 24px;
+        }
+
+        .results-window {
+            border-radius: 24px;
+        }
+
+        .results-window::before {
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(139, 92, 246, 0.018) 1px, transparent 1px);
+            background-size: 46px 46px;
+            opacity: 0.38;
+        }
+
+        .empty-state {
+            letter-spacing: 0.04em;
+        }
+
+        .tools-shell {
+            position: relative;
+        }
+
+        .tools-sidebar {
+            width: 240px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            border-radius: 0;
+            border: none;
+        }
+
+        .tools-workspace {
+            position: relative;
+            border-radius: 12px;
+        }
+
+        .tool-nav-btn {
+            width: 100%;
+            justify-content: flex-start;
+            padding: 14px 18px;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            color: #C0C0C0;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .tool-nav-btn i {
+            color: #C0C0C0;
+            font-size: 16px;
+            transition: color 0.2s ease;
+        }
+
+        .tool-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #FFFFFF;
+        }
+
+        .tool-nav-btn:hover i {
+            color: #FFFFFF;
+        }
+
+        .tool-nav-btn.active {
+            background: #B496FF;
+            border: 1px solid #B496FF;
+            color: #0E0914;
+            font-weight: 500;
+        }
+
+        .tool-nav-btn.active i {
+            color: #0E0914;
+            text-shadow: none;
+        }
+
+        .tool-exec-item {
+            list-style: none;
+            margin-top: auto;
+            padding-top: 1rem !important;
+            border-top: 1px solid rgba(35, 39, 54, 0.96) !important;
+        }
+
+        .tool-exec-link {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            color: rgba(234, 179, 8, 0.92) !important;
+            text-transform: uppercase;
+            font-size: 0.82rem;
+            text-decoration: none;
+        }
+
+        .tool-exec-link i {
+            color: #EAB308;
+        }
+
+        .tool-exec-link::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            margin-left: auto;
+            border-radius: 999px;
+            background: #EAB308;
+            box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.55);
+            animation: executive-pulse 1.8s ease-out infinite;
+        }
+
+        @keyframes executive-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.55);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(234, 179, 8, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(234, 179, 8, 0);
+            }
+        }
+
+        #toolsView .tool-content>h3 {
+            color: #FFFFFF;
+            letter-spacing: 0.1em;
+        }
+
+        #toolsView .tool-content>h3 i {
+            color: #8B5CF6 !important;
+            text-shadow: 0 0 18px rgba(139, 92, 246, 0.28);
+        }
+
+        #toolsView .tool-content>div:first-of-type {
+            padding: 1rem 1.1rem;
+            background: linear-gradient(180deg, rgba(18, 21, 31, 0.82), rgba(14, 16, 23, 0.68));
+            border: 1px solid rgba(35, 39, 54, 0.92);
+            border-radius: 20px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        #portscanner-ports,
+        #scanner-type {
+            box-shadow: inset 0 -2px 0 rgba(139, 92, 246, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+        }
+
+        .tool-output-box {
+            position: relative;
+            background:
+                radial-gradient(circle at top center, rgba(139, 92, 246, 0.08), transparent 34%),
+                linear-gradient(180deg, rgba(16, 18, 27, 0.95), rgba(10, 12, 19, 0.98));
+            border: 1px solid rgba(35, 39, 54, 0.98);
+            border-radius: 24px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), inset 0 0 60px rgba(139, 92, 246, 0.035), 0 24px 48px rgba(0, 0, 0, 0.32);
+        }
+
+        .tool-output-box::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, transparent 56%, rgba(139, 92, 246, 0.08) 100%);
+            pointer-events: none;
+        }
+
+        .tool-output-box .placeholder {
+            position: relative;
+            isolation: isolate;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 0.3rem;
+            min-height: 300px;
+            color: rgba(164, 168, 194, 0.86);
+            letter-spacing: 0.05em;
+            text-align: center;
+        }
+
+        .tool-output-box .placeholder i {
+            width: 88px;
+            height: 88px;
+            display: grid;
+            place-items: center;
+            margin-bottom: 0.65rem;
+            border-radius: 999px;
+            font-size: 2.4rem;
+            color: #8B5CF6;
+            background:
+                radial-gradient(circle, rgba(139, 92, 246, 0.26) 0%, rgba(139, 92, 246, 0.12) 42%, rgba(139, 92, 246, 0.04) 64%, transparent 74%);
+            box-shadow: 0 0 34px rgba(139, 92, 246, 0.28), inset 0 0 18px rgba(255, 255, 255, 0.04);
+            opacity: 1;
+        }
+
+        #portscanner-output {
+            background:
+                radial-gradient(circle at center, rgba(139, 92, 246, 0.12) 0%, transparent 38%),
+                linear-gradient(180deg, rgba(17, 20, 30, 0.96), rgba(10, 12, 19, 0.99));
+            border: 1px solid #232736;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        #portscanner-output .scan-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        #portscanner-output .scan-header-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            font-weight: 600;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        #portscanner-output .scan-header-title i {
+            color: #8B5CF6;
+        }
+
+        #portscanner-output .scan-header-stats {
+            color: #6B7280;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        #portscanner-output .scan-progress-track {
+            background: #1A1F2E;
+            border-radius: 999px;
+            height: 4px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+
+        #portscanner-output .scan-progress-fill {
+            background: #8B5CF6;
+            height: 100%;
+            border-radius: 999px;
+            animation: shimmer 1.5s infinite;
+            background: linear-gradient(90deg, #8B5CF6 0%, #A78BFA 50%, #8B5CF6 100%);
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        #portscanner-output .scan-current-port {
+            color: #8B5CF6;
+            font-family: monospace;
+            font-size: 13px;
+            font-style: italic;
+        }
+
+        #portscanner-output .scan-log {
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0A0D12;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        #portscanner-output .scan-log-entry {
+            margin-bottom: 4px;
+        }
+
+        #portscanner-output .scan-log-time {
+            color: #4B5563;
+        }
+
+        #portscanner-output .scan-log-info {
+            color: #6B7280;
+        }
+
+        #portscanner-output .scan-log-success .port-num {
+            color: #EAB308;
+        }
+
+        #portscanner-output .scan-log-success .port-service {
+            color: #9CA3AF;
+        }
+
+        #portscanner-output .placeholder {
+            color: #4B5563;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        #portscanner-output .placeholder::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 120px;
+            height: 120px;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, transparent 70%);
+            filter: blur(20px);
+            z-index: -1;
+        }
+
+        .tool-actions,
+        #portscanner-actions {
+            border-top: 1px solid rgba(35, 39, 54, 0.92);
+        }
+
+        .btn-secondary,
+        .tool-actions button {
+            border: 1px solid rgba(47, 53, 74, 0.95);
+            background: linear-gradient(180deg, rgba(25, 28, 40, 0.95), rgba(18, 21, 30, 0.92));
+            color: var(--text-secondary);
+            border-radius: 14px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+        }
+
+        .btn-secondary:hover,
+        .tool-actions button:hover {
+            background: linear-gradient(180deg, rgba(32, 36, 50, 0.98), rgba(21, 24, 35, 0.95));
+            border-color: rgba(139, 92, 246, 0.34);
+            color: #FFFFFF;
+        }
+
+        #portscanner-actions .btn-secondary {
+            background: transparent;
+            border: 1px solid #232736;
+            color: #9CA3AF;
+            border-radius: 6px;
+            padding: 4px 14px;
+            box-shadow: none;
+        }
+
+        #portscanner-actions .btn-secondary:hover {
+            background: #1A1F2E;
+            border-color: #232736;
+            color: #FFFFFF;
+        }
+
+        .ps-results-shell {
+            font-family: var(--font-sans);
+        }
+
+        .ps-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .ps-metric-card {
+            background: #151823;
+            border: 1px solid #232736;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .ps-metric-card.is-emphasis {
+            border-color: #EAB308;
+        }
+
+        .ps-metric-label {
+            margin-bottom: 8px;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #6B7280;
+        }
+
+        .ps-metric-value {
+            font-size: 22px;
+            font-weight: 600;
+            color: #F6F8FD;
+        }
+
+        .ps-metric-card.is-emphasis .ps-metric-value {
+            color: #EAB308;
+        }
+
+        .ps-metric-value.is-muted {
+            color: #6B7280;
+        }
+
+        .ps-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .ps-filter-tabs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .ps-filter-tab {
+            appearance: none;
+            background: #151823;
+            border: 1px solid #232736;
+            color: #9CA3AF;
+            border-radius: 999px;
+            padding: 7px 14px;
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .ps-filter-tab:hover:not(.active) {
+            background: #1A1F2E;
+            color: #D1D5DB;
+        }
+
+        .ps-filter-tab.active {
+            background: #8B5CF6;
+            color: #FFFFFF;
+            border-color: transparent;
+        }
+
+        .ps-sort-select {
+            margin-left: auto;
+            background: #151823;
+            border: 1px solid #232736;
+            border-radius: 999px;
+            padding: 7px 14px;
+            font-size: 11px;
+            color: #9CA3AF;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .ps-sort-select:focus {
+            border-color: #8B5CF6;
+        }
+
+        .ps-table-wrap {
+            overflow: hidden;
+            border: 1px solid #232736;
+            border-radius: 8px;
+            background: #0E1016;
+        }
+
+        .ps-table-head,
+        .ps-row {
+            display: grid;
+            grid-template-columns: 80px minmax(180px, 1fr) 130px minmax(180px, 1fr);
+            align-items: center;
+        }
+
+        .ps-table-head {
+            padding: 10px 16px;
+            border-bottom: 1px solid #232736;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #6B7280;
+        }
+
+        .ps-row {
+            min-height: 52px;
+            padding: 0 16px;
+            border-left: 3px solid #8B5CF6;
+            border-bottom: 1px solid #1A1F2E;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .ps-row:last-child {
+            border-bottom: none;
+        }
+
+        .ps-row-even {
+            background: #0E1016;
+        }
+
+        .ps-row-odd {
+            background: #111318;
+        }
+
+        .ps-row:hover {
+            background: #1A1F2E;
+        }
+
+        .ps-row-risk-critical {
+            border-left-color: #8B5CF6;
+        }
+
+        .ps-row-risk-high {
+            border-left-color: #8B5CF6;
+        }
+
+        .ps-port-number {
+            font-family: monospace;
+            font-size: 14px;
+            color: white;
+            font-weight: 600;
+        }
+
+        .ps-service-name {
+            font-size: 13px;
+            color: white;
+            font-weight: 500;
+            font-family: monospace;
+        }
+
+        .ps-service-meta {
+            margin-top: 2px;
+            font-size: 11px;
+            color: #6B7280;
+            font-family: var(--font-mono);
+        }
+
+        .ps-insight-text {
+            font-size: 12px;
+            color: #6B7280;
+            font-style: italic;
+        }
+
+        .ps-risk-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 70px;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #151823;
+            color: #9CA3AF;
+            border: 1px solid #232736;
+        }
+
+        .ps-risk-badge-critical {
+            background: #EAB308;
+            color: #0E1016;
+            border-color: transparent;
+        }
+
+        .ps-risk-badge-high {
+            background: #8B5CF6;
+            color: #FFFFFF;
+            border-color: transparent;
+        }
+
+        .ps-bottom-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-top: 1px solid #232736;
+            background: #111318;
+        }
+
+        .ps-copy-btn {
+            background: transparent;
+            border: 1px solid #232736;
+            color: #9CA3AF;
+            border-radius: 6px;
+            padding: 4px 14px;
+            font-size: 11px;
+            font-family: var(--font-display);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .ps-copy-btn:hover {
+            background: #1A1F2E;
+            color: #FFFFFF;
+        }
+
+        .ps-status-meta {
+            margin-left: auto;
+            font-size: 11px;
+            color: #6B7280;
+        }
+
+        .ps-empty-state {
+            padding: 20px 14px;
+            text-align: center;
+            color: #6B7280;
+            font-size: 13px;
+        }
+
+        .port-ai-summary.ai-insight-box {
+            background: #151823;
+            border: 1px solid #232736;
+            border-left: 3px solid #8B5CF6;
+            border-radius: 8px;
+            padding: 16px 20px;
+        }
+
+        .port-ai-summary.ai-insight-box::before {
+            height: 1px;
+            background: linear-gradient(90deg, #EAB308 0%, #8B5CF6 100%);
+        }
+
+        .port-ai-summary .ai-insight-header {
+            margin-bottom: 10px;
+        }
+
+        .port-ai-summary .ai-insight-header i {
+            color: #8B5CF6;
+        }
+
+        .ps-summary-note {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 980px) {
+            .ps-metrics-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .ps-table-head,
+            .ps-row {
+                grid-template-columns: 72px minmax(140px, 1fr) 116px minmax(120px, 1fr);
+            }
+        }
+
+        @media (max-width: 720px) {
+            .ps-toolbar {
+                align-items: stretch;
+            }
+
+            .ps-sort-select {
+                margin-left: 0;
+                width: 100%;
+                border-radius: 8px;
+            }
+
+            .ps-metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ps-table-head,
+            .ps-row {
+                grid-template-columns: 72px minmax(120px, 1fr) 112px;
+            }
+
+            .ps-table-head div:last-child,
+            .ps-insight-text {
+                display: none;
+            }
+        }
+
+                .os-fingerprint-panel {
+            background: #0E1016;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .os-header-card {
+            background: #151823;
+            border: 1px solid #232736;
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .os-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .os-header-icon {
+            width: 48px;
+            height: 48px;
+            background: #8B5CF6;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+        }
+
+        .os-header-title {
+            color: white;
+            font-weight: 700;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .os-header-subtitle {
+            color: #6B7280;
+            font-size: 14px;
+            margin: 4px 0 0 0;
+        }
+
+        .os-confidence-widget {
+            background: #0E1016;
+            border: 1px solid #232736;
+            border-radius: 8px;
+            padding: 12px 16px;
+            min-width: 180px;
+        }
+
+        .os-confidence-label {
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #6B7280;
+            margin-bottom: 6px;
+        }
+
+        .os-confidence-value {
+            color: #EAB308;
+            font-family: monospace;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .os-confidence-bar {
+            height: 3px;
+            background: #232736;
+            border-radius: 999px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .os-confidence-fill {
+            height: 100%;
+            background: linear-gradient(to right, #EAB308, #F59E0B);
+            border-radius: 999px;
+            transition: width 0.3s ease;
+        }
+
+        .os-info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .os-info-card {
+            background: #151823;
+            border: 1px solid #232736;
+            border-radius: 8px;
+            padding: 14px 16px;
+        }
+
+        .os-info-label {
+            font-size: 10px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #6B7280;
+            margin-bottom: 6px;
+        }
+
+        .os-info-value {
+            font-family: monospace;
+            font-size: 15px;
+            color: #E5E7EB;
+        }
+
+        .os-port-pill {
+            display: inline-block;
+            background: #4C1D95;
+            color: #C4B5FD;
+            border-radius: 999px;
+            padding: 2px 10px;
+            font-size: 13px;
+            font-family: monospace;
+        }
+
+        .os-collapsible-row {
+            background: #151823;
+            border: 1px solid #232736;
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .os-collapsible-row:hover {
+            background: #1A1F2E;
+        }
+
+        .os-collapsible-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .os-collapsible-icon {
+            color: #8B5CF6;
+            font-size: 16px;
+        }
+
+        .os-collapsible-label {
+            color: white;
+            font-weight: 500;
+        }
+
+        .os-collapsible-chevron {
+            color: #6B7280;
+            font-size: 14px;
+            transition: transform 0.2s ease;
+        }
+
+        .os-collapsible-row.open .os-collapsible-chevron {
+            transform: rotate(180deg);
+        }
+
+        .os-collapsible-content {
+            display: none;
+            padding: 16px;
+            background: #0A0D12;
+            border-radius: 0 0 8px 8px;
+            margin-top: -12px;
+            margin-bottom: 12px;
+            border: 1px solid #232736;
+            border-top: none;
+        }
+
+        .os-collapsible-row.open+.os-collapsible-content {
+            display: block;
+        }
+
+        .os-tech-details {
+            border-bottom: 1px solid transparent;
+            border-image: linear-gradient(to right, #8B5CF6, transparent) 1;
+        }
+
+        .os-ai-insight {
+            border-bottom: 1px solid transparent;
+            border-image: linear-gradient(to right, #EAB308, transparent) 1;
+        }
+
+        .os-ai-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #EAB308;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Placeholder styling */
+        input::placeholder {
+            color: #4B5563 !important;
+        }
+
+        .os-ai-label {
+            color: #EAB308;
+            font-weight: 500;
+        }
+
+        .os-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #232736;
+        }
+
+        .os-action-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .os-action-btn {
+            background: transparent;
+            border: 1px solid #232736;
+            border-radius: 999px;
+            padding: 6px 16px;
+            color: #9CA3AF;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .os-action-btn:hover {
+            background: #1A1F2E;
+        }
+
+        .os-action-btn i {
+            color: #8B5CF6;
+        }
+
+        .os-scan-info {
+            color: #4B5563;
+            font-size: 12px;
+        }
+    </style>
+    <!-- Marked library for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <header class="navbar">
+        <div class="navbar-left">
+            <div class="logo-container">
+                <img src="/static/assets/logo1.png" alt="Logo 1" style="height: 40px; width: auto;">
+                <img src="/static/assets/logo.png" alt="Logo Text" style="height: 24px; width: auto; margin-left: 12px;">
+            </div>
+        </div>
+        <div class="navbar-right">
+            <button class="nav-btn nav-btn-login">Sign In</button>
+            <button class="nav-btn nav-btn-signup">Log In</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Port Scanner View -->
+        <div id="portScannerView" class="view-section" style="display:none;">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Target Host</label>
+                    <input type="text" id="target" class="control-input" placeholder="Example.com or 192.168.1.1">
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Port Range</label>
+                    <select id="ports" class="form-select">
+                        <option value="common">Common Ports (1-1024)</option>
+                        <option value="top1000">Top 1000 Ports</option>
+                        <option value="1-1000">1-1000</option>
+                        <option value="1-5000">1-5000</option>
+                        <option value="1-10000">1-10000</option>
+                        <option value="all">All Ports (1-65535)</option>
+                    </select>
+                </div>
+
+                <button id="startBtn" class="start-button" onclick="startScan()">Start scan</button>
+            </div>
+
+            <div class="control-panel-options">
+                <div class="option-toggle">
+                    <input type="checkbox" id="enhancedDetection" checked>
+                    <label for="enhancedDetection">Enhanced Service Detection</label>
+                </div>
+                <div class="option-toggle">
+                    <input type="checkbox" id="osDetection" checked>
+                    <label for="osDetection">OS Detection</label>
+                </div>
+            </div>
+
+            <div class="results-window" id="resultsWindow">
+                <div class="results-panel">
+                    <div id="emptyState" class="empty-state">
+                        <h2 class="empty-heading">CLI Streaming Port Scanner</h2>
+                        <p class="empty-subtext">Your results will appear here</p>
+                        <p class="empty-subtext" style="font-size: 0.85rem; margin-top: 1rem;">Detects: Open ports ·
+                            Services · Versions · Vulnerabilities · CVEs</p>
+                    </div>
+
+                    <div id="resultsContainer" class="results-container hidden">
+                        <div id="scanProgress" class="scan-progress hidden">
+                            <div class="progress-text">
+                                <span id="statusText">Initializing...</span>
+                                <span id="scanProgressPercent">0%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div id="scanProgressBar" class="progress-bar"></div>
+                            </div>
+                        </div>
+                        <div id="allPorts" class="all-ports"></div>
+                    </div>
+
+                    <div id="scanTips" class="scan-tips hidden">
+                        <div class="tip-item"><i class="fa-solid fa-lightbulb"></i> Use common ports (1-1024) for quick
+                            scans</div>
+                        <div class="tip-item"><i class="fa-solid fa-lightbulb"></i> Use top1000 for comprehensive
+                            scanning</div>
+                        <div class="tip-item"><i class="fa-solid fa-lightbulb"></i> Enable enhanced detection for better
+                            service identification</div>
+                    </div>
+
+                    <div class="bottom-icon-left" id="filterIcon" title="Filters" onclick="toggleFilters(event)">
+                        <i class="fa-solid fa-sliders"></i>
+                    </div>
+
+                    <div id="filterPopover" class="filter-popover">
+                        <div class="filter-popover-title">Risk Level</div>
+                        <button class="filter-btn active" data-filter="all">All Ports</button>
+                        <button class="filter-btn" data-filter="critical">Critical</button>
+                        <button class="filter-btn" data-filter="high">High Risk</button>
+                        <button class="filter-btn" data-filter="medium">Medium Risk</button>
+                        <button class="filter-btn" data-filter="low">Low Risk</button>
+                    </div>
+                </div>
+
+                <div id="chatWindow" class="chat-panel">
+                    <div class="chat-header">
+                        <div class="chat-title">
+                            <i class="fa-solid fa-robot"></i>
+                            <span>AI Assistant</span>
+                        </div>
+                        <button onclick="clearChat()"
+                            style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.8rem">Clear</button>
+                    </div>
+
+                    <div id="chatMessages" class="chat-messages">
+                        <div class="chat-message ai">
+                            Hello! I'm your CyberSec-CLI assistant. How can I help you analyze your scan results today?
+                        </div>
+                    </div>
+
+                    <div class="chat-input-area">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Ask about vulnerabilities..."
+                            onkeypress="handleChatKey(event)">
+                        <button class="chat-send-btn" onclick="sendChatMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="chatDataBtn" class="chat-widget-btn" onclick="toggleChat()">
+                    <i class="fa-solid fa-robot"></i>
+                </button>
+            </div>
+        </div>
+
+        
+        <!-- Full Scan View -->
+        <div id="fullScanView" class="view-section">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Target Host / Domain</label>
+                    <input type="text" id="fullTarget" class="control-input" placeholder="example.com or 192.168.1.1">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Target URL (optional)</label>
+                    <input type="text" id="fullUrl" class="control-input" placeholder="https://example.com">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Port Range</label>
+                    <select id="fullPortRange" class="form-select">
+                        <option value="common">Common Ports (1-1024)</option>
+                        <option value="top1000">Top 1000 Ports</option>
+                        <option value="1-1000">1-1000</option>
+                        <option value="1-5000">1-5000</option>
+                        <option value="1-10000">1-10000</option>
+                        <option value="all">All Ports (1-65535)</option>
+                    </select>
+                </div>
+                <button id="fullScanBtn" class="start-button" onclick="runFullScan()"><i class="fa-solid fa-bolt"></i>
+                    Run Full Scan</button>
+            </div>
+
+            <div class="control-panel-options">
+                <div class="option-toggle">
+                    <input type="checkbox" id="fullEnhanced" checked>
+                    <label for="fullEnhanced">Enhanced Service Detection</label>
+                </div>
+                <div class="option-toggle">
+                    <input type="checkbox" id="fullCrawl" checked>
+                    <label for="fullCrawl">Crawl links (web app)</label>
+                </div>
+                <div class="option-toggle">
+                    <input type="checkbox" id="fullPassive" checked>
+                    <label for="fullPassive">Passive mode (web app)</label>
+                </div>
+            </div>
+
+            <div class="results-window" id="fullScanWindow">
+                <div class="results-panel">
+                    <div class="fullscan-grid" id="fullscanGrid">
+                        <div class="fullscan-card" data-tool="port">
+                            <div class="fullscan-title"><i class="fa-solid fa-plug"></i> Port Scan</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-port" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-port" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                                                <div class="fullscan-card" data-tool="webapp">
+                            <div class="fullscan-title"><i class="fa-solid fa-shield-halved"></i> Web App Check</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-webapp" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-webapp" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="headers">
+                            <div class="fullscan-title"><i class="fa-solid fa-heading"></i> HTTP Headers</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-headers" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-headers" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="ssl">
+                            <div class="fullscan-title"><i class="fa-solid fa-lock"></i> SSL Check</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-ssl" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-ssl" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="dns">
+                            <div class="fullscan-title"><i class="fa-solid fa-globe"></i> DNS</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-dns" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-dns" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="whois">
+                            <div class="fullscan-title"><i class="fa-solid fa-server"></i> WHOIS</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-whois" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-whois" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="ping">
+                            <div class="fullscan-title"><i class="fa-solid fa-bolt"></i> Ping</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-ping" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-ping" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="traceroute">
+                            <div class="fullscan-title"><i class="fa-solid fa-route"></i> Traceroute</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-traceroute" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-traceroute" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="subdomains">
+                            <div class="fullscan-title"><i class="fa-solid fa-search"></i> Subdomains</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-subdomains" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-subdomains" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                        <div class="fullscan-card" data-tool="geo">
+                            <div class="fullscan-title"><i class="fa-solid fa-map-marker-alt"></i> GeoIP</div>
+                            <div class="fullscan-status">
+                                <span id="fullscan-status-geo" class="status-pill pending">Pending</span>
+                                <span id="fullscan-detail-geo" class="fullscan-detail">Not started</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1.5rem;">
+                        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+                            <i class="fa-solid fa-terminal" style="color:var(--purple-gradient-start)"></i>
+                            <span style="font-weight:600;">Activity Log</span>
+                        </div>
+                        <div id="fullscanLog" class="fullscan-log">Ready. Click Run Full Scan to start.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Web App Scanner View -->
+        <div id="webAppScannerView" class="view-section" style="display:none;">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Target URL</label>
+                    <input type="text" id="webappTarget" class="control-input" placeholder="https://example.com">
+                </div>
+                <div class="input-group" style="max-width:140px">
+                    <label class="input-label">Max pages</label>
+                    <input type="number" id="webappMaxPages" class="control-input" value="20" min="1" max="100">
+                </div>
+                <button id="webappScanBtn" class="start-button" onclick="startWebAppScan()">Scan Web App</button>
+            </div>
+
+            <div class="control-panel-options">
+                <div class="webapp-mode-toggle">
+                    <input type="checkbox" id="webappCrawl" class="webapp-checkbox" checked>
+                    <label for="webappCrawl">Crawl links</label>
+                </div>
+                <div class="webapp-mode-toggle">
+                    <input type="checkbox" id="webappFullScan" class="webapp-checkbox">
+                    <label for="webappFullScan">Full Scan (slow)</label>
+                </div>
+                <div class="webapp-mode-toggle">
+                    <input type="checkbox" id="webappPassive" class="webapp-checkbox" checked>
+                    <label for="webappPassive">Passive Mode</label>
+                </div>
+            </div>
+
+            <div class="results-window" id="webappResultsWindow">
+                <div class="results-panel">
+                    <div id="webappEmptyState" class="empty-state">
+                        <i class="fa-solid fa-shield-halved"
+                            style="font-size:3rem;color:var(--purple-gradient-start);opacity:.4"></i>
+                        <h2 style="font-size:1.25rem;color:var(--text-secondary);margin-top:1rem">Web Application
+                            Scanner</h2>
+                        <p style="font-size:0.9rem;margin-top:0.5rem">Enter a URL and click Scan Web App to detect
+                            vulnerabilities</p>
+                        <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem">Detects: SQLi · XSS · CSRF
+                            · CORS · Clickjacking · Sensitive files · Security headers</p>
+                    </div>
+                    <div id="webappResultsContainer" class="webapp-results-grid hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Tools View -->
+        <div id="toolsView" class="view-section active">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Network Tools</label>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+                        Select a tool from the sidebar to run network diagnostics
+                    </div>
+                </div>
+            </div>
+
+            <div class="tools-shell" style="display: flex; gap: 2rem; flex: 1; height: calc(100vh - 250px);">
+                <!-- Tool Sidebar -->
+                <div class="tools-sidebar"
+                    style="width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.5rem; background: transparent; border-right: none;">
+                    <button class="tool-nav-btn active" data-tool="portscanner" onclick="selectTool('portscanner')">
+                        <i class="fa-solid fa-plug"></i> Port Scanner
+                    </button>
+                                        <button class="tool-nav-btn" data-tool="webscan" onclick="selectTool('webscan')">
+                        <i class="fa-solid fa-shield-halved"></i> Web App Scanner
+                    </button>
+                    <button class="tool-nav-btn" data-tool="dns" onclick="selectTool('dns')">
+                        <i class="fa-solid fa-globe"></i> DNS Lookup
+                    </button>
+                    <button class="tool-nav-btn" data-tool="whois" onclick="selectTool('whois')">
+                        <i class="fa-solid fa-server"></i> WHOIS
+                    </button>
+                    <button class="tool-nav-btn" data-tool="ping" onclick="selectTool('ping')">
+                        <i class="fa-solid fa-bolt"></i> Ping
+                    </button>
+                    <button class="tool-nav-btn" data-tool="traceroute" onclick="selectTool('traceroute')">
+                        <i class="fa-solid fa-route"></i> Traceroute
+                    </button>
+                    <button class="tool-nav-btn" data-tool="ssl" onclick="selectTool('ssl')">
+                        <i class="fa-solid fa-lock"></i> SSL Check
+                    </button>
+                    <button class="tool-nav-btn" data-tool="headers" onclick="selectTool('headers')">
+                        <i class="fa-solid fa-heading"></i> HTTP Headers
+                    </button>
+                    <button class="tool-nav-btn" data-tool="subdomains" onclick="selectTool('subdomains')">
+                        <i class="fa-solid fa-search"></i> Subdomains
+                    </button>
+                    <button class="tool-nav-btn" data-tool="geo" onclick="selectTool('geo')">
+                        <i class="fa-solid fa-map-marker-alt"></i> GeoIP
+                    </button>
+                    <li class="tool-exec-item"
+                        style="border-top: 1px solid #1A1F2E; margin-top: 12px; padding-top: 12px; display: flex; align-items: center; gap: 8px;">
+                        <span class="gold-dot"
+                            style="width: 7px; height: 7px; border-radius: 50%; background: #EAB308; animation: pulse 2s infinite;"></span>
+                        <a class="tool-exec-link" onclick="switchView('executiveSummary')"
+                            style="color: #EAB308; font-size: 12px; letter-spacing: 0.06em; font-family: monospace; cursor: pointer;">
+                            <i class="fa-solid fa-brain" style="margin-right: 8px;"></i>AI EXECUTIVE REPORT
+                        </a>
+                        <span class="gold-dot"
+                            style="width: 7px; height: 7px; border-radius: 50%; background: #EAB308; animation: pulse 2s infinite;"></span>
+                    </li>
+                </div>
+
+                <!-- Tool Content -->
+                <div class="tools-workspace"
+                    style="flex: 1; background: transparent; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 32px; margin-left: 0; overflow-y: auto;">
+                    <!-- Port Scanner (inline) -->
+                    <div id="tool-portscanner" class="tool-content">
+                        <h3
+                            style="color: #EAEAEA; font-family: 'Inter', sans-serif; font-size: 14px; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; font-weight: 500;">
+                            <i class="fa-solid fa-chart-pie" style="color: #B496FF; font-size: 16px;"></i> Port Scanner
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <div style="position: relative; flex: 1; min-width: 250px;">
+                                <input type="text" id="portscanner-target" class="control-input"
+                                    placeholder="Target IP or domain (eg. 192.168.1.1)" style="width: 100%; padding-right: 40px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
+                                <i class="fa-solid fa-circle-xmark" onclick="document.getElementById('portscanner-target').value=''" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #EF4444; cursor: pointer; font-size: 16px; opacity: 0.8;"></i>
+                            </div>
+                            <select id="port-range" class="form-select" style="width: 180px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #EAEAEA;">
+                                <option value="common">Common Ports</option>
+                                <option value="quick">Quick Scan</option>
+                                <option value="web-audit">Web Audit</option>
+                                <option value="database">Database Exposure</option>
+                                <option value="remote-access">Remote Access</option>
+                                <option value="full-tcp">Full TCP Audit</option>
+                                <option value="stealth">Stealth</option>
+                            </select>
+                            <select id="scanner-type" class="form-select" style="width: 180px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #EAEAEA;">
+                                <option value="connect">TCP Connect</option>
+                                <option value="syn">SYN Stealth</option>
+                                <option value="udp">UDP</option>
+                                <option value="stealth_fin">FIN Stealth</option>
+                                <option value="stealth_null">NULL Stealth</option>
+                                <option value="stealth_xmas">XMAS Stealth</option>
+                                <option value="stealth_ack">ACK Stealth</option>
+                                <option value="zombie">Zombie Scan</option>
+                                <option value="full">Full (+TLS)</option>
+                            </select>
+                            <button class="start-button" id="portscanner-run-btn" onclick="runTool('portscanner')" style="background: linear-gradient(135deg, #B496FF, #8B5CF6); color: white; border-radius: 8px; font-family: 'Inter', sans-serif; font-weight: 500; padding: 0 24px; display: flex; align-items: center; gap: 8px;">
+                                Run Scan <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+
+                        <!-- Advanced Options Panel -->
+                        <div id="portscanner-advanced" style="margin-bottom: 1.5rem;">
+                            <button class="btn-secondary" onclick="toggleAdvanced('portscanner')"
+                                style="margin-bottom: 1rem; background: #151823; border: 1px solid #232736; border-radius: 999px; color: #6B7280; font-size: 12px; font-family: monospace; padding: 8px 16px;">
+                                <i class="fa-solid fa-cog" style="color: #8B5CF6;"></i> Advanced Options
+                            </button>
+                            <div id="portscanner-advanced-panel" class="advanced-panel" style="display: none;">
+                                <!-- Rate Limiting -->
+                                <div class="option-group">
+                                    <label class="option-label">Rate Limiting</label>
+                                    <div class="rate-presets">
+                                        <button type="button" class="rate-btn"
+                                            onclick="setRatePreset('stealth')">Stealth (100 pps)</button>
+                                        <button type="button" class="rate-btn" onclick="setRatePreset('normal')">Normal
+                                            (1000 pps)</button>
+                                        <button type="button" class="rate-btn"
+                                            onclick="setRatePreset('aggressive')">Aggressive (5000 pps)</button>
+                                        <input type="number" id="portscanner-custom-rate" class="control-input"
+                                            placeholder="Custom pps" style="width: 120px;">
+                                    </div>
+                                    <input type="hidden" id="portscanner-rate" value="normal">
+                                </div>
+
+                                <!-- Performance Settings -->
+                                <div class="option-group">
+                                    <label class="option-label">Performance</label>
+                                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                                        <div>
+                                            <label for="portscanner-timeout">Timeout (s)</label>
+                                            <input type="number" id="portscanner-timeout" class="control-input"
+                                                value="3.0" min="0.1" max="30" step="0.1" style="width: 100px;">
+                                        </div>
+                                        <div>
+                                            <label for="portscanner-concurrency">Concurrency</label>
+                                            <input type="number" id="portscanner-concurrency" class="control-input"
+                                                value="500" min="1" max="2000" style="width: 100px;">
+                                        </div>
+                                        <div>
+                                            <label for="portscanner-retries">Max Retries</label>
+                                            <input type="number" id="portscanner-retries" class="control-input"
+                                                value="3" min="0" max="10" style="width: 100px;">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Feature Toggles -->
+                                <div class="option-group">
+                                    <label class="option-label">Features</label>
+                                    <div class="feature-toggles">
+                                        <div class="option-toggle">
+                                            <input type="checkbox" id="portscanner-banner" checked>
+                                            <label for="portscanner-banner">Banner Grabbing</label>
+                                        </div>
+                                        <div class="option-toggle">
+                                            <input type="checkbox" id="portscanner-service-detect" checked>
+                                            <label for="portscanner-service-detect">Service Detection</label>
+                                        </div>
+                                                                                <div class="option-toggle">
+                                            <input type="checkbox" id="portscanner-tls-fingerprint">
+                                            <label for="portscanner-tls-fingerprint">TLS/JA3 Fingerprinting</label>
+                                        </div>
+                                        <div class="option-toggle">
+                                            <input type="checkbox" id="portscanner-cve-lookup" checked>
+                                            <label for="portscanner-cve-lookup">CVE Lookup</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="portscanner-output" class="tool-output-box"
+                            style="background: transparent; border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; min-height: 500px; margin-top: 16px; position: relative;">
+                            
+                            <!-- Empty State (shown by default) -->
+                            <div id="portscanner-empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; min-height: 500px; position: relative;">
+                                
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 16px; opacity: 0.15; filter: grayscale(100%);">
+                                    <img src="/static/assets/logo1.png" alt="Logo Icon Watermark" style="height: 80px; width: auto;">
+                                    <img src="/static/assets/logo.png" alt="Logo Text Watermark" style="height: 40px; width: auto;">
+                                </div>
+                                
+                                <span style="color: #6B7280; font-size: 13px; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; text-transform: uppercase;">Your scan results will appear here</span>
+                                
+                            </div>
+                            <!-- Results Container (hidden by default) -->
+                            <div id="portscanner-results-container" style="display: none; padding: 20px;">
+                                <!-- Results will be populated here by renderPortscannerRows -->
+                            </div>
+                        </div>
+                        <div id="portscanner-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('portscanner')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                            <button class="btn-secondary" id="cancel-scan-btn"
+                                onclick="api.scans.delete(scannerModule.currentScanId || '')"
+                                style="display:none; color:#EF4444; border-color:#EF4444;">
+                                <i class="fa-solid fa-ban"></i> Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- OS Fingerprinting (inline) -->
+                    <div id="tool-osfp" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-desktop" style="color: var(--purple-gradient-start)"></i> OS
+                            Fingerprinting
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="osfp-target" class="control-input"
+                                placeholder="example.com or 192.168.1.1" style="flex: 1; min-width: 220px;">
+                            <button class="start-button" onclick="runTool('osfp')"><i class="fa-solid fa-play"></i>
+                                Run</button>
+                        </div>
+                        <div id="osfp-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-desktop"></i>Enter a host to fingerprint
+                            </div>
+                        </div>
+                        <div id="osfp-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('osfp')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Web App Scanner (inline) -->
+                    <div id="tool-webscan" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-shield-halved" style="color: var(--purple-gradient-start)"></i> Web
+                            App Scanner
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="webscan-target" class="control-input"
+                                placeholder="https://example.com or example.com" style="flex: 1; min-width: 220px;">
+                            <input type="number" id="webscan-maxpages" class="control-input" value="20" min="1"
+                                max="100" style="width: 120px;">
+                            <button class="start-button" id="webscan-run-btn" onclick="runTool('webscan')"><i
+                                    class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="webscan-log" class="webscan-log hidden"></div>
+                        <div id="webscan-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-shield-halved"></i>Enter a URL to scan</div>
+                        </div>
+                    </div>
+
+                    <!-- DNS Tool -->
+                    <div id="tool-dns" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-globe" style="color: var(--purple-gradient-start)"></i> DNS Lookup
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="dns-target" class="control-input" placeholder="example.com"
+                                style="flex: 1; min-width: 200px;">
+                            <select id="dns-record-type" class="form-select" style="width: 140px;">
+                                <option value="A">A</option>
+                                <option value="AAAA">AAAA</option>
+                                <option value="MX">MX</option>
+                                <option value="NS">NS</option>
+                                <option value="TXT">TXT</option>
+                                <option value="CNAME">CNAME</option>
+                                <option value="ALL">ALL</option>
+                            </select>
+                            <button class="start-button" onclick="runTool('dns')"><i class="fa-solid fa-play"></i>
+                                Run</button>
+                        </div>
+                        <div id="dns-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-globe"></i>Enter a domain and click Run to查询
+                                DNS records</div>
+                        </div>
+                        <div id="dns-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('dns')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                            <button class="btn-secondary" onclick="sendToAI('dns')"><i class="fa-solid fa-robot"></i>
+                                Send to AI</button>
+                        </div>
+                    </div>
+
+                    <!-- WHOIS Tool -->
+                    <div id="tool-whois" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-server" style="color: var(--purple-gradient-start)"></i> WHOIS Lookup
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                            <input type="text" id="whois-target" class="control-input" placeholder="example.com"
+                                style="flex: 1;">
+                            <button class="start-button" onclick="runTool('whois')"><i class="fa-solid fa-play"></i>
+                                Run</button>
+                        </div>
+                        <div id="whois-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-server"></i>Enter a domain to查询 WHOIS 信息
+                            </div>
+                        </div>
+                        <div id="whois-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('whois')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                            <button class="btn-secondary" onclick="sendToAI('whois')"><i class="fa-solid fa-robot"></i>
+                                Send to AI</button>
+                        </div>
+                    </div>
+
+                    <!-- Ping Tool -->
+                    <div id="tool-ping" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-bolt" style="color: var(--purple-gradient-start)"></i> Ping Test
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="ping-target" class="control-input"
+                                placeholder="example.com or 192.168.1.1" style="flex: 1; min-width: 200px;">
+                            <input type="number" id="ping-count" class="control-input" placeholder="Count" value="4"
+                                style="width: 100px;">
+                            <button class="start-button" onclick="runTool('ping')"><i class="fa-solid fa-play"></i>
+                                Run</button>
+                        </div>
+                        <div id="ping-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-bolt"></i>Enter an IP or hostname to test
+                                reachability</div>
+                        </div>
+                        <div id="ping-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('ping')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Traceroute Tool -->
+                    <div id="tool-traceroute" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-route" style="color: var(--purple-gradient-start)"></i> Traceroute
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="traceroute-target" class="control-input"
+                                placeholder="example.com or 192.168.1.1" style="flex: 1; min-width: 200px;">
+                            <input type="number" id="traceroute-hops" class="control-input" placeholder="Max hops"
+                                value="30" style="width: 120px;">
+                            <button class="start-button" onclick="runTool('traceroute')"><i
+                                    class="fa-solid fa-play"></i> Run</button>
+                        </div>
+                        <div id="traceroute-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-route"></i>Enter a target to trace network
+                                path</div>
+                        </div>
+                        <div id="traceroute-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('traceroute')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- SSL Tool -->
+                    <div id="tool-ssl" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-lock" style="color: var(--purple-gradient-start)"></i> SSL Certificate
+                            Check
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="ssl-host" class="control-input"
+                                placeholder="https://example.com or example.com" style="flex: 1; min-width: 200px;">
+                            <input type="number" id="ssl-port" class="control-input" placeholder="Port" value="443"
+                                style="width: 100px;">
+                            <button class="start-button" onclick="runTool('ssl')"><i class="fa-solid fa-play"></i>
+                                Run</button>
+                        </div>
+                        <div id="ssl-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-lock"></i>Enter a host to check SSL
+                                certificate</div>
+                        </div>
+                        <div id="ssl-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('ssl')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- HTTP Headers Tool -->
+                    <div id="tool-headers" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-heading" style="color: var(--purple-gradient-start)"></i> HTTP Headers
+                            Analysis
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                            <input type="text" id="headers-url" class="control-input"
+                                placeholder="https://example.com or example.com" style="flex: 1;">
+                            <button class="start-button" onclick="runTool('headers')"><i class="fa-solid fa-play"></i>
+                                Run</button>
+                        </div>
+                        <div id="headers-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-heading"></i>Enter a URL to analyze HTTP
+                                headers</div>
+                        </div>
+                        <div id="headers-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('headers')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Subdomains Tool -->
+                    <div id="tool-subdomains" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; font-family: monospace; color: white;">
+                            <i class="fa-solid fa-search" style="color: #8B5CF6;"></i> Subdomain Discovery
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                            <input type="text" id="subdomains-domain" placeholder="example.com"
+                                style="flex: 1; min-width: 200px; background: #151823; border: 1px solid #8B5CF6; border-radius: 8px; color: white; font-family: monospace; font-size: 14px; padding: 10px 14px;">
+                            <select id="subdomains-wordlist"
+                                style="width: 140px; background: #151823; border: 1px solid #232736; border-radius: 8px; color: #9CA3AF; font-size: 13px; padding: 10px 14px;">
+                                <option value="small">Small</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="large">Large</option>
+                            </select>
+                            <button onclick="runTool('subdomains')"
+                                style="background: linear-gradient(to right, #EAB308, #F59E0B); color: #0E1016; font-weight: 700; border-radius: 8px; padding: 10px 24px; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px;"><i
+                                    class="fa-solid fa-play" style="color: #0E1016;"></i> RUN</button>
+                        </div>
+                        <div id="subdomains-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-search"></i>Enter a domain to discover
+                                subdomains</div>
+                        </div>
+                        <div id="subdomains-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('subdomains')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- GeoIP Tool -->
+                    <div id="tool-geo" class="tool-content" style="display: none;">
+                        <h3
+                            style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-map-marker-alt" style="color: var(--purple-gradient-start)"></i> IP
+                            Geolocation
+                        </h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                            <input type="text" id="geo-ip" class="control-input" placeholder="example.com or 8.8.8.8"
+                                style="flex: 1; max-width: 400px;">
+                            <button class="start-button" onclick="runTool('geo')"><i class="fa-solid fa-play"></i>
+                                Run</button>
+                        </div>
+                        <div id="geo-output" class="tool-output-box">
+                            <div class="placeholder"><i class="fa-solid fa-map-marker-alt"></i>Enter an IP address to
+                                lookup geolocation</div>
+                        </div>
+                        <div id="geo-actions" class="tool-actions" style="display: none;">
+                            <button class="btn-secondary" onclick="copyToolResult('geo')"><i
+                                    class="fa-solid fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Executive Report View -->
+        <div id="executiveSummaryView" class="view-section">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Master AI Executive Report</label>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+                        Aggregated intelligence from all tools run in this session
+                    </div>
+                </div>
+                <button class="start-button" onclick="toolsModule.renderExecutiveSummary()"><i
+                        class="fa-solid fa-sync"></i> Refresh Report</button>
+            </div>
+
+            <div class="results-window">
+                <div class="results-panel" id="executive-summary-output">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-brain"
+                            style="font-size:3rem;color:var(--purple-gradient-start);opacity:.4"></i>
+                        <h2 style="font-size:1.25rem;color:var(--text-secondary);margin-top:1rem">AI Executive Report
+                        </h2>
+                        <p style="font-size:0.9rem;margin-top:0.5rem">Run some network tools first to generate a master
+                            report</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Assistant View -->
+        <div id="aiView" class="view-section">
+            <div class="results-window" style="height: calc(100vh - 200px);">
+                <div class="chat-panel" style="width: 100%; opacity: 1; pointer-events: all;">
+                    <div class="chat-header">
+                        <div class="chat-title">
+                            <i class="fa-solid fa-robot"></i>
+                            <span>AI Security Assistant</span>
+                        </div>
+                        <button onclick="clearAIChat()"
+                            style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.8rem">Clear
+                            Chat</button>
+                    </div>
+                    <div id="aiChatMessages" class="chat-messages">
+                        <div class="chat-message ai">
+                            Hello! I'm your CyberSec AI assistant. I can help you analyze scan results, explain
+                            vulnerabilities, and provide security recommendations. What would you like to know?
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="aiChatInput" class="chat-input"
+                            placeholder="Ask about security, vulnerabilities, or your scan results..."
+                            onkeypress="handleAIChatKey(event)">
+                        <button class="chat-send-btn" onclick="sendAIChatMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scan History View -->
+        <div id="historyView" class="view-section">
+            <div class="control-panel">
+                <div class="input-group">
+                    <label class="input-label">Scan History</label>
+                    <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+                        View and manage your past scans
+                    </div>
+                </div>
+                <button class="start-button" onclick="loadScanHistory()"><i class="fa-solid fa-refresh"></i>
+                    Refresh</button>
+            </div>
+
+            <div class="results-window" style="height: calc(100vh - 250px);">
+                <div class="results-panel">
+                    <div class="results-container">
+                        <table class="data-table" style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Target</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Open Ports</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-tbody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-muted);">Click Refresh
+                                        to load scan history</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/main.js"></script>
+    <div id="portDetailModal"
+        style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:99999;align-items:center;justify-content:center;padding:1.5rem;">
+        <div
+            style="background:#0f111c;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 25px 80px rgba(0,0,0,0.5);">
+            <div
+                style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);background:linear-gradient(135deg, rgba(139,127,235,0.1), rgba(123,111,219,0.05));">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div id="portModalIcon"
+                        style="width:48px;height:48px;border-radius:10px;background:#8B5CF6;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">
+                        <i class="fa-solid fa-plug"></i></div>
+                    <div>
+                        <div id="portModalTitle" style="font-weight:700;font-size:1.2rem;">Port Details</div>
+                        <div id="portModalService" style="color:var(--text-secondary);font-size:0.85rem;">Service
+                            Information</div>
+                    </div>
+                </div>
+                <button onclick="hidePortDetailModal()"
+                    style="background:rgba(255,255,255,0.1);border:none;color:#fff;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;">✕</button>
+            </div>
+            <div style="padding:20px;">
+                <div id="portModalRiskBadge"
+                    style="display:inline-block;padding:6px 14px;border-radius:999px;font-weight:600;font-size:0.85rem;margin-bottom:16px;background:#8B5CF6;color:#fff;">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+                    <div style="background:#151823;border:1px solid #232736;border-radius:8px;padding:16px;">
+                        <div
+                            style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6B7280;margin-bottom:4px;">
+                            PORT</div>
+                        <div id="portModalPort" style="font-size:20px;color:#fff;font-weight:500;">—</div>
+                    </div>
+                    <div style="background:#151823;border:1px solid #232736;border-radius:8px;padding:16px;">
+                        <div
+                            style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6B7280;margin-bottom:4px;">
+                            PROTOCOL</div>
+                        <div id="portModalProtocol" style="font-size:20px;color:#fff;font-weight:500;">—</div>
+                    </div>
+                    <div style="background:#151823;border:1px solid #232736;border-radius:8px;padding:16px;">
+                        <div
+                            style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6B7280;margin-bottom:4px;">
+                            STATE</div>
+                        <div id="portModalState" style="font-size:20px;color:#fff;font-weight:500;">—</div>
+                    </div>
+                    <div style="background:#151823;border:1px solid #232736;border-radius:8px;padding:16px;">
+                        <div
+                            style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6B7280;margin-bottom:4px;">
+                            VERSION</div>
+                        <div id="portModalVersion" style="font-size:20px;color:#fff;font-weight:500;">—</div>
+                    </div>
+                </div>
+                <div style="margin-bottom:20px;">
+                    <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i
+                            class="fa-solid fa-shield-halved"></i> RISK ANALYSIS</div>
+                    <div style="background:#151823;border:1px solid #232736;border-radius:8px;padding:16px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                            <span style="color:var(--text-secondary);">Risk Score</span>
+                            <span id="portModalRiskScore" style="font-weight:600;color:#EAB308;">—</span>
+                        </div>
+                        <div style="background:#232736;border-radius:999px;height:6px;overflow:hidden;">
+                            <div id="portModalRiskBar"
+                                style="height:100%;border-radius:999px;transition:width 0.3s;width:0%;background:linear-gradient(to right, #EAB308, #F59E0B);">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="portModalMitreSection" style="margin-bottom:20px;">
+                    <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i
+                            class="fa-solid fa-crosshairs" style="color:#8B5CF6"></i> MITRE ATT&CK TECHNIQUES</div>
+                    <div id="portModalMitre"
+                        style="background:#151823;border:1px solid #232736;border-radius:8px;padding:16px;"></div>
+                </div>
+                <div id="portModalCVESection" style="margin-bottom:20px;">
+                    <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i
+                            class="fa-solid fa-bug"></i> CVE ENTRIES (<span id="portModalCVECount">0</span>)</div>
+                    <div id="portModalCVE"
+                        style="background:#151823;border:1px solid #232736;border-radius:8px;padding:16px;"></div>
+                </div>
+                <div id="portModalAIRemediationSection" style="margin-bottom:20px; display:none;">
+                    <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i
+                            class="fa-solid fa-robot" style="color:#8B5CF6"></i> AI ACTION PLAN</div>
+                    <div style="border-left:3px solid #8B5CF6;background:#151823;border-radius:8px;padding:16px;">
+                        <div id="portModalAIRemediationText"
+                            style="font-size:0.95rem;line-height:1.6;color:#9CA3AF;font-style:italic;margin-bottom:12px;">
+                        </div>
+
+                        <div id="portModalAIFixScriptContainer" style="display:none;margin-top:16px;">
+                            <div
+                                style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:6px;font-weight:600;">
+                                <i class="fa-solid fa-code"></i> FIX SCRIPT</div>
+                            <div style="position:relative;">
+                                <pre id="portModalAIFixScript"
+                                    style="background:#05060a;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);font-family:monospace;font-size:0.85rem;white-space:pre-wrap;color:#a5d6ff;margin:0;"></pre>
+                                <button
+                                    onclick="navigator.clipboard.writeText(document.getElementById('portModalAIFixScript').textContent);showToast('Fix script copied!');"
+                                    style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:0.75rem;"><i
+                                        class="fa-regular fa-copy"></i> Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;font-weight:500;"><i
+                            class="fa-solid fa-terminal" style="color:#EAB308"></i> BANNER</div>
+                    <pre id="portModalBanner"
+                        style="background:#0A0D12;padding:16px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;color:#9CA3AF;margin:0;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="fullscanModal"
+        style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(2px);z-index:9999;align-items:center;justify-content:center;padding:1.5rem;">
+        <div
+            style="background:#0f111c;border:1px solid rgba(255,255,255,0.08);border-radius:12px;max-width:720px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.35);">
+            <div
+                style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+                <div id="fullscanModalTitle" style="font-weight:700;">Scan Result</div>
+                <button onclick="hideFullScanModal()"
+                    style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;">✕</button>
+            </div>
+            <div id="fullscanModalBody"
+                style="padding:16px;font-family:monospace;font-size:0.9rem;white-space:pre-wrap;word-break:break-word;color:#e5e7eb;">
+            </div>
+        </div>
+    </div>
+    <script src="/static/js/api.js?v=7"></script>
+    <script src="/static/js/tools.js?v=7"></script>
+</body>
+
+</html>

@@ -32,9 +32,18 @@ class HttpHeadersRequest(BaseModel):
 class SubdomainRequest(BaseModel):
     domain: str
     wordlist: Literal["small", "medium", "large"] = "small"
+    strictness: Literal["off", "low", "medium", "high"] = "medium"
     
 class GeoipRequest(BaseModel):
     target: str
+
+class PortScanRequest(BaseModel):
+    target: str
+    ports: list[int] | None = None
+    start_port: int | None = None
+    end_port: int | None = None
+    timeout: float = Field(default=2.0, ge=0.1, le=10.0)
+    max_concurrent: int = Field(default=100, ge=1, le=2000)
 
 class ToolResultOut(BaseModel):
     id: UUID

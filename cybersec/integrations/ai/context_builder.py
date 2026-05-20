@@ -96,9 +96,43 @@ def build_tool_context(tool_name: str, result_data: dict) -> str:
             context += f"{s.get('header')}: {status} (Severity: {s.get('severity')})\n"
     elif tool_name == 'subdomain':
         found = result_data.get('found', [])
+        resolved = [s for s in found if s.get('resolved')]
+        unresolved = [s for s in found if not s.get('resolved')]
         context += f"Found {result_data.get('total_found', 0)} subdomains.\n"
-        for s in found:
-            context += f" - {s.get('subdomain')} ({s.get('ip')})\n"
+        if result_data.get('wildcard_detected'):
+            context += f"Wildcard DNS detected — IPs: {', '.join(result_data.get('wildcard_ips', []))}\n"
+        for s in resolved:
+            recs = s.get('records', {})
+            parts = []
+            for rtype in ("A", "AAAA", "CNAME", "MX", "TXT", "NS"):
+                vals = recs.get(rtype, [])
+                if vals:
+                    if rtype == "TXT":
+                        parts.append(f"TXT({len(vals)})")
+                    else:
+                        parts.append(f"{rtype}: {', '.join(vals)}")
+            if s.get('wildcard'):
+                parts.append("(wildcard)")
+            risk = s.get('risk', {})
+            if risk:
+                parts.append(f"[{risk.get('level', 'LOW')}] {risk.get('reason', '')}")
+            http = s.get('http', {})
+            if http.get('alive'):
+                http_parts = [f"HTTP {http.get('status')}"]
+                if http.get('title'):
+                    http_parts.append(f"title=\"{http['title']}\"")
+                if http.get('server'):
+                    http_parts.append(f"server={http['server']}")
+                if http.get('technologies'):
+                    http_parts.append(f"tech={','.join(http['technologies'])}")
+                if http.get('response_time_ms'):
+                    http_parts.append(f"{http['response_time_ms']}ms")
+                parts.append(" | ".join(http_parts))
+            context += f" - {s.get('subdomain')} | {' | '.join(parts)}\n"
+        if unresolved:
+            context += f"Failed resolutions ({len(unresolved)}):\n"
+            for s in unresolved:
+                context += f" - {s.get('subdomain')}: {s.get('error')}\n"
     elif tool_name == 'whois':
         context += f"Registrar: {result_data.get('registrar')}\n"
         context += f"Dates - Created: {result_data.get('creation_date')}, Expiration: {result_data.get('expiration_date')}\n"
