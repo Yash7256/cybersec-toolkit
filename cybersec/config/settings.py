@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     GEOIP_CACHE_TTL_SECONDS: int = 3600
     GEOIP_ALLOW_PRIVATE_TARGETS: bool = False
 
+    # Threat intelligence configuration
+    ABUSEIPDB_API_KEY: str = ""
+    THREAT_INTEL_MAX_AGE_DAYS: int = 90
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]

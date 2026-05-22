@@ -30,10 +30,19 @@ RUN poetry install --only=main --no-root --no-interaction --no-ansi || \
                 reportlab pydantic-settings email-validator slowapi scapy groq \
                 mitreattack-python arq python-multipart
 
+# Install frontend dependencies in a cacheable layer. Copying only package files
+# here keeps npm from reinstalling on every backend/source-code change.
+COPY cybersec/web/ui/package.json cybersec/web/ui/package-lock.json ./cybersec/web/ui/
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    cd cybersec/web/ui && npm ci --include=dev --no-audit
+
 COPY . .
 
 # Build the React frontend
-RUN cd cybersec/web/ui && npm install && npm run build
+RUN cd cybersec/web/ui && npm run build
 
 EXPOSE 8000
 

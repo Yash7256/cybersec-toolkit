@@ -37,6 +37,10 @@ class SubdomainRequest(BaseModel):
 class GeoipRequest(BaseModel):
     target: str
 
+class OsFingerprintRequest(BaseModel):
+    target: str
+    timeout: float = Field(default=2.0, ge=0.5, le=10.0)
+
 class PortScanRequest(BaseModel):
     target: str
     ports: list[int] | None = None
@@ -44,6 +48,77 @@ class PortScanRequest(BaseModel):
     end_port: int | None = None
     timeout: float = Field(default=2.0, ge=0.1, le=10.0)
     max_concurrent: int = Field(default=100, ge=1, le=2000)
+
+
+class OpenPortOut(BaseModel):
+    port_number: int
+    service: str
+    status: str
+    version: str | None = None
+    raw_banner: str | None = None
+    welcome_message: str | None = None
+    server_response: str | None = None
+    risk_level: str = "medium"
+    risk_reason: str | None = None
+    service_description: str | None = None
+    service_security_concern: str | None = None
+    technologies: list[str] = Field(default_factory=list)
+    screenshot: str | None = None
+    screenshot_url: str | None = None
+    recommendation: str | None = None
+    recommendation_reason: str | None = None
+    recommendation_priority: str | None = None
+    mitre_attack: list[dict[str, Any]] = Field(default_factory=list)
+    potential_threat: str | None = None
+    exploit_availability: dict[str, Any] = Field(default_factory=dict)
+    misconfigurations: list[dict[str, Any]] = Field(default_factory=list)
+    exposure_severity: dict[str, Any] = Field(default_factory=dict)
+    cve_result: dict[str, Any] | None = None
+    cve_count: int = 0
+    cve_critical_count: int = 0
+    cve_high_count: int = 0
+    cve_medium_count: int = 0
+    cve_low_count: int = 0
+    max_cvss_score: float | None = None
+    max_cvss_severity: str | None = None
+    max_cvss_cve: str | None = None
+    fingerprint: dict[str, Any] = Field(default_factory=dict)
+
+
+class SecurityScoreFactorOut(BaseModel):
+    category: str
+    label: str
+    penalty: int
+    severity: str = "medium"
+
+
+class AttackSurfaceOut(BaseModel):
+    level: str = "LOW"
+    score: int = 0
+    publicly_exposed_services: list[dict[str, Any]] = Field(default_factory=list)
+    factors: list[dict[str, Any]] = Field(default_factory=list)
+    summary: str = ""
+
+
+class PortScanOut(BaseModel):
+    target: str
+    total_scanned: int
+    open_ports_count: int
+    open_ports: list[OpenPortOut]
+    detected_technologies: list[str] = Field(default_factory=list)
+    scan_duration_seconds: float
+    packets_sent: int = 0
+    avg_latency_ms: float | None = None
+    security_score: int = 100
+    security_score_factors: list[SecurityScoreFactorOut] = Field(default_factory=list)
+    attack_surface: AttackSurfaceOut = Field(default_factory=AttackSurfaceOut)
+    threat_intelligence: dict[str, Any] = Field(default_factory=dict)
+    misconfiguration_summary: dict[str, Any] = Field(default_factory=dict)
+    exposure_summary: dict[str, Any] = Field(default_factory=dict)
+    attack_paths: dict[str, Any] = Field(default_factory=dict)
+    attack_simulations: list[dict[str, Any]] = Field(default_factory=list)
+    recommendations_error: str | None = None
+    error: str | None = None
 
 class ToolResultOut(BaseModel):
     id: UUID

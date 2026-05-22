@@ -11,8 +11,9 @@ import dataclasses
 from cybersec.apps.api.schemas.tool import (
     DnsRequest, WhoisRequest, PingRequest, TracerouteRequest,
     SslRequest, HttpHeadersRequest, SubdomainRequest, GeoipRequest,
-    PortScanRequest, ToolResultOut
+    OsFingerprintRequest, PortScanRequest, PortScanOut, OpenPortOut, ToolResultOut
 )
+from cybersec.core.tools.port_scanner import PortScanResult
 
 from cybersec.core.tools.dns import dns_lookup
 from cybersec.core.tools.whois import whois_lookup
@@ -22,7 +23,68 @@ from cybersec.core.tools.ssl import ssl_audit
 from cybersec.core.tools.http_headers import check_http_headers
 from cybersec.core.tools.subdomain import find_subdomains
 from cybersec.core.tools.geoip import geoip_lookup
+from cybersec.core.tools.os_fingerprint import os_fingerprint
 from cybersec.core.tools.port_scanner import scan_ports, scan_port_range
+
+
+def _port_scan_to_dict(result: PortScanResult) -> dict:
+    """Serialize scan result with banner fields for the frontend."""
+    return PortScanOut(
+        target=result.target,
+        total_scanned=result.total_scanned,
+        open_ports_count=result.open_ports_count,
+        open_ports=[
+            OpenPortOut(
+                port_number=p.port_number,
+                service=p.service,
+                status=p.status,
+                version=p.version,
+                raw_banner=p.raw_banner,
+                welcome_message=p.welcome_message,
+                server_response=p.server_response,
+                risk_level=p.risk_level,
+                risk_reason=p.risk_reason,
+                service_description=p.service_description,
+                service_security_concern=p.service_security_concern,
+                technologies=p.technologies,
+                screenshot=p.screenshot,
+                screenshot_url=p.screenshot_url,
+                recommendation=p.recommendation,
+                recommendation_reason=p.recommendation_reason,
+                recommendation_priority=p.recommendation_priority,
+                mitre_attack=p.mitre_attack,
+                potential_threat=p.potential_threat,
+                exploit_availability=p.exploit_availability,
+                misconfigurations=p.misconfigurations,
+                exposure_severity=p.exposure_severity,
+                cve_result=dataclasses.asdict(p.cve_result) if p.cve_result else None,
+                cve_count=p.cve_count,
+                cve_critical_count=p.cve_critical_count,
+                cve_high_count=p.cve_high_count,
+                cve_medium_count=p.cve_medium_count,
+                cve_low_count=p.cve_low_count,
+                max_cvss_score=p.max_cvss_score,
+                max_cvss_severity=p.max_cvss_severity,
+                max_cvss_cve=p.max_cvss_cve,
+                fingerprint=p.fingerprint,
+            )
+            for p in result.open_ports
+        ],
+        detected_technologies=result.detected_technologies,
+        scan_duration_seconds=result.scan_duration_seconds,
+        packets_sent=result.packets_sent,
+        avg_latency_ms=result.avg_latency_ms,
+        security_score=result.security_score,
+        security_score_factors=result.security_score_factors,
+        attack_surface=result.attack_surface,
+        threat_intelligence=result.threat_intelligence,
+        misconfiguration_summary=result.misconfiguration_summary,
+        exposure_summary=result.exposure_summary,
+        attack_paths=result.attack_paths,
+        attack_simulations=result.attack_simulations,
+        recommendations_error=result.recommendations_error,
+        error=result.error,
+    ).model_dump()
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -185,6 +247,18 @@ async def run_geoip_legacy_get(
     tool_result_id = await _save_tool_result(db, current_user, "geoip", target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
 
+@router.post("/os-fingerprint")
+@router.post("/os_fingerprint")
+async def run_os_fingerprint(
+    body: OsFingerprintRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user)
+):
+    result = await os_fingerprint(body.target, timeout=body.timeout)
+    result_dict = dataclasses.asdict(result)
+    tool_result_id = await _save_tool_result(db, current_user, "os_fingerprint", body.target, result_dict)
+    return {"tool_result_id": tool_result_id, "data": result_dict}
+
 @router.post("/port_scan")
 async def run_port_scan(
     body: PortScanRequest,
@@ -217,6 +291,6 @@ async def run_port_scan(
             max_concurrent=body.max_concurrent
         )
     
-    result_dict = dataclasses.asdict(result)
+    result_dict = _port_scan_to_dict(result)
     tool_result_id = await _save_tool_result(db, current_user, "port_scan", body.target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
