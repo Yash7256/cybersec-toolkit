@@ -1,9 +1,24 @@
+# Environment and secrets
 .env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Python
 .venv/
 venv/
+env/
+ENV/
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
+.Python
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -13,9 +28,28 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# Frontend
 node_modules/
+cybersec/web/ui/node_modules/
+cybersec/web/ui/dist/
+.vite/
+
+# Runtime/output artifacts
 scan_results/
+data/screenshots/
+runtime/
 *.log
 *.csv
 *.db
+*.sqlite
+*.sqlite3
 data/*.db
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

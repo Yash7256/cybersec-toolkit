@@ -45,9 +45,11 @@ az webapp deployment source config --name $APP_NAME --resource-group $RESOURCE_G
 echo "Setting environment variables..."
 read -p "Enter your GROQ API key: " GROQ_KEY
 read -p "Enter your database URL (leave empty to use Railway): " DB_URL
+read -p "Enter your app secret key: " APP_SECRET
 
 az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP --setting GROQ_API_KEY=$GROQ_KEY
 az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP --setting APP_DEBUG=false
+az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP --setting APP_SECRET_KEY=$APP_SECRET
 az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP --setting CORS_ORIGINS=https://$APP_NAME.azurewebsites.net
 
 if [ ! -z "$DB_URL" ]; then
@@ -63,4 +65,4 @@ echo ""
 echo "Next steps:"
 echo "1. Push your code to GitHub to trigger deployment"
 echo "2. Check deployment logs: az webapp log tail --name $APP_NAME --resource-group $RESOURCE_GROUP"
-echo "3. Test your app: curl https://$APP_NAME.azurewebsites.net/"
+echo "3. Test your app: curl https://$APP_NAME.azurewebsites.net/api/health"

@@ -7,7 +7,7 @@ primary_region = "lhr"  # London (change to your preferred region)
   PYTHONUNBUFFERED = "1"
 
 [build]
-  builder = "heroku"
+  dockerfile = "Dockerfile"
 
 [[services]]
   internal_port = 8000
@@ -33,12 +33,4 @@ primary_region = "lhr"  # London (change to your preferred region)
     method = "get"
     timeout = "5s"
     type = "http"
-    uri = "/health"
-
-[env.production]
-  [env.production.env]
-    SECRET_KEY = "change-me-in-production"
-
-[[statics]]
-  guest_path = "/app/dist"
-  url_prefix = "/static"
+    uri = "/api/health"

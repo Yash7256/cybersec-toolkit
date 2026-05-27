@@ -3,12 +3,19 @@ import {
   Activity,
   ArrowRight,
   BarChart3,
+  Building2,
   CheckCircle2,
+  CircleDot,
   Cloud,
   Cpu,
+  Database,
+  ExternalLink,
+  FileText,
   Fingerprint,
   Gauge,
+  Globe2,
   Heading,
+  Info,
   Lock,
   MapPin,
   Network,
@@ -16,6 +23,7 @@ import {
   Route,
   Search,
   Server,
+  Share2,
   ShieldAlert,
   ShieldCheck,
   Timer,
@@ -249,17 +257,6 @@ export default function GenericTool({ toolId }) {
     );
   };
 
-  const renderSection = (title, fields) => {
-    const visible = fields.filter(Boolean);
-    if (!visible.length) return null;
-    return (
-      <section className="space-y-3">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</h3>
-        <div className="space-y-3">{visible}</div>
-      </section>
-    );
-  };
-
   const copyText = async (label, text) => {
     if (!text) return;
     await navigator.clipboard.writeText(text);
@@ -279,109 +276,296 @@ export default function GenericTool({ toolId }) {
     run({ silent: false, appendLive: true });
   };
 
-  const renderIpResult = (item) => (
-    <div key={item.ip || item.target} className="space-y-3 border border-dark-600 bg-dark-800/40 rounded-xl p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm font-mono text-gray-100">{item.ip || item.target}</span>
-        {item.cdn_provider && <span className="text-xs font-mono text-amber-300">{item.cdn_provider}</span>}
-        {item.country_code && <span className="text-xs font-mono text-gray-400">{item.country_code}</span>}
+  const hasCoordinates = (data) => Number.isFinite(Number(data.lat)) && Number.isFinite(Number(data.lon));
+
+  const renderLocationDetail = (label, value) => {
+    if (value === null || value === undefined || value === '') return null;
+    return (
+      <div className="grid grid-cols-[120px_minmax(0,1fr)] items-center gap-4 border-b border-[#554365]/55 py-2.5 last:border-b-0">
+        <span className="text-[11px] text-[#92859d]">{label}</span>
+        <span className="text-[11px] text-[#ded4e9] break-words">{String(value)}</span>
       </div>
-      {item.summary && <p className="text-sm text-gray-300">{item.summary}</p>}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-        {renderField('asn', item.asn)}
-        {renderField('org', item.org)}
-        {renderField('city', item.city)}
-        {renderField('rdap_cidr', item.rdap_cidr)}
-        {renderField('reverse_dns', item.reverse_dns || 'No PTR record')}
-        {renderField('abuse', item.abuse_contact)}
+    );
+  };
+
+  const geoText = (value, fallback = 'Unknown') => (
+    value === null || value === undefined || value === '' ? fallback : String(value)
+  );
+
+  const geoBool = (value) => (value === true ? 'Yes' : value === false ? 'No' : 'Unknown');
+
+  const geoCard = (title, children, IconCmp = CircleDot) => (
+    <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/78 p-5">
+      <div className="mb-4 flex items-center gap-3 text-[11px] font-semibold uppercase text-[#b79aff]">
+        <IconCmp className="h-4 w-4" />
+        <span>{title}</span>
       </div>
+      {children}
     </div>
   );
 
-  const renderGeoResults = (data) => (
-    <div className="p-6 space-y-6">
-      {(data.summary || data.infrastructure_note) && (
-        <section className="space-y-2 border border-dark-600 bg-dark-800/60 rounded-xl p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            {data.summary && <p className="text-sm text-gray-100">{data.summary}</p>}
-            <div className="flex gap-2">
-              <button type="button" className="px-3 py-2 text-xs font-mono text-gray-300 border border-dark-600 rounded-lg hover:bg-dark-700" onClick={() => copyText('summary', data.summary)}>
-                {copied === 'summary' ? 'Copied' : 'Copy summary'}
-              </button>
-              <button type="button" className="px-3 py-2 text-xs font-mono text-gray-300 border border-dark-600 rounded-lg hover:bg-dark-700" onClick={() => copyText('json', JSON.stringify(data, null, 2))}>
-                {copied === 'json' ? 'Copied' : 'Copy JSON'}
-              </button>
+  const geoInfoRow = (label, value) => (
+    <div className="grid grid-cols-[116px_minmax(0,1fr)] gap-3 border-b border-[#554365]/55 py-2.5 last:border-b-0">
+      <span className="text-[11px] text-[#8f839b]">{label}</span>
+      <span className="whitespace-pre-line text-[11px] text-[#ded4e9] break-words">{geoText(value)}</span>
+    </div>
+  );
+
+  const geoMetricTile = (IconCmp, title, value, subtext, extra) => (
+    <div className="min-h-[84px] rounded-lg border border-[#5f4c6c]/80 bg-[#13091f]/72 p-4">
+      <div className="flex items-center gap-2 text-[10px] font-bold text-[#efe9f5]">
+        <IconCmp className="h-3.5 w-3.5" />
+        <span>{title}</span>
+      </div>
+      <div className="mt-4 text-[12px] font-semibold leading-snug text-[#f4eef7] break-words">{geoText(value)}</div>
+      {subtext && <div className="mt-1 text-[9px] text-[#8f839b] break-words">{subtext}</div>}
+      {extra}
+    </div>
+  );
+
+  const geoPill = (children, tone = 'neutral') => {
+    const tones = {
+      neutral: 'border-[#5f4c6c] bg-[#13091f] text-[#d6cbe2]',
+      good: 'border-[#4a6a45] bg-[#101c18] text-[#5ee166]',
+      info: 'border-[#5f4c6c] bg-[#160d24] text-[#d6cbe2]',
+      warn: 'border-[#6e5a35] bg-[#1d1514] text-[#ffbf6b]',
+    };
+    return (
+      <span className={`inline-flex h-6 items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] ${tones[tone] || tones.neutral}`}>
+        {children}
+      </span>
+    );
+  };
+
+  const renderLocationMap = (data) => {
+    const coordinatesReady = hasCoordinates(data);
+    const coordinates = coordinatesReady ? `${data.lat},${data.lon}` : '';
+    const mapEmbedUrl = coordinatesReady
+      ? `https://maps.google.com/maps?q=${encodeURIComponent(coordinates)}&z=10&output=embed`
+      : '';
+    const mapUrl = data.map_url || (coordinatesReady ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(coordinates)}` : null);
+    const earthUrl = coordinatesReady ? `https://earth.google.com/web/search/${encodeURIComponent(coordinates)}` : null;
+
+    return (
+      <>
+        <div className="mb-6 text-[18px] font-medium uppercase text-[#b79aff]">Location</div>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(290px,390px)_minmax(0,1fr)] gap-6">
+          <div className="min-w-0 rounded-lg border border-[#63516e]/80 bg-[#13091f]/74 p-5">
+            {renderLocationDetail('Country', [data.flag_emoji, data.country, data.country_code && `(${data.country_code})`].filter(Boolean).join(' '))}
+            {renderLocationDetail('Continent', [data.continent, data.continent_code && `(${data.continent_code})`].filter(Boolean).join(' '))}
+            {renderLocationDetail('Region', data.region)}
+            {renderLocationDetail('City', data.city)}
+            {renderLocationDetail('Postal code', data.postal)}
+            {renderLocationDetail('Coordinates', coordinatesReady ? coordinates : null)}
+            {renderLocationDetail('Timezone', data.timezone)}
+            {renderLocationDetail('UTC offset', data.timezone_utc)}
+            <div className="flex flex-wrap gap-6 pt-3">
+              {mapUrl && (
+                <a className="inline-flex items-center gap-1.5 text-[11px] text-[#a98be8] hover:text-[#cab7ff]" href={mapUrl} target="_blank" rel="noreferrer">
+                  Open in google maps <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+              {earthUrl && (
+                <a className="inline-flex items-center gap-1.5 text-[11px] text-[#a98be8] hover:text-[#cab7ff]" href={earthUrl} target="_blank" rel="noreferrer">
+                  Open in google earth <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
             </div>
           </div>
-          {data.infrastructure_note && <p className="text-sm text-amber-200">{data.infrastructure_note}</p>}
+
+          <div className="relative min-h-[300px] overflow-hidden rounded-lg border border-[#684f82] bg-[#12091f]">
+            {coordinatesReady ? (
+              <>
+                <iframe
+                  title={`Google map for ${[data.city, data.region, data.country].filter(Boolean).join(', ') || coordinates}`}
+                  src={mapEmbedUrl}
+                  className="absolute inset-0 h-full w-full grayscale invert-[0.86] hue-rotate-[226deg] saturate-[2.2] brightness-[0.72] contrast-[1.15]"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allowFullScreen
+                />
+                <div className="pointer-events-none absolute inset-0 bg-[#3b0b6f]/24 mix-blend-screen" />
+                <div className="pointer-events-none absolute left-[54%] top-[54%] h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#b46cff]/45 bg-[#7c3aed]/20 shadow-[0_0_34px_rgba(172,92,255,0.9)]">
+                  <div className="absolute inset-4 rounded-full border border-[#cba5ff]/55 bg-[#7c3aed]/30" />
+                  <MapPin className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 text-[#e9d5ff]" />
+                </div>
+                <div className="pointer-events-none absolute right-8 top-[45%] max-w-[175px] rounded-md border border-[#684f82] bg-[#1f1235]/88 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.35)]">
+                  <div className="text-[11px] font-semibold text-[#f4eef7]">{geoText(data.city, data.region || data.country || 'Location')}</div>
+                  <div className="mt-1 text-[10px] text-[#c6b8d5]">{[data.region, data.country].filter(Boolean).join(', ')}</div>
+                  <div className="mt-1 text-[10px] text-[#c6b8d5]">{coordinates}</div>
+                </div>
+              </>
+            ) : (
+              <div className="absolute inset-0 grid place-items-center p-6 text-center">
+                <div>
+                  <MapPin className="mx-auto h-8 w-8 text-purple-300" />
+                  <p className="mt-3 text-sm text-gray-300">Coordinates unavailable for this lookup.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderGeoResolvedIp = (item, index, data) => {
+    const ip = item.ip || item.target || data.ip;
+    return (
+      <div key={`${ip}-${index}`} className="grid grid-cols-1 gap-5 rounded-lg border border-[#63516e]/80 bg-[#13091f]/78 p-5 xl:grid-cols-[minmax(220px,1.2fr)_minmax(280px,1.6fr)_repeat(4,minmax(70px,.55fr))]">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-lg font-semibold text-[#f4eef7]">
+            <span className="h-3 w-3 rounded-full bg-[#5add56]" />
+            <span>{geoText(ip)}</span>
+          </div>
+          <div className="mt-3 flex items-center gap-2 text-[11px] text-[#c6b8d5]">
+            <span>{[item.country || data.country, item.country_code || data.country_code].filter(Boolean).join(' ')}</span>
+            <span>{item.flag_emoji || data.flag_emoji}</span>
+          </div>
+          {(item.is_cdn || data.is_cdn) && <span className="mt-5 inline-flex rounded-full bg-[#2d7a3b] px-7 py-2 text-[11px] text-[#bfffc6]">Edge/CDN</span>}
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap gap-2">
+            {item.asn_type && <span className="rounded-full bg-[#7a5a1e]/80 px-4 py-1 text-[10px] text-[#f2c078]">{item.asn_type}</span>}
+            {(item.cdn_provider || data.cdn_provider) && <span className="rounded-full bg-[#27425e] px-4 py-1 text-[10px] text-[#9cc8ff]">{item.cdn_provider || data.cdn_provider}</span>}
+          </div>
+          <p className="mt-4 max-w-[420px] text-[11px] leading-5 text-[#d2c5dc]">{item.summary || data.summary}</p>
+        </div>
+        {[
+          ['ASN', item.asn || data.asn],
+          ['Org', item.org || data.org],
+          ['City', item.city || data.city],
+          ['Reverse DNS', item.reverse_dns || data.reverse_dns || 'No PTR record'],
+        ].map(([label, value]) => (
+          <div key={label} className="min-w-0">
+            <div className="text-[11px] text-[#8f839b]">{label}</div>
+            <div className="mt-2 text-[11px] text-[#ded4e9] break-words">{geoText(value)}</div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderGeoResults = (data) => {
+    const resolvedRows = Array.isArray(data.ip_results) && data.ip_results.length ? data.ip_results : [data];
+    const confidencePct = data.confidence === 'high' ? 86 : data.confidence === 'medium' ? 62 : 34;
+
+    return (
+      <div className="space-y-8 p-1 md:p-2">
+        <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-[24px] font-semibold leading-tight text-[#f4eef7]">{geoText(data.target)}</h2>
+                {data.map_url && (
+                  <a href={data.map_url} target="_blank" rel="noreferrer" aria-label="Open map">
+                    <ExternalLink className="h-4 w-4 text-[#b79aff]" />
+                  </a>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {geoPill(<><span className="h-2 w-2 rounded-full bg-[#56dc4f]" /> Lookup Completed</>, 'good')}
+                {geoPill(<><MapPin className="h-3 w-3" /> {geoText(data.ip)}</>, 'info')}
+                {geoPill(<><Timer className="h-3 w-3" /> 1.3s</>, 'info')}
+                {geoPill(<><Database className="h-3 w-3" /> {data.cached ? 'Cached (IPWHOIS)' : 'Fresh (IPWHOIS)'}</>, 'info')}
+              </div>
+            </div>
+          </div>
+
+          {(data.infrastructure_note || data.summary) && (
+            <div className="mt-5 flex gap-4 rounded-xl border border-[#6f4a9a] bg-[#44206d]/82 px-6 py-6 text-[#ded4e9]">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#b79aff]" />
+              <p className="text-sm leading-6">{data.infrastructure_note || data.summary}</p>
+            </div>
+          )}
+
+          <div className="mt-6 grid grid-cols-1 gap-1.5 md:grid-cols-2 xl:grid-cols-6">
+            {geoMetricTile(Globe2, 'IP Address', data.ip, data.ip?.includes(':') ? 'IPv6' : 'IPv4')}
+            {geoMetricTile(Network, 'ASN', data.asn, data.org)}
+            {geoMetricTile(Radio, 'ISP', data.isp)}
+            {geoMetricTile(Building2, 'Organization', data.org)}
+            {geoMetricTile(MapPin, 'IP Type', data.is_cdn ? 'Proxy/CDN' : geoText(data.asn_type), data.cdn_provider)}
+            {geoMetricTile(ShieldCheck, 'Confidence Score', geoText(data.confidence), null, (
+              <div className="mt-3 h-1.5 rounded-full bg-[#5a4a60]">
+                <div className="h-full rounded-full bg-[#5add56]" style={{ width: `${confidencePct}%` }} />
+              </div>
+            ))}
+          </div>
         </section>
-      )}
 
-      {renderSection('Location', [
-        renderField('ip', data.ip),
-        renderField('country', [data.flag_emoji, data.country, data.country_code && `(${data.country_code})`].filter(Boolean).join(' ')),
-        renderField('continent', [data.continent, data.continent_code && `(${data.continent_code})`].filter(Boolean).join(' ')),
-        renderField('region', data.region),
-        renderField('city', data.city),
-        renderField('postal', data.postal),
-        renderField('coordinates', data.lat !== null && data.lon !== null ? `${data.lat}, ${data.lon}` : null),
-        renderField('accuracy_radius', data.accuracy_radius),
-        renderField('map', data.map_url),
-        renderField('timezone', data.timezone),
-        renderField('local_time', data.local_time),
-        renderField('timezone_utc', data.timezone_utc),
-      ])}
-
-      {renderSection('Network', [
-        renderField('isp', data.isp),
-        renderField('organization', data.org),
-        renderField('asn', data.asn),
-        renderField('asn_route', data.asn_route),
-        renderField('asn_domain', data.asn_domain),
-        renderField('asn_type', data.asn_type),
-        renderField('rdap_name', data.rdap_name),
-        renderField('rdap_cidr', data.rdap_cidr),
-        renderField('rdap_registry', data.rdap_registry),
-        renderField('rdap_range', data.rdap_start_address && data.rdap_end_address ? `${data.rdap_start_address} - ${data.rdap_end_address}` : null),
-        renderField('currency', data.currency),
-        renderField('calling_code', data.calling_code),
-      ])}
-
-      {renderSection('Security', [
-        renderField('cdn', data.is_cdn),
-        renderField('cdn_provider', data.cdn_provider),
-        renderField('proxy', data.is_proxy),
-        renderField('vpn', data.is_vpn),
-        renderField('tor', data.is_tor),
-        renderField('hosting', data.is_hosting),
-        renderField('mobile', data.is_mobile),
-        renderField('threat_score', data.threat_score),
-        renderField('abuse_contact', data.abuse_contact),
-        renderField('rdap_abuse_email', data.rdap_abuse_email),
-        renderField('rdap_abuse_phone', data.rdap_abuse_phone),
-        renderField('confidence', data.confidence),
-        renderField('location_accuracy', data.location_accuracy),
-      ])}
-
-      {renderSection('DNS', [
-        renderField('target', data.target),
-        renderField('resolved_ips', data.resolved_ips),
-        renderField('reverse_dns', data.reverse_dns || 'No PTR record'),
-      ])}
-
-      {Array.isArray(data.ip_results) && data.ip_results.length > 1 && (
-        <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">All Resolved IPs</h3>
-          <div className="space-y-3">{data.ip_results.map(renderIpResult)}</div>
+        <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+          {renderLocationMap(data)}
+          <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-3">
+            {geoCard('Network Information', (
+              <div>
+                {geoInfoRow('ISP', data.isp)}
+                {geoInfoRow('Organization', data.org)}
+                {geoInfoRow('ASN', data.asn)}
+                {geoInfoRow('ASN Domain', data.asn_domain)}
+                {geoInfoRow('Calling Code', data.calling_code)}
+              </div>
+            ))}
+            {geoCard('Security Information', (
+              <div>
+                {geoInfoRow('CDN', geoBool(data.is_cdn))}
+                {geoInfoRow('CDN Provider', data.cdn_provider)}
+                {geoInfoRow('Proxy', geoBool(data.is_proxy))}
+                {geoInfoRow('Hosting', geoBool(data.is_hosting))}
+                {geoInfoRow('Confidence', data.confidence)}
+                {geoInfoRow('Location Accuracy', data.location_accuracy)}
+              </div>
+            ))}
+            {geoCard('DNS Information', (
+              <div>
+                {geoInfoRow('Target', data.target)}
+                {geoInfoRow('Resolved IPs', Array.isArray(data.resolved_ips) ? data.resolved_ips.join('\n') : data.resolved_ips)}
+                {geoInfoRow('Reverse DNS', data.reverse_dns || 'No PTR record')}
+              </div>
+            ))}
+          </div>
         </section>
-      )}
 
-      {renderSection('Provider', [
-        renderField('provider', data.provider),
-        renderField('cached', data.cached),
-      ])}
-    </div>
-  );
+        <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+          <div className="mb-6 text-[18px] font-medium uppercase text-[#b79aff]">All Resolved IPs</div>
+          <div className="space-y-4">{resolvedRows.map((item, index) => renderGeoResolvedIp(item, index, data))}</div>
+        </section>
+
+        <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+          <div className="mb-7 text-[18px] font-medium uppercase text-[#b79aff]">Provider Information</div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {geoMetricTile(Building2, 'Provider', geoText(data.provider).toUpperCase())}
+            {geoMetricTile(Database, 'Cached', geoBool(data.cached))}
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+          <div className="mb-2 text-[18px] font-medium uppercase text-[#b79aff]">Export & Share</div>
+          <p className="text-sm text-[#d2c5dc]">Download or share your scan report.</p>
+          <div className="mt-7 grid grid-cols-1 gap-4 md:grid-cols-4">
+            {['Export PDF', 'Export JSON', 'Export CSV'].map((label) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => label === 'Export JSON' && copyText('json', JSON.stringify(data, null, 2))}
+                className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"
+              >
+                <FileText className="h-4 w-4" />
+                {copied === 'json' && label === 'Export JSON' ? 'Copied JSON' : label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => copyText('summary', data.summary)}
+              className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"
+            >
+              <Share2 className="h-4 w-4" />
+              {copied === 'summary' ? 'Copied' : 'Share report'}
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  };
 
   const pct = (value) => Math.max(0, Math.min(100, Number(value || 0)));
 

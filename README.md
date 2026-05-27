@@ -71,13 +71,13 @@ docker-compose up -d postgres
 alembic upgrade head
 
 # Start the API server (hot-reload)
-uvicorn cybersec.api.main:app --reload --port 8000
+uvicorn cybersec.apps.api.main:app --reload --port 8000
 ```
 
 #### Frontend Development
 
 ```bash
-cd cybersec-frontend
+cd cybersec/web/ui
 npm install
 npm run dev          # → http://localhost:5173 (proxies /api to :8000)
 ```
@@ -85,9 +85,10 @@ npm run dev          # → http://localhost:5173 (proxies /api to :8000)
 To rebuild and serve the frontend from FastAPI:
 
 ```bash
-cd cybersec
-npm run build:frontend   # builds once into cybersec/web/static/
-uvicorn cybersec.api.main:app --reload --port 8000
+cd cybersec/web/ui
+npm run build            # builds once into cybersec/web/ui/dist/
+cd ../../..
+uvicorn cybersec.apps.api.main:app --reload --port 8000
 ```
 
 ---
@@ -333,10 +334,10 @@ Metrics are included in JSON exports and available via the API.
 
 ```bash
 # Production deployment
-docker-compose -f docker-compose.prod.yml up -d
+docker compose up -d --build
 
-# Scale API instances
-docker-compose -f docker-compose.prod.yml up -d --scale api=3
+# Rebuild after frontend/backend changes
+docker compose up -d --build backend
 ```
 
 ### Environment Variables
@@ -349,15 +350,16 @@ DATABASE_URL=postgresql://user:pass@localhost/cybersec
 GROQ_API_KEY=your_groq_api_key
 
 # Security
-SECRET_KEY=your_secret_key
-JWT_SECRET_KEY=your_jwt_secret
+APP_SECRET_KEY=your_secret_key
+JWT_ALGORITHM=HS256
 
-# Rate Limiting
-RATE_LIMIT_REQUESTS_PER_MINUTE=100
+# Redis / workers
+REDIS_URL=redis://localhost:6379/0
 
 # Scanning
-DEFAULT_SCAN_TIMEOUT=3.0
-MAX_CONCURRENT_SCANS=10
+SCAN_TIMEOUT=10.0
+OS_FINGERPRINT_TIMEOUT=5.0
+SERVICE_DETECTION_TIMEOUT=8.0
 ```
 
 ---
@@ -387,10 +389,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ---
 
 **Built with ❤️ by the CyberSec Team**
-cd cybersec-frontend
-npm run build
-cp -r dist/* ../cybersec-new/cybersec/web/static/
-```
 
 ---
 
@@ -483,8 +481,7 @@ cybersec-new/
 │   │   ├── ai/            # Groq client, prompts, context builder
 │   │   └── tools/         # dns, whois, ping, traceroute, ssl, http_headers, subdomain, geoip
 │   ├── database/          # SQLAlchemy models, session, base
-│   └── web/static/        # Built React frontend served by FastAPI
-├── cybersec-frontend/     # React + Vite + Tailwind source
+│   └── web/ui/            # React + Vite + Tailwind source and dist build
 ├── alembic/               # Database migrations
 ├── Dockerfile
 ├── docker-compose.yml

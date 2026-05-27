@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -25,7 +23,9 @@ services:
       - redis_data:/data
 
   backend:
-    build: .
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -40,14 +40,16 @@ services:
       redis:
         condition: service_started
     volumes:
-      - ./cybersec:/app/cybersec
+      - ../../cybersec:/app/cybersec
     command: >
       sh -c "poetry run alembic upgrade head &&
              poetry run uvicorn cybersec.apps.api.main:app
              --host 0.0.0.0 --port 8000 --workers 1"
 
   celery_worker:
-    build: .
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/cybersec
       APP_SECRET_KEY: change-this-in-production
@@ -60,7 +62,7 @@ services:
       redis:
         condition: service_started
     volumes:
-      - ./cybersec:/app/cybersec
+      - ../../cybersec:/app/cybersec
     command: poetry run celery -A cybersec.runtime.tasks worker --loglevel=info
 
 volumes:
