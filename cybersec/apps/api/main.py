@@ -191,7 +191,7 @@ def create_app() -> FastAPI:
     # Run `npm run build` inside cybersec/web/ui before starting, or let
     # the Dockerfile handle it via `RUN cd cybersec/web/ui && npm run build`.
     import os
-    from fastapi.responses import FileResponse
+    from fastapi.responses import FileResponse, PlainTextResponse
     from fastapi.staticfiles import StaticFiles
 
     from cybersec.core.tools.subdomain import SCREENSHOT_DIR
@@ -203,6 +203,25 @@ def create_app() -> FastAPI:
     
     current_dir = Path(__file__).resolve().parent
     react_dist = current_dir.parent.parent / "web" / "ui" / "dist"
+    react_public = current_dir.parent.parent / "web" / "ui" / "public"
+    favicon_candidates = [
+        react_dist / "favicon.ico",
+        react_public / "favicon.ico",
+        react_dist / "assets" / "logo.svg",
+        react_public / "assets" / "logo.svg",
+    ]
+
+    def _favicon_path() -> Path | None:
+        return next((path for path in favicon_candidates if path.is_file()), None)
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    @app.get("/favicon.svg", include_in_schema=False)
+    async def favicon():
+        icon = _favicon_path()
+        if icon:
+            media_type = "image/x-icon" if icon.suffix.lower() == ".ico" else "image/svg+xml"
+            return FileResponse(str(icon), media_type=media_type)
+        return PlainTextResponse("", status_code=204)
 
     if not react_dist.is_dir():
         import logging
@@ -216,11 +235,12 @@ def create_app() -> FastAPI:
             StaticFiles(directory=str(react_dist / "assets")),
             name="assets",
         )
+
         # Serve the React SPA index.html for every non-API route
         @app.get("/{full_path:path}", include_in_schema=False)
         async def serve_react(full_path: str):
             index = str(react_dist / "index.html")
-            return FileResponse(index)
+            return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
     return app
 

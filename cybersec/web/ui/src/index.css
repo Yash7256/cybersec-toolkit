@@ -1364,6 +1364,479 @@
     border: 1px solid rgba(204, 185, 255, 0.13);
   }
 
+  .whois-results {
+    display: grid;
+    gap: 30px;
+    padding: 22px 46px 44px;
+    color: #d8cfec;
+  }
+
+  .whois-hero-panel,
+  .whois-timeline-panel,
+  .whois-two-col-panel,
+  .whois-three-col-panel,
+  .whois-raw-panel {
+    border-radius: 8px;
+    border: 1px solid rgba(203, 178, 255, 0.16);
+    background: rgba(25, 12, 43, 0.72);
+  }
+
+  .whois-hero-panel {
+    padding: 42px 38px 30px;
+  }
+
+  .whois-domain-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .whois-domain-line h2 {
+    margin: 0;
+    color: #e9def7;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .whois-domain-line svg {
+    color: #b79af5;
+  }
+
+  .whois-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+
+  .whois-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 21px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(199, 183, 232, 0.2);
+    background: rgba(16, 8, 28, 0.78);
+    color: #bdb0cd;
+    font-size: 10px;
+    font-family: 'Fira Code', ui-monospace, monospace;
+  }
+
+  .whois-chip.success {
+    color: #73f59f;
+    border-color: rgba(115, 245, 159, 0.2);
+    background: rgba(30, 86, 49, 0.22);
+  }
+
+  .whois-summary {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 78px;
+    padding: 18px 22px;
+    border-radius: 8px;
+    border: 1px solid rgba(190, 142, 255, 0.34);
+    background: rgba(83, 35, 130, 0.72);
+  }
+
+  .whois-summary svg {
+    flex: 0 0 auto;
+    color: #b89cff;
+  }
+
+  .whois-summary p {
+    margin: 0;
+    color: #d6cee2;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .whois-timeline-panel {
+    padding: 34px 40px 42px;
+  }
+
+  .whois-timeline-panel h3,
+  .whois-raw-head h3 {
+    margin: 0;
+    color: #b995ff;
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .whois-timeline {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 26px;
+    margin: 30px 0 34px;
+    padding-bottom: 26px;
+  }
+
+  .whois-timeline-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 4px;
+    height: 3px;
+    background: #9b70e7;
+  }
+
+  .whois-timeline-fill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #66f58a, #59c8ff, #ffd162);
+  }
+
+  .whois-timeline-point {
+    position: relative;
+    min-width: 0;
+    padding-left: 4px;
+  }
+
+  .whois-timeline-point::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    bottom: -28px;
+    width: 11px;
+    height: 11px;
+    border-radius: 999px;
+    background: #8f6cf7;
+    box-shadow: 0 0 0 3px rgba(143, 108, 247, 0.16);
+  }
+
+  .whois-timeline-point:first-of-type::after {
+    background: #66f58a;
+  }
+
+  .whois-timeline-point span {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(188, 148, 255, 0.2);
+    background: rgba(15, 7, 26, 0.9);
+    color: #bb9cff;
+  }
+
+  .whois-timeline-point small {
+    display: block;
+    color: #9a89ac;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .whois-timeline-point strong {
+    display: block;
+    margin-top: 3px;
+    color: #74fb9d;
+    font-size: 13px;
+    font-weight: 800;
+    word-break: break-word;
+  }
+
+  .whois-status-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .whois-metric-card,
+  .whois-info-card,
+  .whois-compact-card,
+  .whois-health-card,
+  .whois-risk-card {
+    border-radius: 8px;
+    border: 1px solid rgba(221, 203, 255, 0.3);
+    background: rgba(16, 7, 27, 0.6);
+  }
+
+  .whois-metric-card {
+    min-height: 126px;
+    padding: 24px 24px 18px;
+  }
+
+  .whois-metric-card svg {
+    color: #efe8ff;
+    margin-bottom: 18px;
+  }
+
+  .whois-metric-card span,
+  .whois-metric-card small {
+    display: block;
+    color: #b3a5c2;
+    font-size: 11px;
+  }
+
+  .whois-metric-card strong {
+    display: block;
+    margin: 16px 0 12px;
+    color: #e7dff2;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .whois-two-col-panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+    padding: 46px;
+  }
+
+  .whois-three-col-panel {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    padding: 0 46px 32px;
+    border-top: 0;
+    background: transparent;
+  }
+
+  .whois-info-card {
+    min-height: 330px;
+    padding: 32px 32px 28px;
+  }
+
+  .whois-info-card h3,
+  .whois-compact-card h3,
+  .whois-health-card h3,
+  .whois-risk-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 28px;
+    color: #b996ff;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .whois-info-card h3 svg,
+  .whois-compact-card h3 svg,
+  .whois-health-card h3 svg,
+  .whois-risk-card h3 svg {
+    color: #aa8bf6;
+  }
+
+  .whois-data-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    min-height: 31px;
+    border-bottom: 1px solid rgba(207, 188, 232, 0.16);
+  }
+
+  .whois-data-line span {
+    color: #93849f;
+    font-size: 12px;
+  }
+
+  .whois-data-line strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: #d9d0e5;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: right;
+    word-break: break-word;
+  }
+
+  .whois-data-line strong.accent {
+    color: #bda2ff;
+  }
+
+  .whois-data-line strong.pill {
+    padding: 3px 7px;
+    border-radius: 999px;
+    color: #f2bf73;
+    background: rgba(242, 191, 115, 0.12);
+  }
+
+  .whois-data-line strong svg {
+    flex: 0 0 auto;
+    color: #72f89a;
+  }
+
+  .whois-health-card,
+  .whois-risk-card {
+    min-height: 420px;
+    padding: 32px 32px 28px;
+  }
+
+  .whois-score-ring {
+    width: 92px;
+    height: 92px;
+    display: grid;
+    place-items: center;
+    margin: 4px auto 22px;
+    border-radius: 999px;
+    background:
+      radial-gradient(circle at center, #12081f 58%, transparent 60%),
+      conic-gradient(#72f89a var(--score), rgba(120, 82, 168, 0.34) 0);
+  }
+
+  .whois-score-ring span {
+    color: #eee9f5;
+    font-size: 19px;
+    font-weight: 800;
+  }
+
+  .whois-score-ring small {
+    color: #b9aac8;
+    font-size: 9px;
+  }
+
+  .whois-health-card > strong,
+  .whois-risk-card > strong {
+    display: block;
+    margin-bottom: 6px;
+    color: #63f993;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .whois-health-card > p,
+  .whois-risk-card > p,
+  .whois-mini-copy {
+    margin: 0 0 22px;
+    color: #b6a8c5;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .whois-check-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    color: #ded5e8;
+    font-size: 12px;
+  }
+
+  .whois-check-line svg {
+    flex: 0 0 auto;
+    color: #72f89a;
+    stroke-width: 3;
+  }
+
+  .whois-risk-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .whois-risk-illustration {
+    display: block;
+    width: 76px;
+    height: 76px;
+    margin: 22px auto 18px;
+    color: #78ff9f;
+    stroke-width: 2.4;
+  }
+
+  .whois-risk-warning {
+    position: absolute;
+    top: 104px;
+    left: calc(50% - 48px);
+    width: 50px;
+    height: 50px;
+    color: #78ff9f;
+    stroke-width: 2.4;
+  }
+
+  .whois-compact-card {
+    min-height: 208px;
+    padding: 22px 22px 18px;
+  }
+
+  .whois-compact-card h3 {
+    margin-bottom: 18px;
+    font-size: 10px;
+  }
+
+  .whois-mini-copy {
+    margin-top: 12px;
+    margin-bottom: 0;
+    font-size: 10px;
+  }
+
+  .whois-raw-panel {
+    padding: 46px;
+  }
+
+  .whois-raw-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .whois-raw-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .whois-raw-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 22px;
+    padding: 0 10px;
+    border-radius: 5px;
+    color: #341e53;
+    background: #b897ff;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .whois-raw-actions button:last-child {
+    color: #cdbceb;
+    background: transparent;
+  }
+
+  .whois-raw-panel pre {
+    max-height: 420px;
+    margin: 0;
+    overflow: auto;
+    padding: 20px;
+    border-radius: 6px;
+    background: rgba(39, 15, 64, 0.78);
+    color: #d7d0e2;
+    font-family: 'Fira Code', ui-monospace, monospace;
+    font-size: 10px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .whois-terms {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 18px;
+    color: #aaa0b6;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .whois-terms svg {
+    flex: 0 0 auto;
+    color: #efe8ff;
+  }
+
   .empty-logo {
     width: 64px;
     height: 64px;
@@ -1402,6 +1875,21 @@
 
     .run-btn {
       flex: 1 1 190px;
+    }
+
+    .whois-results {
+      padding: 18px 22px 32px;
+      gap: 22px;
+    }
+
+    .whois-two-col-panel,
+    .whois-three-col-panel {
+      grid-template-columns: 1fr;
+      padding: 28px;
+    }
+
+    .whois-status-cards {
+      grid-template-columns: 1fr;
     }
   }
 

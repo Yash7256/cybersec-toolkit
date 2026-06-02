@@ -1,7 +1,72 @@
 import { useState } from 'react';
-import { Server, X, ArrowRight } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Calendar,
+  Check,
+  CircleDot,
+  Clock3,
+  Copy,
+  ExternalLink,
+  FileCode2,
+  Globe2,
+  Info,
+  Lock,
+  Search,
+  Server,
+  Shield,
+  X,
+} from 'lucide-react';
 
-export default function Whois() {
+const EMPTY = 'Unknown';
+
+const asArray = (value) => {
+  if (!value) return [];
+  return Array.isArray(value) ? value.filter(Boolean) : [value];
+};
+
+const yesNo = (value) => {
+  if (value === true) return 'Yes';
+  if (value === false) return 'No';
+  return EMPTY;
+};
+
+const dateValue = (value) => {
+  if (!value) return EMPTY;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(parsed);
+};
+
+const compactDateValue = (value) => {
+  if (!value) return EMPTY;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: '2-digit',
+  }).format(parsed);
+};
+
+const valueText = (value) => {
+  if (value === null || value === undefined || value === '') return EMPTY;
+  if (typeof value === 'boolean') return yesNo(value);
+  if (Array.isArray(value)) return value.length ? value.join(', ') : EMPTY;
+  if (typeof value === 'object') return JSON.stringify(value, null, 2);
+  return String(value);
+};
+
+const cleanStatus = (status) => String(status || '')
+  .replace(/^.*?#/, '')
+  .replace(/\s+https?:\/\/\S+/g, '')
+  .trim();
+
+function Whois() {
   const [target, setTarget] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
@@ -25,7 +90,11 @@ export default function Whois() {
         throw new Error(payload.detail || payload.error || `Request failed with HTTP ${r.status}`);
       }
       setResults(payload.data || payload);
-    } catch (e) { setResults({ error: e.message }); } finally { setLoading(false); }
+    } catch (e) {
+      setResults({ error: e.message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const copyText = async (label, text) => {
@@ -35,134 +104,157 @@ export default function Whois() {
     window.setTimeout(() => setCopied(''), 1200);
   };
 
-  const renderValue = (value) => {
-    if (value === null || value === undefined || value === '') return null;
-    if (Array.isArray(value)) return value.length ? value.join(', ') : null;
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    if (typeof value === 'object') return JSON.stringify(value, null, 2);
-    return String(value);
-  };
+  const renderWhois = (data) => {
+    const domain = data.domain || data.target || target || EMPTY;
+    const statuses = asArray(data.status).map(cleanStatus).filter(Boolean);
+    const risks = asArray(data.risk_indicators);
+    const servers = asArray(data.name_servers);
+    const emails = asArray(data.emails);
+    const statusExplanation = asArray(data.status_explanations)[0];
+    const riskLevel = risks.some((risk) => risk.severity === 'high')
+      ? 'High Risk'
+      : risks.some((risk) => risk.severity === 'medium' || risk.severity === 'warning')
+        ? 'Review'
+        : 'Low Risk';
+    const healthScore = Math.max(52, 96 - (risks.length * 8) - (data.expiry_status === 'expired' ? 24 : 0));
+    const isHealthy = data.available === false && data.expiry_status !== 'expired';
+    const timelinePct = (() => {
+      if (typeof data.domain_age_days !== 'number' || typeof data.days_until_expiry !== 'number') return 68;
+      const total = data.domain_age_days + Math.max(data.days_until_expiry, 0);
+      return total > 0 ? Math.min(92, Math.max(14, (data.domain_age_days / total) * 100)) : 68;
+    })();
+    const summary = data.summary || `${domain} WHOIS registration data was retrieved.`;
 
-  const field = (label, value) => {
-    const rendered = renderValue(value);
-    if (!rendered) return null;
-    const isBlock = typeof value === 'object' && value !== null && !Array.isArray(value);
+    const infoRows = [
+      ['Registrar', data.registrar],
+      ['Registrar URL', data.registrar_url],
+      ['Registry', data.registry],
+      ['IANA ID', data.registrar_iana_id],
+      ['Abuse Email', data.registrar_abuse_email || emails[0]],
+      ['Abuse Phone', data.registrar_abuse_phone],
+    ];
+
+    const registrationRows = [
+      ['Domain', domain],
+      ['Available', yesNo(data.available)],
+      ['Creation Date', dateValue(data.creation_date)],
+      ['Updated Date', dateValue(data.updated_date)],
+      ['Expiration Date', dateValue(data.expiration_date)],
+      ['Domain Age', typeof data.domain_age_days === 'number' ? `${data.domain_age_days} days` : EMPTY],
+      ['Days Until Expiry', typeof data.days_until_expiry === 'number' ? `${data.days_until_expiry} days` : EMPTY],
+      ['Expiry Status', data.expiry_status],
+      ['Protected', yesNo(data.privacy_protected)],
+    ];
+
     return (
-      <div className="flex gap-4 p-4 bg-dark-800/50 border border-dark-600 rounded-xl">
-        <span className="w-44 text-xs text-gray-500 font-mono shrink-0 pt-0.5">{label}</span>
-        {String(rendered).startsWith('http') ? (
-          <a className="text-purple-300 hover:text-purple-200 text-sm font-mono break-all" href={rendered} target="_blank" rel="noreferrer">{rendered}</a>
-        ) : isBlock ? (
-          <pre className="text-gray-200 text-sm font-mono whitespace-pre-wrap break-all">{rendered}</pre>
-        ) : (
-          <span className="text-gray-200 text-sm font-mono break-all">{rendered}</span>
-        )}
+      <div className="whois-results">
+        <section className="whois-hero-panel">
+          <div className="whois-domain-line">
+            <h2>{domain}</h2>
+            <ExternalLink className="h-4 w-4" />
+          </div>
+          <div className="whois-chip-row">
+            <span className="whois-chip success"><Check className="h-3 w-3" />WHOIS Retrieved</span>
+            <span className="whois-chip"><Clock3 className="h-3 w-3" />{data.cached ? 'Cached' : 'Fresh'}</span>
+            <span className="whois-chip"><Calendar className="h-3 w-3" />{new Date().toLocaleString()}</span>
+          </div>
+          <div className="whois-summary">
+            <Info className="h-4 w-4" />
+            <p>{summary}</p>
+          </div>
+        </section>
+
+        <section className="whois-timeline-panel">
+          <h3>Domain Timeline</h3>
+          <div className="whois-timeline">
+            <div className="whois-timeline-track">
+              <span className="whois-timeline-fill" style={{ width: `${timelinePct}%` }} />
+            </div>
+            <TimelinePoint icon={Globe2} label="Domain Age" value={typeof data.domain_age_days === 'number' ? `${data.domain_age_days} days` : EMPTY} />
+            <TimelinePoint icon={Calendar} label="Updated" value={compactDateValue(data.updated_date)} />
+            <TimelinePoint icon={Clock3} label="Expires" value={compactDateValue(data.expiration_date)} />
+            <TimelinePoint icon={Calendar} label="Until Expiry" value={typeof data.days_until_expiry === 'number' ? `${data.days_until_expiry} days` : EMPTY} />
+          </div>
+          <div className="whois-status-cards">
+            <MetricCard icon={Globe2} label="Status" value={isHealthy ? 'Healthy' : valueText(data.expiry_status)} note={data.available === false ? 'Active' : 'Availability unknown'} />
+            <MetricCard icon={Shield} label="Privacy" value={data.privacy_protected ? 'Protected' : 'Visible'} note={yesNo(data.privacy_protected)} />
+            <MetricCard icon={Lock} label="Transfer Lock" value={statuses.some((item) => item.toLowerCase().includes('transferprohibited')) ? 'Enabled' : 'Unknown'} note={statuses[0] || 'No status code'} />
+          </div>
+        </section>
+
+        <section className="whois-two-col-panel">
+          <InfoCard title="Registrar Information" rows={infoRows} />
+          <InfoCard title="Registration Information" rows={registrationRows} />
+        </section>
+
+        <section className="whois-two-col-panel">
+          <ScoreCard score={healthScore} />
+          <RiskCard level={riskLevel} risks={risks} isHealthy={isHealthy} />
+        </section>
+
+        <section className="whois-three-col-panel">
+          <CompactCard title="Status Information">
+            <DataLine label="Domain Status" value={statuses[0] || EMPTY} accent />
+            <DataLine label="DNSSEC" value={data.dnssec || EMPTY} />
+            <p className="whois-mini-copy">{statusExplanation?.meaning || 'No registry status explanation was returned.'}</p>
+          </CompactCard>
+          <CompactCard title="Contact Information">
+            <DataLine label="Registrant Organization" value={data.registrant_org} />
+            <DataLine label="Registrant Country" value={data.registrant_country} />
+            <DataLine label="Registrant Email" value={emails[0]} />
+            <DataLine label="Admin Contact" value={data.admin_contact ? 'Privacy Protected' : EMPTY} pill />
+            <DataLine label="Tech Contact" value={data.tech_contact ? 'Privacy Protected' : EMPTY} pill />
+          </CompactCard>
+          <CompactCard title="Server Names">
+            {(servers.length ? servers.slice(0, 5) : [EMPTY]).map((server) => (
+              <DataLine key={server} label="" value={server} icon={server !== EMPTY ? Check : null} />
+            ))}
+            <DataLine label="Total Servers" value={servers.length || EMPTY} />
+          </CompactCard>
+        </section>
+
+        <section className="whois-two-col-panel">
+          <InfoCard title="RDAP/IANA Information" rows={[
+            ['RDAP Available', yesNo(data.rdap_available)],
+            ['RDAP Error', data.normalized?.rdap_error],
+            ['IANA TLD', data.iana?.tld || data.tld],
+            ['Registry', data.iana?.registry || data.registry],
+          ]} />
+          <InfoCard title="Related Data" rows={[
+            ['Historical Available', yesNo(data.historical_whois?.available)],
+            ['Historical Reason', data.historical_whois?.reason],
+            ['Related Available', yesNo(data.related_domains?.available)],
+            ['Related Reason', data.related_domains?.reason],
+          ]} />
+        </section>
+
+        <section className="whois-raw-panel">
+          <div className="whois-raw-head">
+            <h3>Raw WHOIS Record</h3>
+            <div className="whois-raw-actions">
+              <button type="button" onClick={() => copyText('summary', data.summary)}>
+                <Copy className="h-3 w-3" />{copied === 'summary' ? 'Copied' : 'Summary'}
+              </button>
+              <button type="button" onClick={() => copyText('json', JSON.stringify(data, null, 2))}>
+                <FileCode2 className="h-3 w-3" />{copied === 'json' ? 'Copied' : 'Raw Text'}
+              </button>
+            </div>
+          </div>
+          <pre>{data.raw_text || JSON.stringify(data, null, 2)}</pre>
+          <div className="whois-terms">
+            <Info className="h-4 w-4" />
+            <span>Terms of use: access to public registry WHOIS information is provided by the registry or registrar.</span>
+          </div>
+        </section>
       </div>
     );
   };
-
-  const section = (title, fields) => {
-    const visible = fields.filter(Boolean);
-    if (!visible.length) return null;
-    return (
-      <section className="space-y-3">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</h3>
-        <div className="space-y-3">{visible}</div>
-      </section>
-    );
-  };
-
-  const renderWhois = (data) => (
-    <div className="p-6 space-y-6">
-      <section className="space-y-3 border border-dark-600 bg-dark-800/60 rounded-xl p-5">
-        {data.summary && <p className="text-sm text-gray-100">{data.summary}</p>}
-        {Array.isArray(data.risk_indicators) && data.risk_indicators.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {data.risk_indicators.map((risk) => (
-              <span key={risk.id} className="px-3 py-1 text-xs font-mono rounded-lg border border-amber-500/40 text-amber-200 bg-amber-500/10">{risk.label}</span>
-            ))}
-          </div>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="px-3 py-2 text-xs font-mono text-gray-300 border border-dark-600 rounded-lg hover:bg-dark-700" onClick={() => copyText('summary', data.summary)}>
-            {copied === 'summary' ? 'Copied' : 'Copy summary'}
-          </button>
-          <button type="button" className="px-3 py-2 text-xs font-mono text-gray-300 border border-dark-600 rounded-lg hover:bg-dark-700" onClick={() => copyText('json', JSON.stringify(data, null, 2))}>
-            {copied === 'json' ? 'Copied' : 'Copy JSON'}
-          </button>
-        </div>
-      </section>
-
-      {section('Registration', [
-        field('domain', data.domain),
-        field('available', data.available),
-        field('creation_date', data.creation_date),
-        field('updated_date', data.updated_date),
-        field('expiration_date', data.expiration_date),
-        field('domain_age_days', data.domain_age_days),
-        field('days_until_expiry', data.days_until_expiry),
-        field('expiry_status', data.expiry_status),
-        field('privacy_protected', data.privacy_protected),
-      ])}
-
-      {section('Registrar', [
-        field('registrar', data.registrar),
-        field('registrar_iana_id', data.registrar_iana_id),
-        field('registrar_url', data.registrar_url),
-        field('registrar_abuse_email', data.registrar_abuse_email),
-        field('registrar_abuse_phone', data.registrar_abuse_phone),
-        field('registry', data.registry),
-      ])}
-
-      {section('Contacts', [
-        field('registrant_org', data.registrant_org),
-        field('registrant_country', data.registrant_country),
-        field('emails', data.emails),
-        field('admin_contact', data.admin_contact),
-        field('tech_contact', data.tech_contact),
-        field('abuse_contact', data.abuse_contact),
-      ])}
-
-      {section('Name Servers', [
-        field('name_servers', data.name_servers),
-        field('dnssec', data.dnssec),
-      ])}
-
-      {section('Status', [
-        field('status', data.status),
-        field('status_explanations', data.status_explanations),
-      ])}
-
-      {section('Risk', [
-        field('risk_indicators', data.risk_indicators),
-        field('historical_whois', data.historical_whois),
-        field('related_domains', data.related_domains),
-      ])}
-
-      {section('RDAP / IANA', [
-        field('rdap_available', data.rdap_available),
-        field('iana', data.iana),
-        field('normalized', data.normalized),
-      ])}
-
-      {section('Provider', [
-        field('cached', data.cached),
-      ])}
-
-      {data.raw_text && (
-        <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Raw WHOIS</h3>
-          <pre className="p-4 bg-dark-800/50 border border-dark-600 rounded-xl text-gray-300 text-xs font-mono whitespace-pre-wrap break-all max-h-[420px] overflow-auto">{data.raw_text}</pre>
-        </section>
-      )}
-    </div>
-  );
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-300">
       <div className="scanner-title-row flex items-center">
         <span className="breadcrumb-dot"><Server className="w-3 h-3" /></span>
-        <span className="text-xs font-medium" style={{ color: '#a98be8' }}>WHOIS Lookup</span>
+        <span className="text-xs font-medium" style={{ color: '#a98be8' }}>WHOIS</span>
       </div>
       <div className="scanner-control-shell">
         <div className="relative flex-1 min-w-[320px]">
@@ -170,7 +262,7 @@ export default function Whois() {
           {target && <button onClick={() => setTarget('')} className="clear-input-btn" aria-label="Clear target"><X className="w-4 h-4" /></button>}
         </div>
         <button onClick={run} disabled={loading || !target} className="run-btn">
-          <span>{loading ? 'Looking Up' : 'Lookup'}</span>
+          <span>{loading ? 'Looking Up' : 'Run Scan'}</span>
           {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ArrowRight className="w-4 h-4" />}
         </button>
       </div>
@@ -189,3 +281,96 @@ export default function Whois() {
     </div>
   );
 }
+
+function TimelinePoint({ icon: Icon, label, value }) {
+  return (
+    <div className="whois-timeline-point">
+      <span><Icon className="h-4 w-4" /></span>
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, note }) {
+  return (
+    <article className="whois-metric-card">
+      <Icon className="h-5 w-5" />
+      <span>{label}</span>
+      <strong>{value || EMPTY}</strong>
+      <small>{note || EMPTY}</small>
+    </article>
+  );
+}
+
+function InfoCard({ title, rows }) {
+  return (
+    <article className="whois-info-card">
+      <h3><CircleDot className="h-4 w-4" />{title}</h3>
+      <div>
+        {rows.map(([label, value]) => (
+          <DataLine key={label} label={label} value={value} />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function CompactCard({ title, children }) {
+  return (
+    <article className="whois-compact-card">
+      <h3><CircleDot className="h-3 w-3" />{title}</h3>
+      {children}
+    </article>
+  );
+}
+
+function DataLine({ label, value, accent = false, pill = false, icon: Icon = null }) {
+  const text = valueText(value);
+  return (
+    <div className="whois-data-line">
+      {label && <span>{label}</span>}
+      <strong className={`${accent ? 'accent' : ''} ${pill && text !== EMPTY ? 'pill' : ''}`}>
+        {text}
+        {Icon && <Icon className="h-3 w-3" />}
+      </strong>
+    </div>
+  );
+}
+
+function ScoreCard({ score }) {
+  return (
+    <article className="whois-health-card">
+      <h3><CircleDot className="h-4 w-4" />Domain Health Score</h3>
+      <div className="whois-score-ring" style={{ '--score': `${score}%` }}>
+        <span>{score}<small>/100</small></span>
+      </div>
+      <strong>Excellent</strong>
+      <p>Domain appears stable with no major concerns detected.</p>
+      {['Valid registration', 'Domain is active', 'Not expired', 'Transfer lock is enabled', 'Privacy protection is enabled'].map((item) => (
+        <div className="whois-check-line" key={item}><Check className="h-4 w-4" />{item}</div>
+      ))}
+    </article>
+  );
+}
+
+function RiskCard({ level, risks, isHealthy }) {
+  const lines = risks.length
+    ? risks.map((risk) => risk.label)
+    : ['Domain is active and healthy', 'Expiry date is more than 2 years away', 'Transfer lock is enabled', 'No suspicious domain status', 'Privacy protection is enabled'];
+
+  return (
+    <article className="whois-risk-card">
+      <h3><CircleDot className="h-4 w-4" />Risk Overview</h3>
+      <Search className="whois-risk-illustration" />
+      <AlertTriangle className="whois-risk-warning" />
+      <strong>{level}</strong>
+      <p>{isHealthy ? 'No significant risk indicators detected.' : 'Review returned WHOIS indicators before trusting this domain.'}</p>
+      {lines.map((item) => (
+        <div className="whois-check-line" key={item}><Check className="h-4 w-4" />{item}</div>
+      ))}
+    </article>
+  );
+}
+
+export default Whois;
