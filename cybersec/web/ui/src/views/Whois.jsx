@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -71,28 +71,105 @@ function Whois() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [copied, setCopied] = useState('');
+  const streamAbortRef = useRef(null);
+
+  useEffect(() => () => {
+    streamAbortRef.current?.abort();
+  }, []);
+
+  const applyWhoisStreamEvent = (event) => {
+    if (!event || typeof event !== 'object') return;
+    if (event.type === 'init') {
+      setResults({
+        ...event.data,
+        scanning: true,
+      });
+      return;
+    }
+    if (event.type === 'stage') {
+      setResults((previous) => ({
+        ...(previous || { target, domain: target }),
+        scan_stage: event.stage,
+        scan_message: event.message,
+        scanning: true,
+      }));
+      return;
+    }
+    if (event.type === 'done') {
+      setResults({
+        ...event.data,
+        scanning: false,
+      });
+      return;
+    }
+    if (event.type === 'error') {
+      setResults({ error: event.error || 'WHOIS stream failed' });
+    }
+  };
 
   const run = async () => {
     if (!target) return;
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
     setLoading(true);
+    setResults({
+      target,
+      domain: target,
+      scanning: true,
+      scan_stage: 'init',
+      scan_message: 'Starting WHOIS lookup',
+      name_servers: [],
+      status: [],
+      emails: [],
+      risk_indicators: [],
+      status_explanations: [],
+      historical_whois: { available: false, reason: 'Pending lookup' },
+      related_domains: { available: false, reason: 'Pending lookup' },
+      normalized: {},
+      cached: false,
+    });
     try {
-      const r = await fetch('/api/tools/whois', {
+      const r = await fetch('/api/tools/whois/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target }),
+        signal: controller.signal,
       });
-      const contentType = r.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        throw new Error(`Expected JSON from /api/tools/whois, but received ${contentType || 'an HTML response'}. Check that the API server is running.`);
-      }
-      const payload = await r.json();
       if (!r.ok) {
-        throw new Error(payload.detail || payload.error || `Request failed with HTTP ${r.status}`);
+        throw new Error(`WHOIS stream failed with HTTP ${r.status}`);
       }
-      setResults(payload.data || payload);
+      if (!r.body) {
+        throw new Error('WHOIS stream is unavailable in this browser.');
+      }
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let done = false;
+      while (!done) {
+        const chunk = await reader.read();
+        done = chunk.done;
+        buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !done });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+        parts.forEach((part) => {
+          const dataLine = part.split('\n').find((line) => line.startsWith('data:'));
+          if (!dataLine) return;
+          try {
+            applyWhoisStreamEvent(JSON.parse(dataLine.slice(5).trim()));
+          } catch (error) {
+            console.warn('Invalid WHOIS stream event', error);
+          }
+        });
+      }
+      if (buffer.trim()) {
+        const dataLine = buffer.split('\n').find((line) => line.startsWith('data:'));
+        if (dataLine) applyWhoisStreamEvent(JSON.parse(dataLine.slice(5).trim()));
+      }
     } catch (e) {
-      setResults({ error: e.message });
+      if (e.name !== 'AbortError') setResults({ error: e.message });
     } finally {
+      if (streamAbortRef.current === controller) streamAbortRef.current = null;
       setLoading(false);
     }
   };
@@ -105,6 +182,7 @@ function Whois() {
   };
 
   const renderWhois = (data) => {
+    const isScanning = Boolean(data.scanning);
     const domain = data.domain || data.target || target || EMPTY;
     const statuses = asArray(data.status).map(cleanStatus).filter(Boolean);
     const risks = asArray(data.risk_indicators);
@@ -123,7 +201,7 @@ function Whois() {
       const total = data.domain_age_days + Math.max(data.days_until_expiry, 0);
       return total > 0 ? Math.min(92, Math.max(14, (data.domain_age_days / total) * 100)) : 68;
     })();
-    const summary = data.summary || `${domain} WHOIS registration data was retrieved.`;
+    const summary = isScanning ? data.scan_message || 'WHOIS lookup is running...' : data.summary || `${domain} WHOIS registration data was retrieved.`;
 
     const infoRows = [
       ['Registrar', data.registrar],
@@ -154,7 +232,10 @@ function Whois() {
             <ExternalLink className="h-4 w-4" />
           </div>
           <div className="whois-chip-row">
-            <span className="whois-chip success"><Check className="h-3 w-3" />WHOIS Retrieved</span>
+            <span className={`whois-chip ${isScanning ? '' : 'success'}`}>
+              {isScanning ? <Clock3 className="h-3 w-3 animate-pulse" /> : <Check className="h-3 w-3" />}
+              {isScanning ? 'WHOIS Running' : 'WHOIS Retrieved'}
+            </span>
             <span className="whois-chip"><Clock3 className="h-3 w-3" />{data.cached ? 'Cached' : 'Fresh'}</span>
             <span className="whois-chip"><Calendar className="h-3 w-3" />{new Date().toLocaleString()}</span>
           </div>

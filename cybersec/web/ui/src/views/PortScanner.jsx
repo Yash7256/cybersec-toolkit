@@ -1,7 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { ScanLine, X, ArrowRight, FileText } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import {
+  Activity,
+  ArrowRight,
+  Bug,
+  CheckCircle2,
+  CircleDot,
+  Database,
+  FileText,
+  Globe2,
+  Radio,
+  ScanLine,
+  Server,
+  Share2,
+  ShieldCheck,
+  Tags,
+  X,
+} from 'lucide-react';
 import {
   parsePortScanResponse,
+  mapOpenPort,
   collectDetectedTechnologies,
   hasBannerData,
   bannerPreview,
@@ -28,9 +45,6 @@ function RiskBadge({ label = 'medium', color = 'medium', title }) {
     </span>
   );
 }
-
-const PORT_RESULT_COLUMNS =
-  '72px 88px minmax(90px, 1fr) 96px minmax(150px, 200px) minmax(120px, 160px) 100px 88px';
 
 function BannerSection({ label, text }) {
   if (!text) return null;
@@ -134,89 +148,11 @@ function TechChip({ name }) {
   return <span className="tech-chip">{name}</span>;
 }
 
-function DetectedTechnologiesPanel({ technologies }) {
-  if (!technologies?.length) return null;
-  return (
-    <div className="detected-tech-panel">
-      <div className="detected-tech-panel-title">Detected Technologies</div>
-      <div className="detected-tech-chips">
-        {technologies.map((name) => (
-          <TechChip key={name} name={name} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function RecommendedActionsPanel({ rows, error }) {
-  const recommendations = (rows || []).filter((row) => row.recommendation);
-  if (!recommendations.length && !error) return null;
-
-  return (
-    <div className="recommended-actions-panel">
-      <div className="recommended-actions-title">Recommended Actions</div>
-      {recommendations.length > 0 ? (
-        <div className="recommended-actions-list">
-          {recommendations.map((row) => {
-            const priority = row.recommendation_priority || row.risk_level || 'medium';
-            return (
-              <div key={`rec-${row.port}`} className="recommended-action-item">
-                <div className="recommended-action-head">
-                  <span className="recommended-action-port">
-                    Port {row.port} ({row.service || 'Unknown'})
-                  </span>
-                  <RiskBadge label={priority} color={priority} />
-                </div>
-                {row.recommendation_reason && (
-                  <p className="recommended-action-reason">{row.recommendation_reason}</p>
-                )}
-                <p className="recommended-action-text">{row.recommendation}</p>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="recommended-action-error">{error}</p>
-      )}
-    </div>
-  );
-}
-
 function scoreColor(score) {
   if (score >= 85) return '#4ade80';
   if (score >= 70) return '#facc15';
   if (score >= 50) return '#fb923c';
   return '#f87171';
-}
-
-function SecurityScorePanel({ stats }) {
-  if (!stats) return null;
-  const score = Math.max(0, Math.min(100, Math.round(stats.securityScore ?? 100)));
-  const factors = stats.securityScoreFactors || [];
-
-  return (
-    <div className="security-score-panel">
-      <div className="security-score-main">
-        <span className="security-score-label">Security Score</span>
-        <span className="security-score-value" style={{ color: scoreColor(score) }}>
-          {score}/100
-        </span>
-      </div>
-      <div className="security-score-based">Based on:</div>
-      {factors.length > 0 ? (
-        <div className="security-score-factors">
-          {factors.map((factor, index) => (
-            <div key={`${factor.category}-${index}`} className="security-score-factor">
-              <RiskBadge label={factor.severity || 'medium'} color={factor.severity || 'medium'} />
-              <span>{factor.label}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="security-score-empty">This scan did not produce risky-port, exposed-service, weak TLS, or vulnerable-version scoring factors.</p>
-      )}
-    </div>
-  );
 }
 
 function surfaceColor(level) {
@@ -269,137 +205,95 @@ function combineThreatIntelligence(current, incoming) {
   return incomingRank > currentRank ? incoming : current;
 }
 
-function ThreatIntelligencePanel({ stats }) {
-  const intel = stats?.threatIntelligence;
-  if (!intel) return null;
-
-  return (
-    <div className="threat-intel-panel">
-      <div className="threat-intel-head">
-        <span className="threat-intel-title">Threat Intelligence</span>
-        <span className="threat-intel-reputation" style={{ color: reputationColor(intel.reputation) }}>
-          IP Reputation: {intel.reputation}
-        </span>
-      </div>
-      <div className="threat-intel-summary">
-        {intel.summary || 'IP reputation data was not available for this target.'}
-      </div>
-      <div className="threat-intel-grid">
-        <span>IP: <strong>{intel.ip || 'Unknown'}</strong></span>
-        <span>Reported: <strong>{intel.reportedTimes || 0} time(s)</strong></span>
-        <span>Abuse Score: <strong>{intel.abuseConfidenceScore ?? 'Unknown'}</strong></span>
-        <span>Known Botnet: <strong>{intel.knownBotnet ? 'Yes' : 'No'}</strong></span>
-      </div>
-      <div className="threat-intel-sources">
-        <span>Sources:</span>
-        {(intel.sources?.length ? intel.sources : ['No source returned a hit']).map((source) => (
-          <span key={source}>{source}</span>
-        ))}
-      </div>
-      {intel.spamhaus?.listed && (
-        <div className="threat-intel-warning">
-          Spamhaus listing detected: {intel.spamhaus.zones?.map((zone) => zone.name || zone.zone).join(', ')}
-        </div>
-      )}
-      {intel.error && <div className="threat-intel-note">{intel.error}</div>}
-    </div>
-  );
-}
-
-function AttackSurfacePanel({ stats }) {
-  const surface = stats?.attackSurface;
-  if (!surface) return null;
-
-  return (
-    <div className="attack-surface-panel">
-      <div className="attack-surface-head">
-        <span className="attack-surface-title">Attack Surface Analysis</span>
-        <span className="attack-surface-level" style={{ color: surfaceColor(surface.level) }}>
-          {surface.level}
-        </span>
-      </div>
-      <div className="attack-surface-section-label">Publicly Exposed Services</div>
-      {surface.publiclyExposedServices?.length > 0 ? (
-        <div className="attack-surface-services">
-          {surface.publiclyExposedServices.map((entry) => (
-            <span key={`${entry.port}-${entry.service}`} className="attack-surface-service">
-              {entry.service}
-              <span>{entry.port}</span>
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="attack-surface-muted">No open services were exposed in this scan.</p>
-      )}
-      {surface.summary && <p className="attack-surface-summary">{surface.summary}</p>}
-      {surface.factors?.length > 0 && (
-        <div className="attack-surface-factors">
-          {surface.factors.slice(0, 5).map((factor, index) => (
-            <div key={`${factor.category}-${index}`} className="attack-surface-factor">
-              <RiskBadge label={factor.severity || 'medium'} color={factor.severity || 'medium'} />
-              <span>{factor.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ExposureSeverityPanel({ rows, stats }) {
+function ExposureSeverityFocusPanel({ rows, stats, riskCounts }) {
   const exposures = (rows || [])
     .filter((row) => row.exposure_severity?.finding)
-    .sort((a, b) => (b.exposure_severity.score || 0) - (a.exposure_severity.score || 0));
-  if (!exposures.length) return null;
-
+    .sort((a, b) => Number(b.exposure_severity.score || 0) - Number(a.exposure_severity.score || 0));
+  const primary = exposures[0];
   const summary = stats?.exposureSummary || {};
-  const highest = summary.highestSeverity || exposures[0]?.exposure_severity?.severity || 'low';
+  const critical = summary.critical ?? riskCounts.critical ?? 0;
+  const high = summary.high ?? riskCounts.high ?? 0;
+  const medium = summary.medium ?? riskCounts.medium ?? 0;
+  const low = summary.low ?? riskCounts.low ?? 0;
+  const score = summary.highestScore || primary?.exposure_severity?.score || null;
+  const severity = summary.highestSeverity || primary?.exposure_severity?.severity || null;
+  const publicExposure = summary.publicExposure ?? Boolean((rows || []).length);
+  const finding = summary.highestFinding
+    || primary?.exposure_severity?.finding
+    || null;
 
   return (
-    <div className="exposure-panel">
-      <div className="exposure-head">
-        <span className="exposure-title">Exposure Severity Engine</span>
-        <span className="exposure-score" style={{ color: scoreColor(100 - (summary.highestScore || 0)) }}>
-          {String(highest).toUpperCase()} · {summary.highestScore || exposures[0].exposure_severity.score}/100
-        </span>
+    <div className="min-h-[300px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <div className="mb-3 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]">
+            <CircleDot className="h-4 w-4" />
+            <span>Exposure Severity Engine</span>
+          </div>
+          <div className="text-[18px] font-semibold text-[#ff4f5f]">{score == null ? '—' : `${score}/100`}</div>
+        </div>
+        <RiskBadge label={severity || 'pending'} color={severity || 'medium'} />
       </div>
-      <p className="exposure-lead">
-        {summary.highestFinding || exposures[0].exposure_severity.finding}
-      </p>
-      <div className="exposure-summary">
-        <span>Public Exposure: <strong>{summary.publicExposure ? 'Yes' : 'No'}</strong></span>
-        {['critical', 'high', 'medium', 'low'].map((level) => (
-          <span key={level}>{level}: <strong>{summary[level] || 0}</strong></span>
+      <p className="min-h-[42px] text-[12px] leading-relaxed text-[#b7abc5]">{finding || '—'}</p>
+      <div className="mt-5 flex items-center justify-between border-t border-[#554365]/70 pt-4 text-[12px] text-[#d8cce6]">
+        <span>Public exposure</span>
+        <span className={publicExposure ? 'text-[#69f08a]' : 'text-[#92859d]'}>{publicExposure ? 'Yes' : 'No'}</span>
+      </div>
+      <div className="mt-20 grid grid-cols-4 gap-4 text-center">
+        {[
+          ['critical', critical, '#ff4f7b'],
+          ['high', high, '#fb923c'],
+          ['medium', medium, '#facc15'],
+          ['low', low, '#69f08a'],
+        ].map(([label, value, color]) => (
+          <div key={label}>
+            <div className="mb-2 text-[11px]" style={{ color }}>{label}</div>
+            <div className="text-2xl font-light text-[#f4eef7]">{value}</div>
+          </div>
         ))}
       </div>
-      <div className="exposure-list">
-        {exposures.slice(0, 6).map((row) => {
-          const exposure = row.exposure_severity;
-          const severity = ['critical', 'high', 'medium', 'low'].includes(exposure.severity)
-            ? exposure.severity
-            : 'medium';
+    </div>
+  );
+}
+
+function RecommendedActionsFocusPanel({ rows }) {
+  const recommendations = (rows || [])
+    .filter((row) => row.recommendation)
+    .slice(0, 2);
+
+  return (
+    <div className="min-h-[300px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+      <div className="mb-6 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]">
+        <CircleDot className="h-4 w-4" />
+        <span>Recommended Actions</span>
+      </div>
+      <div className="space-y-4">
+        {recommendations.length === 0 && (
+          <div className="rounded-lg border border-[#554365]/70 bg-[#1b0d2b]/80 p-5 text-[12px] text-[#b7abc5]">
+            —
+          </div>
+        )}
+        {recommendations.map((row) => {
+          const priority = row.recommendation_priority || row.risk_level || 'medium';
           return (
-            <div key={`exposure-${row.port}`} className="exposure-item">
-              <div className="exposure-item-head">
-                <span className="exposure-port">Port {row.port} ({row.service || 'Unknown'})</span>
-                <span className="exposure-item-score">
-                  {exposure.score}/100
-                  <RiskBadge label={severity} color={severity} />
-                </span>
+            <div key={`focus-rec-${row.port}`} className="grid grid-cols-[44px_minmax(0,1fr)] gap-4 rounded-lg border border-[#743248]/80 bg-[#351222]/72 p-5">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-[#4a1730] text-[#ff4f5f]">
+                <Bug className="h-5 w-5" />
               </div>
-              <p className="exposure-finding">{exposure.finding}</p>
-              {exposure.factors?.length > 0 && (
-                <div className="exposure-factors">
-                  {exposure.factors.slice(0, 5).map((factor) => (
-                    <span key={`${row.port}-${factor}`}>{factor}</span>
-                  ))}
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="text-[13px] font-semibold text-[#ff4f5f]">
+                    Port {row.port} ({row.service || 'Unknown'})
+                  </div>
+                  <RiskBadge label={priority} color={priority} />
                 </div>
-              )}
-              {exposure.recommendation && (
-                <p className="exposure-recommendation">
-                  <span>Action:</span> {exposure.recommendation}
+                <p className="text-[11px] leading-relaxed text-[#d8cce6]">
+                  {row.recommendation_reason || '—'}
                 </p>
-              )}
+                <p className="mt-2 text-[11px] leading-relaxed text-[#b7abc5]">
+                  {row.recommendation}
+                </p>
+              </div>
             </div>
           );
         })}
@@ -408,210 +302,198 @@ function ExposureSeverityPanel({ rows, stats }) {
   );
 }
 
-function AttackPathPanel({ stats }) {
-  const graph = stats?.attackPaths;
-  if (!graph?.nodes?.length || !graph?.paths?.length) return null;
-
-  const nodeMap = new Map(graph.nodes.map((node) => [node.id, node]));
-  const primaryPath = graph.paths[0];
-  const steps = primaryPath.steps
-    .map((id) => nodeMap.get(id))
-    .filter(Boolean);
-  if (!steps.length) return null;
+function VisibilityFocusPanel({ rows, stats, riskCounts }) {
+  const visibleRows = rows || [];
+  const primary = visibleRows.find((row) => row.risk_level === 'critical' || row.risk_level === 'high') || visibleRows[0];
+  const serviceName = primary?.service || '—';
+  const versionName = primary?.version || primary?.fingerprint?.detected || '—';
+  const intel = stats?.threatIntelligence || {};
+  const misconfig = stats?.misconfigurationSummary || {};
+  const intelReturned = Boolean(intel.ip || intel.summary || intel.sources?.length || intel.reputation);
+  const criticalCves = visibleRows.reduce((sum, row) => sum + Number(row.cve_critical_count || 0), 0);
+  const highCves = visibleRows.reduce((sum, row) => sum + Number(row.cve_high_count || 0), 0);
+  const exploitRows = visibleRows.filter((row) => row.exploit_availability?.publicExploitAvailable != null);
+  const publicExploits = exploitRows.length
+    ? (visibleRows.some((row) => row.exploit_availability?.publicExploitAvailable) ? 'Yes' : 'No')
+    : '—';
+  const surfaceLevel = stats?.attackSurface?.level || (riskCounts.critical ? 'CRITICAL' : riskCounts.high ? 'HIGH' : visibleRows.length ? 'MEDIUM' : 'LOW');
+  const missingHeaders = visibleRows.find((row) => row.misconfigurations?.length)?.misconfigurations?.[0];
+  const cveRow = visibleRows.find((row) => row.max_cvss_score != null || row.max_cvss_cve);
+  const targetIp = intel.ip || stats?.threatIntelligence?.ip || '—';
 
   return (
-    <div className="attack-path-panel">
-      <div className="attack-path-head">
-        <span className="attack-path-title">Attack Path Visualization</span>
-        <RiskBadge
-          label={graph.highestSeverity || primaryPath.severity || 'medium'}
-          color={graph.highestSeverity || primaryPath.severity || 'medium'}
-        />
+    <>
+      <div className="min-h-[260px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7 xl:col-span-2">
+        <div className="mb-8 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]">
+          <CircleDot className="h-4 w-4" />
+          <span>Attack Surface Visualisation</span>
+        </div>
+        <div className="grid grid-cols-[1fr_32px_1fr_32px_1fr] items-center gap-4 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <Globe2 className="h-12 w-12 text-[#e9d5ff]" />
+            <div className="text-sm font-semibold text-[#f4eef7]">{targetIp}</div>
+            <div className="text-[10px] text-[#92859d]">Resolved IP</div>
+          </div>
+          <ArrowRight className="h-5 w-5 text-[#b79aff]" />
+          <div className="flex flex-col items-center gap-3">
+            <Server className="h-12 w-12 text-[#e9d5ff]" />
+            <div className="text-sm font-semibold text-[#f4eef7]">{serviceName}</div>
+            <div className="text-[10px] text-[#92859d]">{versionName}</div>
+          </div>
+          <ArrowRight className="h-5 w-5 text-[#b79aff]" />
+          <div className="flex flex-col items-center gap-3">
+            <ShieldCheck className="h-12 w-12 text-[#e9d5ff]" />
+            <div className="text-sm font-semibold text-[#f4eef7]">{primary ? `Port ${primary.port}` : '—'}</div>
+            <div className="text-[10px] text-[#92859d]">{surfaceLevel}</div>
+          </div>
+        </div>
+        <div className="mt-8 rounded-lg border border-[#4f3b63] bg-[#2a1a3d] p-4">
+          <div className="mb-2 flex items-center gap-3">
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-[#a78bfa] text-[#24183b]">i</span>
+            <RiskBadge label={surfaceLevel.toLowerCase()} color={surfaceLevel.toLowerCase()} />
+          </div>
+          <p className="text-[11px] leading-relaxed text-[#92859d]">
+            {primary?.risk_reason || stats?.attackSurface?.summary || '—'}
+          </p>
+        </div>
       </div>
-      <p className="attack-path-summary">
-        {graph.summary || primaryPath.summary}
-      </p>
-      <div className="attack-path-flow" aria-label={primaryPath.title}>
-        {steps.map((node, index) => {
-          const next = steps[index + 1];
-          const edge = next
-            ? graph.edges.find((item) => item.source === node.id && item.target === next.id)
-            : null;
-          return (
-            <React.Fragment key={node.id}>
-              <div className={`attack-path-node attack-path-node-${node.type}`}>
-                <span className="attack-path-node-type">{node.type}</span>
-                <span className="attack-path-node-label">{node.label}</span>
-                {node.port && <span className="attack-path-node-port">TCP/{node.port}</span>}
-                {node.detail && <span className="attack-path-node-detail">{node.detail}</span>}
-              </div>
-              {edge && (
-                <div className="attack-path-edge" aria-hidden="true">
-                  <span />
-                  <strong>↓</strong>
-                  <em>{edge.label}</em>
-                </div>
-              )}
-            </React.Fragment>
-          );
-        })}
+
+      <div className="min-h-[260px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+        <div className="mb-6 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]">
+          <CircleDot className="h-4 w-4" />
+          <span>Vulnerability Signals</span>
+        </div>
+        {[
+          ['Critical CVEs', criticalCves],
+          ['High CVEs', highCves],
+          ['Public Exploits', publicExploits],
+        ].map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between border-b border-[#554365]/70 py-3 text-[12px] text-[#d8cce6] last:border-b-0">
+            <span>{label}</span>
+            <span className={value === 'Yes' || Number(value) > 0 ? 'text-[#ff4f5f]' : 'text-[#92859d]'}>{value}</span>
+          </div>
+        ))}
+        <div className="mt-7 rounded-lg border border-[#4f3b63] bg-[#2a1a3d] p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[12px] font-semibold text-[#f4eef7]">{cveRow?.max_cvss_cve || '—'}</span>
+            <RiskBadge label={cveRow?.max_cvss_severity || 'pending'} color={(cveRow?.max_cvss_severity || 'medium').toLowerCase()} />
+          </div>
+          <p className="text-[11px] text-[#92859d]">
+            {cveRow?.max_cvss_score ? `CVSS ${cveRow.max_cvss_score}` : '—'}
+          </p>
+        </div>
       </div>
-      {graph.paths.length > 1 && (
-        <div className="attack-path-alt">
-          {graph.paths.slice(1, 4).map((path) => (
-            <span key={path.id}>{path.summary}</span>
+
+      <div className="min-h-[260px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]">
+            <CircleDot className="h-4 w-4" />
+            <span>Threat Intelligence</span>
+          </div>
+          <RiskBadge label={intelReturned ? `IP reputation: ${intel.reputation || '—'}` : 'pending'} color={(intel.reputation || '').toLowerCase() === 'clean' ? 'low' : 'medium'} />
+        </div>
+        <p className="mb-5 text-[11px] leading-relaxed text-[#92859d]">
+          {intel.summary || '—'}
+        </p>
+        {[
+          ['IP', intel.ip || '—'],
+          ['Reported', `${intel.reportedTimes || 0} time(s)`],
+          ['Abuse Score', intel.abuseConfidenceScore ?? '—'],
+          ['Known Botnet', intelReturned ? (intel.knownBotnet ? 'Yes' : 'No') : '—'],
+        ].map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between border-b border-[#554365]/70 py-2.5 text-[12px] text-[#d8cce6] last:border-b-0">
+            <span>{label}</span>
+            <span>{value}</span>
+          </div>
+        ))}
+        <div className="mt-4 text-right text-[10px] text-[#b79aff]">
+          Sources {intel.sources?.length ? intel.sources.join(', ') : '—'}
+        </div>
+      </div>
+
+      <div className="min-h-[260px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]">
+            <CircleDot className="h-4 w-4" />
+            <span>Attack Surface Analysis</span>
+          </div>
+          <RiskBadge label={surfaceLevel.toLowerCase()} color={surfaceLevel.toLowerCase()} />
+        </div>
+        <div className="space-y-4 text-[12px] leading-relaxed text-[#b7abc5]">
+          <p>{primary ? `${primary.service || '—'} on port ${primary.port}: ${primary.risk_level || '—'} risk.` : '—'}</p>
+          <p>{stats?.attackSurface?.summary || `${visibleRows.length} open service${visibleRows.length === 1 ? '' : 's'} detected.`}</p>
+          <p>{primary?.risk_reason || '—'}</p>
+        </div>
+      </div>
+
+      <div className="min-h-[260px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]">
+            <CircleDot className="h-4 w-4" />
+            <span>Misconfiguration Detection</span>
+          </div>
+          <span className="text-[12px] text-[#d8cce6]">{misconfig.total || 0} finding{(misconfig.total || 0) === 1 ? '' : 's'}</span>
+        </div>
+        <div className="mb-6 grid grid-cols-4 gap-3 text-center">
+          {[
+            ['critical', misconfig.critical || 0, '#ff4f7b'],
+            ['high', misconfig.high || 0, '#fb923c'],
+            ['medium', misconfig.medium || 0, '#facc15'],
+            ['low', misconfig.low || 0, '#69f08a'],
+          ].map(([label, value, color]) => (
+            <div key={label}>
+              <div className="mb-1 text-[10px]" style={{ color }}>{label}</div>
+              <div className="text-2xl font-light text-[#f4eef7]">{value}</div>
+            </div>
           ))}
         </div>
-      )}
-    </div>
+        <div className="rounded-lg border border-[#4f3b63] bg-[#2a1a3d] p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[12px] font-semibold text-[#f4eef7]">
+              {missingHeaders ? `Port ${primary?.port || ''} (${primary?.service || '—'})` : '—'}
+            </span>
+            <RiskBadge label={missingHeaders?.severity || 'pending'} color={missingHeaders?.severity || 'medium'} />
+          </div>
+          <p className="text-[11px] leading-relaxed text-[#92859d]">
+            {missingHeaders?.recommendation || '—'}
+          </p>
+        </div>
+      </div>
+    </>
   );
 }
 
-function AttackSimulationPanel({ stats }) {
-  const simulations = stats?.attackSimulations || [];
-  if (!simulations.length) return null;
-
+function AdversaryFocusPanel({ rows, stats }) {
+  const surface = stats?.attackSurface || {};
+  const services = surface.publiclyExposedServices || [];
+  const primary = rows?.find((row) => row.risk_level === 'critical' || row.risk_level === 'high') || rows?.[0];
   return (
-    <div className="attack-sim-panel">
-      <div className="attack-sim-title">Attack Simulation Recommendations</div>
-      <div className="attack-sim-list">
-        {simulations.slice(0, 5).map((simulation) => (
-          <div key={simulation.id || simulation.chain} className="attack-sim-item">
-            <div className="attack-sim-head">
-              <span>{simulation.title}</span>
-              <RiskBadge label={simulation.severity || 'medium'} color={simulation.severity || 'medium'} />
-            </div>
-            <div className="attack-sim-label">Possible Attack Chain</div>
-            <div className="attack-sim-chain">
-              {(simulation.steps?.length ? simulation.steps : simulation.chain.split('→')).map((step, index, arr) => (
-                <React.Fragment key={`${simulation.id}-${step}-${index}`}>
-                  <span>{String(step).trim()}</span>
-                  {index < arr.length - 1 && <strong>→</strong>}
-                </React.Fragment>
-              ))}
-            </div>
-            <div className="attack-sim-meta">
-              <span>Likelihood: <strong>{simulation.likelihood || 'Medium'}</strong></span>
-              <span>Basis: <strong>{simulation.confidence || 'Inferred'}</strong></span>
-              {simulation.evidence?.slice(0, 3).map((item) => (
-                <span key={`${simulation.id}-${item}`}>{item}</span>
-              ))}
-            </div>
-            {simulation.recommendation && (
-              <p className="attack-sim-recommendation">
-                <span>Recommendation:</span> {simulation.recommendation}
-              </p>
-            )}
+    <div className="min-h-[300px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+      <div className="mb-6 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]">
+        <CircleDot className="h-4 w-4" />
+        <span>Adversary & Exploit Modeling</span>
+      </div>
+      <div className="flex items-center justify-between border-b border-[#554365]/70 pb-4 text-[12px] text-[#d8cce6]">
+        <span>Attack surface</span>
+        <span style={{ color: surface.level ? surfaceColor(surface.level) : '#92859d' }}>{surface.level || '—'}</span>
+      </div>
+      <p className="mt-5 min-h-[42px] text-[12px] leading-relaxed text-[#b7abc5]">
+        {surface.summary || '—'}
+      </p>
+      <div className="mt-6 space-y-3">
+        {(services.length ? services.slice(0, 3) : primary ? [{ port: primary.port, service: primary.service, riskLevel: primary.risk_level }] : []).map((entry) => (
+          <div key={`adversary-${entry.port}-${entry.service}`} className="rounded-lg border border-[#4f3b63] bg-[#24183b]/70 p-4 text-[12px] text-[#d8cce6]">
+            Port {entry.port} {entry.service || 'Unknown'} is reachable.
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function MisconfigurationPanel({ rows, stats }) {
-  const items = (rows || []).flatMap((row) =>
-    (row.misconfigurations || []).map((finding, index) => ({
-      ...finding,
-      port: row.port,
-      service: row.service,
-      key: `${row.port}-${finding.category || finding.title}-${index}`,
-    })),
-  );
-  if (!items.length) return null;
-
-  const summary = stats?.misconfigurationSummary || {};
-
-  return (
-    <div className="misconfig-panel">
-      <div className="misconfig-head">
-        <span className="misconfig-title">Misconfiguration Detection</span>
-        <span className="misconfig-count">
-          {summary.total || items.length} finding{(summary.total || items.length) === 1 ? '' : 's'}
-        </span>
-      </div>
-      <div className="misconfig-summary">
-        {['critical', 'high', 'medium', 'low'].map((level) => (
-          <span key={level}>
-            {level}: <strong>{summary[level] || 0}</strong>
-          </span>
-        ))}
-      </div>
-      <div className="misconfig-list">
-        {items.map((finding) => {
-          const severity = ['critical', 'high', 'medium', 'low'].includes(finding.severity)
-            ? finding.severity
-            : 'medium';
-          return (
-            <div key={finding.key} className="misconfig-item">
-              <div className="misconfig-item-head">
-                <span className="misconfig-port">
-                  Port {finding.port} ({finding.service || 'Unknown'})
-                </span>
-                <RiskBadge label={severity} color={severity} />
-              </div>
-              <div className="misconfig-finding-title">{finding.title}</div>
-              {finding.evidence && <p className="misconfig-evidence">{finding.evidence}</p>}
-              {finding.recommendation && (
-                <p className="misconfig-recommendation">
-                  <span>Recommendation:</span> {finding.recommendation}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function MitreAttackPanel({ rows }) {
-  const mappedRows = (rows || []).filter((row) => row.mitre_attack?.length);
-  if (!mappedRows.length) return null;
-
-  return (
-    <div className="mitre-panel">
-      <div className="mitre-panel-title">MITRE ATT&amp;CK Mapping</div>
-      <div className="mitre-list">
-        {mappedRows.map((row) => (
-          <div key={`mitre-${row.port}`} className="mitre-item">
-            <div className="mitre-item-head">
-              <span className="mitre-port">Port {row.port}</span>
-              <span className="mitre-service">{row.service || 'Unknown'}</span>
-            </div>
-            <div className="mitre-techniques">
-              {row.mitre_attack.slice(0, 4).map((technique) => (
-                <a
-                  key={`${row.port}-${technique.technique_id}`}
-                  href={technique.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mitre-technique"
-                  title={technique.attack_vector}
-                >
-                  <span className="mitre-technique-name">
-                    {technique.technique_name} ({technique.technique_id})
-                  </span>
-                  <span className="mitre-technique-tactic">{technique.tactic}</span>
-                </a>
-              ))}
-            </div>
-            {row.potential_threat && (
-              <p className="mitre-threat">
-                <span>Potential Threat:</span> {row.potential_threat}
-              </p>
-            )}
+        {!services.length && !primary && (
+          <div className="rounded-lg border border-[#554365]/70 bg-[#1b0d2b]/80 p-5 text-[12px] text-[#b7abc5]">
+            —
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
-}
-
-function exploitStatusColor(value) {
-  if (value === true) return '#f87171';
-  if (value === false) return '#4ade80';
-  return '#facc15';
 }
 
 function cvssSeverity(score, fallback = 'UNKNOWN') {
@@ -629,51 +511,6 @@ function cvssLabel(score, severity) {
   const normalized = cvssSeverity(score, severity).toLowerCase();
   const label = normalized.charAt(0).toUpperCase() + normalized.slice(1);
   return `CVSS: ${Number(score).toFixed(1)} ${label}`;
-}
-
-function ExploitAvailabilityPanel({ rows }) {
-  const items = (rows || [])
-    .filter((row) => row.exploit_availability)
-    .filter((row) => row.exploit_availability.publicExploitAvailable !== false || row.exploit_availability.evidence?.length);
-  if (!items.length) return null;
-
-  return (
-    <div className="exploit-panel">
-      <div className="exploit-panel-title">Exploit Availability Check</div>
-      <div className="exploit-list">
-        {items.map((row) => {
-          const exploit = row.exploit_availability;
-          const available = exploit.publicExploitAvailable;
-          return (
-            <div key={`exploit-${row.port}`} className="exploit-item">
-              <div className="exploit-head">
-                <span className="exploit-version">
-                  {exploit.serviceVersion || `${row.service} on port ${row.port}`}
-                </span>
-                <span className="exploit-status" style={{ color: exploitStatusColor(available) }}>
-                  {available === true ? 'Curated Public Exploit Signal' : 'Exploit Status Unknown'}
-                </span>
-              </div>
-              <div className="exploit-meta">
-                <span>ExploitDB: <strong>{exploit.exploitdb}</strong></span>
-                <span>Metasploit Module: <strong>{exploit.metasploit}</strong></span>
-                {exploit.metasploitModule && (
-                  <span>Module: <strong>{exploit.metasploitModule}</strong></span>
-                )}
-              </div>
-              {exploit.evidence?.length > 0 && (
-                <div className="exploit-evidence">
-                  {exploit.evidence.slice(0, 3).map((item) => (
-                    <span key={`${row.port}-${item}`}>{item}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 function CVEModal({ row, onClose }) {
@@ -872,12 +709,6 @@ function formatScanDuration(seconds) {
   return `${n.toFixed(1)}s`;
 }
 
-function formatLatency(ms) {
-  const n = Number(ms);
-  if (!Number.isFinite(n)) return '—';
-  return `${Math.round(n)}ms`;
-}
-
 export default function PortScanner() {
   const [target, setTarget] = useState('');
   const [portRange, setPortRange] = useState('common');
@@ -890,6 +721,215 @@ export default function PortScanner() {
   const [cveRow, setCveRow] = useState(null);
   const [detectedTechnologies, setDetectedTechnologies] = useState([]);
   const [scanStats, setScanStats] = useState(null);
+  const [activeFocusTab, setActiveFocusTab] = useState('risk');
+  const streamAbortRef = useRef(null);
+  const scanStartRef = useRef(0);
+
+  useEffect(() => () => {
+    streamAbortRef.current?.abort();
+  }, []);
+
+  const buildLiveScanStats = (rows, progressData = {}) => {
+    const liveRows = Array.isArray(rows) ? rows : [];
+    const riskCounts = ['critical', 'high', 'medium', 'low'].reduce((acc, level) => {
+      acc[level] = liveRows.filter((row) => row.risk_level === level).length;
+      return acc;
+    }, {});
+    const highestSeverity = riskCounts.critical ? 'critical' : riskCounts.high ? 'high' : riskCounts.medium ? 'medium' : 'low';
+    const exposedServices = liveRows.map((row) => ({
+      port: Number(row.port),
+      service: row.service || 'Unknown',
+      riskLevel: row.risk_level || 'medium',
+    }));
+    const startedAt = scanStartRef.current || performance.now();
+    const checked = Number(progressData.checked ?? 0);
+    const total = Number(progressData.total ?? checked);
+
+    return {
+      live: true,
+      scanDurationSeconds: (performance.now() - startedAt) / 1000,
+      packetsSent: checked,
+      avgLatencyMs: progressData.latency_ms == null ? null : Number(progressData.latency_ms),
+      securityScore: null,
+      securityScoreFactors: [],
+      attackSurface: {
+        level: riskCounts.critical ? 'CRITICAL' : riskCounts.high ? 'HIGH' : liveRows.length ? 'MEDIUM' : 'LOW',
+        score: Math.min(100, liveRows.length * 12 + riskCounts.high * 10 + riskCounts.critical * 18),
+        publiclyExposedServices: exposedServices,
+        factors: exposedServices.slice(0, 6).map((entry) => ({
+          category: 'public_service',
+          label: `Port ${entry.port} ${entry.service} is publicly reachable.`,
+          weight: 8,
+          severity: entry.riskLevel,
+        })),
+        summary: liveRows.length
+          ? `${liveRows.length} open service${liveRows.length === 1 ? '' : 's'} detected while scanning ${checked}/${total || '?'} ports.`
+          : `Scanning ${checked}/${total || '?'} ports for exposed services.`,
+      },
+      threatIntelligence: { sources: [] },
+      misconfigurationSummary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, categories: [] },
+      exposureSummary: {
+        publicExposure: liveRows.length > 0,
+        highestSeverity,
+        highestScore: null,
+        highestFinding: '',
+        highestPort: liveRows[0]?.port ?? null,
+        critical: riskCounts.critical,
+        high: riskCounts.high,
+        medium: riskCounts.medium,
+        low: riskCounts.low,
+      },
+      attackPaths: { nodes: [], edges: [], paths: [], summary: '', highestSeverity },
+      attackSimulations: [],
+      recommendationsError: '',
+    };
+  };
+
+  const getInitialPortTotal = () => {
+    if (portRange === 'all') return 65535;
+    if (portRange !== 'custom') return 0;
+    const trimmed = customPortRange.trim();
+    if (!trimmed) return 0;
+    if (trimmed.includes('-')) {
+      const [start, end] = trimmed.split('-').map((part) => parseInt(part.trim(), 10));
+      return Number.isFinite(start) && Number.isFinite(end) && end >= start ? end - start + 1 : 0;
+    }
+    return trimmed.split(',').map((part) => parseInt(part.trim(), 10)).filter((port) => Number.isFinite(port)).length;
+  };
+
+  const mergeRowsByPort = (currentRows, incomingRows) => {
+    const byPort = new Map((currentRows || []).map((row) => [Number(row.port), row]));
+    (incomingRows || []).forEach((row) => {
+      byPort.set(Number(row.port), row);
+    });
+    return Array.from(byPort.values()).sort((a, b) => Number(a.port) - Number(b.port));
+  };
+
+  const runPortScanStream = async (body, options = {}) => {
+    const {
+      finishOnDone = true,
+      mergeFinal = false,
+      progressOffset = 0,
+      progressSpan = 99,
+      abortPrevious = true,
+      resetTimer = true,
+    } = options;
+    if (abortPrevious) {
+      streamAbortRef.current?.abort();
+    }
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+    if (resetTimer) {
+      scanStartRef.current = performance.now();
+    }
+    let completed = false;
+    let finalPayload = null;
+
+    const response = await fetch('/api/tools/port_scan/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.detail || `Scan failed (${response.status})`);
+    }
+    if (!response.body) {
+      throw new Error('Port scan stream is unavailable in this browser.');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    const handleEvent = (event) => {
+      if (!event || typeof event !== 'object') return;
+      if (event.type === 'init') {
+        setResults((previous) => {
+          const current = mergeFinal && Array.isArray(previous) ? previous : [];
+          setScanStats(buildLiveScanStats(current, { checked: 0, total: event.data?.total_scanned || 0 }));
+          return current;
+        });
+      }
+      if (event.type === 'progress' || event.type === 'port') {
+        const checked = Number(event.progress?.checked || 0);
+        const total = Number(event.progress?.total || 0);
+        if (total > 0) {
+          setProgress(Math.min(99, Math.round(progressOffset + ((checked / total) * progressSpan))));
+        }
+        setResults((previous) => {
+          const current = Array.isArray(previous) ? previous : [];
+          setScanStats(buildLiveScanStats(current, event.progress));
+          return current;
+        });
+      }
+      if (event.type === 'port' && event.port) {
+        const row = mapOpenPort(event.port);
+        setResults((previous) => {
+          const current = Array.isArray(previous) ? previous : [];
+          const next = current.some((item) => Number(item.port) === Number(row.port))
+            ? current.map((item) => (Number(item.port) === Number(row.port) ? row : item))
+            : [...current, row].sort((a, b) => Number(a.port) - Number(b.port));
+          setDetectedTechnologies(collectDetectedTechnologies(next));
+          setScanStats(buildLiveScanStats(next, event.progress));
+          return next;
+        });
+      }
+      if (event.type === 'done') {
+        const { ports, detectedTechnologies: scanTechs, stats } = parsePortScanResponse({ data: event.data });
+        finalPayload = { ports, detectedTechnologies: scanTechs, stats };
+        if (finishOnDone) setProgress(100);
+        if (mergeFinal) {
+          setResults((previous) => {
+            const next = mergeRowsByPort(Array.isArray(previous) ? previous : [], ports);
+            setDetectedTechnologies(collectDetectedTechnologies(next, scanTechs));
+            setScanStats(buildLiveScanStats(next, { checked: body.ports?.length || body.end_port || 0, total: body.ports?.length || body.end_port || 0 }));
+            return next;
+          });
+        } else {
+          setResults(ports);
+          setDetectedTechnologies(scanTechs);
+          setScanStats(stats);
+        }
+        completed = true;
+        if (finishOnDone) {
+          window.setTimeout(() => {
+            setIsScanning(false);
+            setProgress(0);
+          }, 400);
+        }
+      }
+      if (event.type === 'error') {
+        throw new Error(event.error || 'Port scan stream failed');
+      }
+    };
+
+    let done = false;
+    while (!done) {
+      const chunk = await reader.read();
+      done = chunk.done;
+      buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !done });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+      parts.forEach((part) => {
+        const dataLine = part.split('\n').find((line) => line.startsWith('data:'));
+        if (!dataLine) return;
+        handleEvent(JSON.parse(dataLine.slice(5).trim()));
+      });
+    }
+    if (buffer.trim()) {
+      const dataLine = buffer.split('\n').find((line) => line.startsWith('data:'));
+      if (dataLine) handleEvent(JSON.parse(dataLine.slice(5).trim()));
+    }
+    if (!completed) {
+      setIsScanning(false);
+      setProgress(0);
+    }
+    if (streamAbortRef.current === controller) streamAbortRef.current = null;
+    return finalPayload;
+  };
 
   const handleScan = async () => {
     if (!target.trim() || isScanning) return;
@@ -904,15 +944,11 @@ export default function PortScanner() {
     setErrorMsg(null);
     setBannerRow(null);
     setCveRow(null);
-    setScanStats(null);
     setProgress(0);
+    scanStartRef.current = performance.now();
+    setScanStats(buildLiveScanStats([], { checked: 0, total: getInitialPortTotal() }));
 
     let progressInterval = null;
-    if (portRange !== 'all') {
-      progressInterval = setInterval(() => {
-        setProgress(p => Math.min(p + Math.random() * 8, 90));
-      }, 400);
-    }
 
     try {
       const targetClean = target.trim();
@@ -941,37 +977,35 @@ export default function PortScanner() {
             max_concurrent: 1000
           };
 
-          const createResp = await fetch('/api/tools/port_scan', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+          const batchStart = currentStart;
+          const batchSize = currentEnd - currentStart + 1;
+          const streamed = await runPortScanStream(body, {
+            finishOnDone: false,
+            mergeFinal: true,
+            progressOffset: ((batchStart - 1) / MAX_PORT) * 100,
+            progressSpan: (batchSize / MAX_PORT) * 100,
+            abortPrevious: false,
+            resetTimer: false,
           });
-
-          if (!createResp.ok) {
-            const errData = await createResp.json().catch(() => ({}));
-            throw new Error(errData.detail || `Scan failed (${createResp.status})`);
-          }
-
-          const responseData = await createResp.json();
-          if (responseData.data && responseData.data.error) {
-            throw new Error(responseData.data.error);
-          }
-
-          const { ports, stats } = parsePortScanResponse(responseData);
+          const ports = streamed?.ports || [];
+          const stats = streamed?.stats || buildLiveScanStats(ports, {
+            checked: currentEnd,
+            total: MAX_PORT,
+          });
           packetsSent += stats.packetsSent;
           if (Number.isFinite(stats.avgLatencyMs) && stats.packetsSent > 0) {
             weightedLatencyTotal += stats.avgLatencyMs * stats.packetsSent;
             weightedLatencyPackets += stats.packetsSent;
           }
-          securityScore = Math.min(securityScore, stats.securityScore);
+          if (Number.isFinite(stats.securityScore)) {
+            securityScore = Math.min(securityScore, stats.securityScore);
+          }
           securityScoreFactors.push(...(stats.securityScoreFactors || []));
           attackSurface = combineAttackSurface(attackSurface, stats.attackSurface);
           threatIntelligence = combineThreatIntelligence(threatIntelligence, stats.threatIntelligence);
-          if (ports.length > 0) {
-            allOpenPorts.push(...ports);
-            setResults([...allOpenPorts]);
-            setDetectedTechnologies(collectDetectedTechnologies(allOpenPorts));
-          }
+          allOpenPorts = mergeRowsByPort(allOpenPorts, ports);
+          setResults([...allOpenPorts]);
+          setDetectedTechnologies(collectDetectedTechnologies(allOpenPorts));
 
           setProgress(Math.floor((currentEnd / MAX_PORT) * 100));
           currentStart += BATCH_SIZE;
@@ -1006,35 +1040,7 @@ export default function PortScanner() {
           }
         }
 
-        const createResp = await fetch('/api/tools/port_scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-
-        if (!createResp.ok) {
-          const errData = await createResp.json().catch(() => ({}));
-          throw new Error(errData.detail || `Scan failed (${createResp.status})`);
-        }
-
-        const responseData = await createResp.json();
-        
-        if (responseData.data && responseData.data.error) {
-          throw new Error(responseData.data.error);
-        }
-
-        if (progressInterval) clearInterval(progressInterval);
-        setProgress(100);
-
-        const { ports, detectedTechnologies: scanTechs, stats } = parsePortScanResponse(responseData);
-
-        setTimeout(() => {
-          setResults(ports);
-          setDetectedTechnologies(scanTechs);
-          setScanStats(stats);
-          setIsScanning(false);
-          setProgress(0);
-        }, 400);
+        await runPortScanStream(body);
       }
     } catch (err) {
       console.error(err);
@@ -1044,6 +1050,294 @@ export default function PortScanner() {
       setErrorMsg(err.message || 'An error occurred during scan.');
       // Keep results if any were accumulated
     }
+  };
+
+  const downloadText = (filename, content, type = 'text/plain') => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const renderMetricTile = (Icon, label, value, tone = '#f4eef7') => (
+    <div className="min-h-[78px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-4">
+      <div className="flex items-center gap-2 text-[10px] font-bold text-[#efe9f5]">
+        <Icon className="h-3.5 w-3.5" />
+        <span>{label}</span>
+      </div>
+      <div className="mt-4 text-[13px] font-semibold break-words" style={{ color: tone }}>{value}</div>
+    </div>
+  );
+
+  const renderSectionTitle = (title) => (
+    <div className="mb-7 flex items-center gap-3 text-[13px] font-medium uppercase text-[#b79aff]">
+      <CircleDot className="h-5 w-5" />
+      <span>{title}</span>
+    </div>
+  );
+
+  const renderFocusContent = (rows, riskCounts) => {
+    if (activeFocusTab === 'visibility') {
+      return (
+        <VisibilityFocusPanel rows={rows} stats={scanStats} riskCounts={riskCounts} />
+      );
+    }
+    if (activeFocusTab === 'adversary') {
+      const mitreRows = rows.filter((row) => row.mitre_attack?.length);
+      const exploitRows = rows.filter((row) => row.exploit_availability?.publicExploitAvailable != null);
+      return (
+        <>
+          <AdversaryFocusPanel rows={rows} stats={scanStats} />
+          <div className="min-h-[300px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+            {renderSectionTitle('MITRE Signals')}
+            <div className="space-y-3">
+              {mitreRows.length === 0 && <p className="text-[12px] leading-relaxed text-[#b7abc5]">—</p>}
+              {mitreRows.slice(0, 3).map((row) => (
+                <div key={`mitre-focus-${row.port}`} className="rounded-lg border border-[#4f3b63] bg-[#24183b]/70 p-4 text-[12px] text-[#d8cce6]">
+                  <div className="mb-2 font-semibold text-[#f4eef7]">Port {row.port} ({row.service || '—'})</div>
+                  {row.mitre_attack.slice(0, 2).map((technique) => (
+                    <div key={`${row.port}-${technique.technique_id}`} className="flex items-center justify-between gap-3 border-t border-[#382748] py-2 first:border-t-0">
+                      <span>{technique.technique_id}</span>
+                      <span className="text-right text-[#b7abc5]">{technique.technique_name}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="min-h-[300px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+            {renderSectionTitle('Exploit Availability')}
+            <div className="space-y-3 text-[12px] text-[#d8cce6]">
+              {exploitRows.length === 0 && <p className="leading-relaxed text-[#b7abc5]">—</p>}
+              {exploitRows.slice(0, 4).map((row) => (
+                <div key={`exploit-focus-${row.port}`} className="rounded-lg border border-[#4f3b63] bg-[#24183b]/70 p-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span>Port {row.port} ({row.service || '—'})</span>
+                    <span className={row.exploit_availability.publicExploitAvailable ? 'text-[#ff4f5f]' : 'text-[#69f08a]'}>
+                      {row.exploit_availability.publicExploitAvailable ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <div className="text-[#92859d]">ExploitDB: {row.exploit_availability.exploitdb || '—'}</div>
+                  <div className="text-[#92859d]">Metasploit: {row.exploit_availability.metasploit || '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      );
+    }
+    return (
+      <>
+        <ExposureSeverityFocusPanel rows={rows} stats={scanStats} riskCounts={riskCounts} />
+        <RecommendedActionsFocusPanel rows={rows} />
+      </>
+    );
+  };
+
+  const renderPortDashboard = () => {
+    const rows = Array.isArray(results) ? results : [];
+    const score = Number.isFinite(scanStats?.securityScore)
+      ? Math.max(0, Math.min(100, Math.round(scanStats.securityScore)))
+      : null;
+    const cveTotal = rows.reduce((sum, row) => sum + Number(row.cve_count || 0), 0);
+    const riskCounts = ['critical', 'high', 'medium', 'low'].reduce((acc, level) => {
+      acc[level] = rows.filter((row) => row.risk_level === level).length;
+      return acc;
+    }, {});
+    const dominantRisk = riskCounts.critical ? 'Critical' : riskCounts.high ? 'High' : riskCounts.medium ? 'Medium' : rows.length ? 'Low' : 'Pending';
+    const attackLevel = scanStats?.attackSurface?.level || (riskCounts.critical ? 'Critical' : riskCounts.high ? 'High' : rows.length ? 'Medium' : 'Pending');
+    const reputation = scanStats?.threatIntelligence?.reputation || '—';
+    const techs = detectedTechnologies.length ? detectedTechnologies : collectDetectedTechnologies(rows);
+    const techSummaries = techs.map((tech) => {
+      const matchingRows = rows.filter((row) => row.technologies?.includes(tech));
+      const bestConfidence = matchingRows.reduce((best, row) => {
+        const confidence = Number(row.fingerprint?.confidence || 0);
+        return Math.max(best, confidence);
+      }, 0);
+      return { name: tech, ports: matchingRows.map((row) => row.port), bestConfidence };
+    });
+    const scanDuration = scanStats ? formatScanDuration(scanStats.scanDurationSeconds) : isScanning ? 'Streaming' : '0.0s';
+    const exposureTotal = Math.max(1, rows.length || 1);
+    const exposureGradient = `conic-gradient(#f87171 0deg ${(riskCounts.critical / exposureTotal) * 360}deg, #fb923c ${(riskCounts.critical / exposureTotal) * 360}deg ${((riskCounts.critical + riskCounts.high) / exposureTotal) * 360}deg, #d9f94f ${((riskCounts.critical + riskCounts.high) / exposureTotal) * 360}deg ${((riskCounts.critical + riskCounts.high + riskCounts.medium) / exposureTotal) * 360}deg, #69f08a ${((riskCounts.critical + riskCounts.high + riskCounts.medium) / exposureTotal) * 360}deg 360deg)`;
+    const csv = [
+      ['Port', 'State', 'Service', 'Version', 'CVEs', 'Risk'].join(','),
+      ...rows.map((row) => [row.port, row.state, row.service, row.version, row.cve_count, row.risk_level].map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')),
+    ].join('\n');
+
+    return (
+      <div className="flex-1 overflow-y-auto p-1 md:p-2">
+        <div className="space-y-8">
+          <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+            <div className="flex flex-wrap items-center gap-3">
+              {isScanning ? <Activity className="h-7 w-7 animate-pulse text-[#b79aff]" /> : <CheckCircle2 className="h-7 w-7 text-[#5add56]" />}
+              <h2 className="text-[26px] font-medium text-[#f4eef7]">{isScanning ? 'Port Scan Running' : 'Port Scan Completed'}</h2>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#63516e]/80 bg-[#13091f]/74 px-3 text-[11px] text-[#d6cbe2]">
+                <ScanLine className="h-3.5 w-3.5 text-[#f4eef7]" /> {Math.round(progress)}% Scan Progress
+              </span>
+              <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#63516e]/80 bg-[#13091f]/74 px-3 text-[11px] text-[#d6cbe2]">
+                <Server className="h-3.5 w-3.5 text-[#f4eef7]" /> {rows.length} Open Ports Found
+              </span>
+              <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#63516e]/80 bg-[#13091f]/74 px-3 text-[11px] text-[#d6cbe2]">
+                <ShieldCheck className="h-3.5 w-3.5 text-[#f4eef7]" /> {dominantRisk} Risk
+              </span>
+              <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#63516e]/80 bg-[#13091f]/74 px-3 text-[11px] text-[#d6cbe2]">
+                <Activity className="h-3.5 w-3.5 text-[#f4eef7]" /> {scanDuration}
+              </span>
+            </div>
+            <div className="mt-6 grid grid-cols-1 gap-1.5 md:grid-cols-2 xl:grid-cols-6">
+              {renderMetricTile(Server, 'Open Ports', rows.length)}
+              {renderMetricTile(Bug, 'CVEs', cveTotal)}
+              {renderMetricTile(Radio, 'Risk Level', dominantRisk, dominantRisk === 'Critical' ? '#ff4f5f' : dominantRisk === 'High' ? '#fb923c' : '#69f08a')}
+              {renderMetricTile(ShieldCheck, 'Security Score', score == null ? '—' : `${score}/100`)}
+              {renderMetricTile(Tags, 'Attack Surface', attackLevel, surfaceColor(attackLevel))}
+              {renderMetricTile(Globe2, 'IP Reputation', reputation, reputationColor(reputation))}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+              <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-8">
+                {renderSectionTitle('Security Score')}
+                <div className="flex flex-col items-center">
+                  <div className="grid h-36 w-36 place-items-center rounded-full" style={{ background: score == null ? '#4a3857' : `conic-gradient(${scoreColor(score)} ${score * 3.6}deg, #4a3857 0deg)` }}>
+                    <div className="grid h-24 w-24 place-items-center rounded-full bg-[#13091f] text-center">
+                      <strong className="text-3xl text-[#f4eef7]">{score == null ? '—' : score}<span className="text-sm text-[#92859d]">{score == null ? '' : '/100'}</span></strong>
+                    </div>
+                  </div>
+                  <p className="mt-5 text-center text-sm text-[#d8cce6]">{score == null ? '—' : score >= 85 ? 'High Security Posture' : score >= 65 ? 'Moderate Security Posture' : 'Elevated Exposure'}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-8">
+                {renderSectionTitle('Exposure Breakdown')}
+                <div className="grid grid-cols-[120px_minmax(0,1fr)] items-center gap-6">
+                  <div className="h-28 w-28 rounded-full" style={{ background: exposureGradient }} />
+                  <div className="space-y-3 text-sm">
+                    {[
+                      ['High', riskCounts.high, '#fb923c'],
+                      ['Critical', riskCounts.critical, '#f87171'],
+                      ['Medium', riskCounts.medium, '#d9f94f'],
+                      ['Low', riskCounts.low, '#69f08a'],
+                    ].map(([label, value, color]) => (
+                      <div key={label} className="flex items-center justify-between gap-3 text-[#d8cce6]">
+                        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />{label}</span>
+                        <strong>{value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-5 space-y-3 border-t border-[#554365]/70 pt-4 text-xs text-[#b7abc5]">
+                  <p><span className="text-[#fb923c]">Critical Exposure</span><br />{rows.find((row) => row.risk_level === 'critical')?.service || 'No critical service'} publicly reachable.</p>
+                  <p><span className="text-[#d9f94f]">Medium Exposure</span><br />{rows.find((row) => row.risk_level === 'medium')?.service || 'No medium-risk service'} publicly reachable.</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-8">
+                {renderSectionTitle('Detected Technologies')}
+                <div className="space-y-6">
+                  {(techSummaries.length ? techSummaries.slice(0, 4) : [{ name: '—', ports: [], bestConfidence: 0 }]).map((tech) => (
+                    <div key={tech.name} className="grid grid-cols-[42px_minmax(0,1fr)] gap-4">
+                      <div className="grid h-10 w-10 place-items-center rounded-lg bg-[#281743] text-[#b79aff]">
+                        <Database className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[#f4eef7]">{tech.name}</div>
+                        <div className="text-[10px] text-[#92859d]">
+                          {tech.ports.length ? `Observed on port${tech.ports.length === 1 ? '' : 's'} ${tech.ports.join(', ')}` : '—'}
+                        </div>
+                        {tech.bestConfidence > 0 && (
+                          <>
+                            <div className="text-[10px] text-[#92859d]">Fingerprint confidence: {Math.round(tech.bestConfidence)}%</div>
+                            <div className="mt-2 h-1.5 rounded-full bg-[#43364b]"><div className="h-full rounded-full bg-[#69f08a]" style={{ width: `${Math.round(tech.bestConfidence)}%` }} /></div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-7 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-8">
+              {renderSectionTitle('Open Ports & Services')}
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[880px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-[#554365]/80 text-[11px] text-[#92859d]">
+                      {['Port', 'State', 'Service', 'Preview', 'Version / Tech', 'Banner', 'CVEs', 'Risk'].map((head) => <th key={head} className="px-4 py-3 font-medium">{head}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 && (
+                      <tr><td colSpan="8" className="px-4 py-10 text-center text-sm text-[#92859d]">{isScanning ? 'Streaming port results into the dashboard...' : 'No open ports found.'}</td></tr>
+                    )}
+                    {rows.map((row) => {
+                      const riskProps = riskBadgeProps(row);
+                      return (
+                        <tr key={row.port} className="border-b border-[#382748] text-[12px] text-[#d8cce6] last:border-b-0">
+                          <td className="px-4 py-5 font-mono text-[#ddd6fe]">{row.port}</td>
+                          <td className="px-4 py-5"><RiskBadge label={row.state || 'open'} color="open" /></td>
+                          <td className="px-4 py-5"><ServiceTooltip row={row} /></td>
+                          <td className="px-4 py-5"><ScreenshotPreview row={row} /></td>
+                          <td className="px-4 py-5"><VersionCell version={row.version} technologies={row.technologies} fingerprint={row.fingerprint} /></td>
+                          <td className="px-4 py-5">
+                            <button type="button" className="banner-view-btn" disabled={!hasBannerData(row)} onClick={() => setBannerRow(row)}>
+                              View Banner
+                            </button>
+                            {hasBannerData(row) && <div className="mt-2 max-w-[150px] truncate text-[10px] text-[#8b7ec8]">{bannerPreview(row)}</div>}
+                          </td>
+                          <td className="px-4 py-5"><CVECell row={row} onViewCVE={setCveRow} /></td>
+                          <td className="px-4 py-5"><RiskBadge label={riskProps.label} color={riskProps.color} title={riskProps.title} /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+            <div className="grid grid-cols-3 overflow-hidden rounded-t-lg border border-[#4f3b63] bg-[#24183b] text-center text-sm text-[#b7abc5]">
+              {[
+                ['visibility', 'Security Visibility Layer Focus'],
+                ['adversary', 'Adversary & Exploit Modeling Focus'],
+                ['risk', 'Risk & Remediation Engine Focus'],
+              ].map(([key, label], index) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveFocusTab(key)}
+                  aria-pressed={activeFocusTab === key}
+                  className={`px-4 py-4 transition hover:bg-[#382748] ${activeFocusTab === key ? 'bg-[#654f90] text-[#f4eef7]' : index > 0 ? 'border-l border-[#4f3b63]' : ''}`}
+                >
+                  <Globe2 className="mr-2 inline h-4 w-4" />{label}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 gap-6 rounded-b-lg border-x border-b border-[#382748] bg-[#13091f]/50 p-8 xl:grid-cols-3">
+              {renderFocusContent(rows, riskCounts)}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+            <div className="mb-2 text-[18px] font-medium uppercase text-[#b79aff]">Export & Share</div>
+            <p className="text-sm text-[#d2c5dc]">Download or share your scan report.</p>
+            <div className="mt-7 grid grid-cols-1 gap-4 md:grid-cols-4">
+              <button type="button" onClick={() => window.print()} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"><FileText className="h-4 w-4" /> Export PDF</button>
+              <button type="button" onClick={() => downloadText(`${target || 'port-scan'}-ports.json`, JSON.stringify({ target, results: rows, stats: scanStats }, null, 2), 'application/json')} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"><FileText className="h-4 w-4" /> Export JSON</button>
+              <button type="button" onClick={() => downloadText(`${target || 'port-scan'}-ports.csv`, csv, 'text/csv')} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"><FileText className="h-4 w-4" /> Export CSV</button>
+              <button type="button" onClick={() => navigator.clipboard?.writeText(`${target}: ${rows.length} open port(s), ${dominantRisk} risk`)} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"><Share2 className="h-4 w-4" /> Share report</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -1163,203 +1457,7 @@ export default function PortScanner() {
         )}
 
         {results !== null && (
-          <div className="flex flex-col flex-1 overflow-hidden">
-            {results.length > 0 && (
-              <div
-                className="port-result-grid text-[10px] font-semibold tracking-wider uppercase"
-                style={{
-                  gridTemplateColumns: PORT_RESULT_COLUMNS,
-                  color: '#8b7ec8',
-                  borderBottom: '1px solid rgba(124,58,237,0.12)',
-                }}
-              >
-                <span>Port</span>
-                <span>State</span>
-                <span>Service</span>
-                <span>Preview</span>
-                <span>Version / Tech</span>
-                <span>Banner</span>
-                <span>CVEs</span>
-                <span>Risk</span>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto port-results-scroll">
-              {isScanning && results.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-40 gap-3">
-                  <div
-                    className="w-7 h-7 border-[3px] rounded-full animate-spin"
-                    style={{
-                      borderColor: 'rgba(124,58,237,0.2)',
-                      borderTopColor: '#8b5cf6',
-                    }}
-                  />
-                  <span className="text-xs font-mono animate-pulse" style={{ color: '#8b5cf6' }}>
-                    Scanning ports...
-                  </span>
-                </div>
-              )}
-
-              {results.map((r, i) => {
-                const riskProps = riskBadgeProps(r);
-                return (
-                  <div
-                    key={`${r.port}-${i}`}
-                    className="port-result-grid"
-                    style={{ gridTemplateColumns: PORT_RESULT_COLUMNS }}
-                  >
-                    <span className="font-mono text-sm font-semibold" style={{ color: '#ddd6fe' }}>
-                      {r.port}
-                    </span>
-                    <span>
-                      <RiskBadge label={r.state || 'open'} color={r.state === 'open' ? 'open' : 'low'} />
-                    </span>
-                    <ServiceTooltip row={r} />
-                    <ScreenshotPreview row={r} />
-                    <VersionCell
-                      version={r.version}
-                      technologies={r.technologies}
-                      fingerprint={r.fingerprint}
-                    />
-                    <span className="flex flex-col gap-1 min-w-0">
-                      <button
-                        type="button"
-                        className="banner-view-btn inline-flex items-center gap-1 self-start"
-                        disabled={!hasBannerData(r)}
-                        onClick={() => setBannerRow(r)}
-                        title={
-                          hasBannerData(r)
-                            ? 'View captured banner'
-                            : 'No banner captured'
-                        }
-                      >
-                        <FileText className="w-3 h-3 shrink-0" />
-                        View Banner
-                      </button>
-                      {hasBannerData(r) && (
-                        <span
-                          className="text-[10px] font-mono truncate port-banner-preview"
-                          title={r.welcome_message || r.raw_banner}
-                        >
-                          {bannerPreview(r)}
-                        </span>
-                      )}
-                    </span>
-                    <CVECell row={r} onViewCVE={setCveRow} />
-                    <span>
-                      <RiskBadge
-                        label={riskProps.label}
-                        color={riskProps.color}
-                        title={riskProps.title}
-                      />
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {!isScanning && results.length > 0 && (
-              <DetectedTechnologiesPanel technologies={detectedTechnologies} />
-            )}
-
-            {!isScanning && scanStats && (
-              <SecurityScorePanel stats={scanStats} />
-            )}
-
-            {!isScanning && scanStats && (
-              <ThreatIntelligencePanel stats={scanStats} />
-            )}
-
-            {!isScanning && scanStats && (
-              <AttackSurfacePanel stats={scanStats} />
-            )}
-
-            {!isScanning && results.length > 0 && (
-              <ExposureSeverityPanel rows={results} stats={scanStats} />
-            )}
-
-            {!isScanning && scanStats && (
-              <AttackPathPanel stats={scanStats} />
-            )}
-
-            {!isScanning && scanStats && (
-              <AttackSimulationPanel stats={scanStats} />
-            )}
-
-            {!isScanning && results.length > 0 && (
-              <MisconfigurationPanel rows={results} stats={scanStats} />
-            )}
-
-            {!isScanning && results.length > 0 && (
-              <MitreAttackPanel rows={results} />
-            )}
-
-            {!isScanning && results.length > 0 && (
-              <ExploitAvailabilityPanel rows={results} />
-            )}
-
-            {!isScanning && results.length > 0 && (
-              <RecommendedActionsPanel rows={results} error={scanStats?.recommendationsError} />
-            )}
-
-            {!isScanning && scanStats && (
-              <div
-                className="flex flex-wrap items-center gap-4 px-5 py-3 text-xs font-mono"
-                style={{
-                  borderTop: '1px solid rgba(124,58,237,0.12)',
-                  color: '#6b5fa0',
-                }}
-              >
-                <span>
-                  <span style={{ color: '#a78bfa' }}>{results.length}</span> open
-                </span>
-                <span>
-                  <span style={{ color: '#f87171' }}>{results.filter(r => r.risk_level === 'high').length}</span> high
-                </span>
-                <span>
-                  <span style={{ color: '#facc15' }}>{results.filter(r => r.risk_level === 'medium').length}</span> med
-                </span>
-                <span>
-                  <span style={{ color: '#4ade80' }}>{results.filter(r => r.risk_level === 'low').length}</span> low
-                </span>
-                <span>
-                  Scan duration: <span style={{ color: '#c4b5fd' }}>{formatScanDuration(scanStats.scanDurationSeconds)}</span>
-                </span>
-                <span>
-                  Packets sent: <span style={{ color: '#c4b5fd' }}>{scanStats.packetsSent}</span>
-                </span>
-                <span>
-                  Latency: <span style={{ color: '#c4b5fd' }}>{formatLatency(scanStats.avgLatencyMs)}</span>
-                </span>
-                <span>
-                  Security Score: <span style={{ color: scoreColor(scanStats.securityScore) }}>{Math.round(scanStats.securityScore ?? 100)}/100</span>
-                </span>
-                {scanStats.attackSurface && (
-                  <span>
-                    Attack Surface: <span style={{ color: surfaceColor(scanStats.attackSurface.level) }}>{scanStats.attackSurface.level}</span>
-                  </span>
-                )}
-                {scanStats.exposureSummary && (
-                  <span>
-                    Exposure: <span style={{ color: scoreColor(100 - (scanStats.exposureSummary.highestScore || 0)) }}>{String(scanStats.exposureSummary.highestSeverity || 'low').toUpperCase()}</span>
-                  </span>
-                )}
-                {scanStats.threatIntelligence && (
-                  <span>
-                    IP Reputation: <span style={{ color: reputationColor(scanStats.threatIntelligence.reputation) }}>{scanStats.threatIntelligence.reputation}</span>
-                  </span>
-                )}
-                {scanStats.misconfigurationSummary && (
-                  <span>
-                    Misconfigs: <span style={{ color: '#fb923c' }}>{scanStats.misconfigurationSummary.total || 0}</span>
-                  </span>
-                )}
-                <span className="ml-auto">
-                  Target: <span style={{ color: '#c4b5fd' }}>{target}</span>
-                </span>
-              </div>
-            )}
-          </div>
+          renderPortDashboard()
         )}
       </div>
 

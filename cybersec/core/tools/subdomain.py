@@ -5,7 +5,7 @@ import re
 import string
 import time
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 import dns.asyncresolver
 import dns.exception
@@ -549,3 +549,158 @@ async def find_subdomains(
         dns_time_ms=dns_time_ms,
         http_time_ms=http_time_ms,
     )
+
+
+async def stream_subdomain_events(
+    domain: str,
+    wordlist: str = "small",
+    strictness: str = "medium",
+    risk_keywords: dict[str, list[str]] | None = None,
+):
+    """Yield incremental subdomain scan events for SSE/fetch streaming."""
+    scan_start = time.monotonic()
+
+    if strictness not in WILDCARD_STRICTNESS_LEVELS:
+        strictness = "medium"
+
+    entries = WORDLISTS.get(wordlist, WORDLISTS["small"])
+    full_hostnames = [f"{sub}.{domain}" for sub in entries]
+    results: list[dict] = []
+    wildcard_detected = False
+    wildcard_ips: list[str] = []
+
+    yield {
+        "type": "init",
+        "data": {
+            "domain": domain,
+            "found": [],
+            "total_checked": len(entries),
+            "total_found": 0,
+            "wildcard_detected": False,
+            "wildcard_ips": [],
+            "scan_time_ms": 0,
+            "dns_time_ms": 0,
+            "http_time_ms": 0,
+            "scanning": True,
+        },
+    }
+
+    if strictness != "off":
+        yield {"type": "stage", "stage": "wildcard", "message": "Checking wildcard DNS"}
+        wildcard_detected, wildcard_ips = await _detect_wildcard(domain)
+        yield {
+            "type": "wildcard",
+            "wildcard_detected": wildcard_detected,
+            "wildcard_ips": wildcard_ips,
+        }
+
+    dns_start = time.monotonic()
+    dns_tasks = [
+        asyncio.create_task(resolve_subdomain_records(hostname, "wordlist"))
+        for hostname in full_hostnames
+    ]
+    checked_count = 0
+
+    for task in asyncio.as_completed(dns_tasks):
+        row = await task
+        checked_count += 1
+
+        if wildcard_detected and wildcard_ips and row.get("resolved"):
+            wc_set = set(wildcard_ips)
+            records = row.get("records", {})
+            match_ips = set(records.get("A", []))
+            if strictness == "high":
+                match_ips.update(records.get("AAAA", []))
+            if match_ips & wc_set:
+                row["wildcard"] = True
+
+        if not (strictness in ("medium", "high") and row.get("wildcard")):
+            results.append(row)
+
+        yield {
+            "type": "candidate",
+            "row": row,
+            "progress": {
+                "checked": checked_count,
+                "total": len(entries),
+                "found": sum(1 for item in results if item.get("resolved")),
+            },
+        }
+
+    dns_time_ms = round((time.monotonic() - dns_start) * 1000)
+
+    http_time_ms = 0
+    resolved_rows = [row for row in results if row.get("resolved")]
+    if resolved_rows:
+        yield {
+            "type": "stage",
+            "stage": "http",
+            "message": f"Probing {len(resolved_rows)} resolved host(s)",
+        }
+        http_start = time.monotonic()
+        limits = httpx.Limits(max_connections=50, max_keepalive_connections=20)
+        async with httpx.AsyncClient(
+            limits=limits,
+            timeout=httpx.Timeout(HTTP_PROBE_TIMEOUT, connect=5.0),
+            follow_redirects=True,
+            max_redirects=MAX_REDIRECTS,
+            verify=False,
+        ) as client:
+            async def probe_row(row: dict) -> tuple[dict, dict]:
+                return row, await probe_subdomain_http(client, row["subdomain"])
+
+            http_tasks = [
+                asyncio.create_task(probe_row(row))
+                for row in resolved_rows
+            ]
+            completed_http = 0
+            for task in asyncio.as_completed(http_tasks):
+                row, http_data = await task
+                row["http"] = http_data
+                row["risk"] = classify_subdomain_risk(
+                    row["subdomain"], row.get("http"), risk_keywords
+                )
+                verified, confidence = compute_confidence(row, wildcard_ips)
+                row["verified"] = verified
+                row["confidence"] = confidence
+                completed_http += 1
+                yield {
+                    "type": "candidate",
+                    "row": row,
+                    "progress": {
+                        "checked": checked_count,
+                        "total": len(entries),
+                        "found": sum(1 for item in results if item.get("resolved")),
+                        "http_checked": completed_http,
+                        "http_total": len(resolved_rows),
+                    },
+                }
+        http_time_ms = round((time.monotonic() - http_start) * 1000)
+
+    for row in results:
+        if row.get("verified") is None:
+            if row.get("resolved"):
+                row["risk"] = classify_subdomain_risk(
+                    row["subdomain"], row.get("http"), risk_keywords
+                )
+            verified, confidence = compute_confidence(row, wildcard_ips)
+            row["verified"] = verified
+            row["confidence"] = confidence
+
+    await capture_screenshots(results)
+
+    resolved_count = sum(1 for row in results if row.get("resolved"))
+    scan_time_ms = round((time.monotonic() - scan_start) * 1000)
+    final = SubdomainResult(
+        domain=domain,
+        found=results,
+        total_checked=len(entries),
+        total_found=resolved_count,
+        error=None,
+        wildcard_detected=wildcard_detected,
+        wildcard_ips=wildcard_ips,
+        scan_time_ms=scan_time_ms,
+        dns_time_ms=dns_time_ms,
+        http_time_ms=http_time_ms,
+    )
+    yield {"type": "done", "data": asdict(final)}

@@ -27,6 +27,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Timer,
+  WifiOff,
   X,
   Zap,
 } from 'lucide-react';
@@ -185,14 +186,259 @@ export default function GenericTool({ toolId }) {
   const [results, setResults] = useState(null);
   const [copied, setCopied] = useState('');
   const liveRequestActive = useRef(false);
+  const streamAbortRef = useRef(null);
 
   const Icon = meta?.icon;
+
+  const applySubdomainStreamEvent = useCallback((event) => {
+    if (!event || typeof event !== 'object') return;
+    if (event.type === 'init') {
+      setResults({
+        ...event.data,
+        checked_count: 0,
+        total_candidates: event.data?.total_checked || 0,
+        scanning: true,
+      });
+      return;
+    }
+    if (event.type === 'wildcard') {
+      setResults((previous) => ({
+        ...(previous || {}),
+        wildcard_detected: Boolean(event.wildcard_detected),
+        wildcard_ips: event.wildcard_ips || [],
+        scanning: true,
+      }));
+      return;
+    }
+    if (event.type === 'stage') {
+      setResults((previous) => ({
+        ...(previous || {}),
+        scan_stage: event.stage,
+        scan_message: event.message,
+        scanning: true,
+      }));
+      return;
+    }
+    if (event.type === 'candidate' && event.row) {
+      setResults((previous) => {
+        const current = previous || { domain: target, found: [], total_found: 0 };
+        const existingRows = Array.isArray(current.found) ? current.found : [];
+        const rowKey = event.row.subdomain || event.row.name;
+        const nextRows = existingRows.some((row) => (row.subdomain || row.name) === rowKey)
+          ? existingRows.map((row) => ((row.subdomain || row.name) === rowKey ? { ...row, ...event.row } : row))
+          : [...existingRows, event.row];
+        return {
+          ...current,
+          found: nextRows,
+          checked_count: event.progress?.checked ?? current.checked_count ?? nextRows.length,
+          total_candidates: event.progress?.total ?? current.total_candidates ?? current.total_checked ?? nextRows.length,
+          total_checked: event.progress?.total ?? current.total_checked ?? nextRows.length,
+          total_found: event.progress?.found ?? nextRows.filter((row) => row?.resolved).length,
+          http_checked: event.progress?.http_checked ?? current.http_checked,
+          http_total: event.progress?.http_total ?? current.http_total,
+          scanning: true,
+        };
+      });
+      return;
+    }
+    if (event.type === 'done') {
+      setResults({
+        ...event.data,
+        checked_count: event.data?.total_checked || 0,
+        total_candidates: event.data?.total_checked || 0,
+        scanning: false,
+      });
+      return;
+    }
+    if (event.type === 'error') {
+      setResults({ error: event.error || 'Subdomain stream failed' });
+    }
+  }, [target]);
+
+  const runSubdomainStream = useCallback(async () => {
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+    setLoading(true);
+    setResults({
+      domain: target,
+      found: [],
+      total_checked: 0,
+      total_candidates: 0,
+      checked_count: 0,
+      total_found: 0,
+      wildcard_detected: false,
+      wildcard_ips: [],
+      scan_time_ms: 0,
+      dns_time_ms: 0,
+      http_time_ms: 0,
+      scanning: true,
+    });
+    try {
+      const response = await fetch('/api/tools/subdomain/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: target }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Subdomain stream failed with HTTP ${response.status}`);
+      }
+      if (!response.body) {
+        throw new Error('Subdomain stream is unavailable in this browser.');
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let done = false;
+      while (!done) {
+        const chunk = await reader.read();
+        done = chunk.done;
+        buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !done });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+        parts.forEach((part) => {
+          const dataLine = part.split('\n').find((line) => line.startsWith('data:'));
+          if (!dataLine) return;
+          try {
+            applySubdomainStreamEvent(JSON.parse(dataLine.slice(5).trim()));
+          } catch (error) {
+            console.warn('Invalid subdomain stream event', error);
+          }
+        });
+      }
+      if (buffer.trim()) {
+        const dataLine = buffer.split('\n').find((line) => line.startsWith('data:'));
+        if (dataLine) applySubdomainStreamEvent(JSON.parse(dataLine.slice(5).trim()));
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') setResults({ error: error.message });
+    } finally {
+      if (streamAbortRef.current === controller) streamAbortRef.current = null;
+      setLoading(false);
+    }
+  }, [applySubdomainStreamEvent, target]);
+
+  const applyGeoStreamEvent = useCallback((event) => {
+    if (!event || typeof event !== 'object') return;
+    if (event.type === 'init') {
+      setResults({
+        ...event.data,
+        scanning: true,
+      });
+      return;
+    }
+    if (event.type === 'stage') {
+      setResults((previous) => ({
+        ...(previous || { target }),
+        scan_stage: event.stage,
+        scan_message: event.message,
+        scanning: true,
+      }));
+      return;
+    }
+    if (event.type === 'done') {
+      setResults({
+        ...event.data,
+        scanning: false,
+      });
+      return;
+    }
+    if (event.type === 'error') {
+      setResults({ error: event.error || 'GeoIP stream failed' });
+    }
+  }, [target]);
+
+  const runGeoStream = useCallback(async () => {
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+    setLoading(true);
+    setResults({
+      target,
+      ip: null,
+      resolved_ips: [],
+      ip_results: [],
+      provider: 'ipwhois',
+      cached: false,
+      scanning: true,
+      scan_stage: 'init',
+      scan_message: 'Starting GeoIP lookup',
+    });
+    try {
+      const response = await fetch('/api/tools/geoip/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`GeoIP stream failed with HTTP ${response.status}`);
+      }
+      if (!response.body) {
+        throw new Error('GeoIP stream is unavailable in this browser.');
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let done = false;
+      while (!done) {
+        const chunk = await reader.read();
+        done = chunk.done;
+        buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !done });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+        parts.forEach((part) => {
+          const dataLine = part.split('\n').find((line) => line.startsWith('data:'));
+          if (!dataLine) return;
+          try {
+            applyGeoStreamEvent(JSON.parse(dataLine.slice(5).trim()));
+          } catch (error) {
+            console.warn('Invalid GeoIP stream event', error);
+          }
+        });
+      }
+      if (buffer.trim()) {
+        const dataLine = buffer.split('\n').find((line) => line.startsWith('data:'));
+        if (dataLine) applyGeoStreamEvent(JSON.parse(dataLine.slice(5).trim()));
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') setResults({ error: error.message });
+    } finally {
+      if (streamAbortRef.current === controller) streamAbortRef.current = null;
+      setLoading(false);
+    }
+  }, [applyGeoStreamEvent, target]);
 
   const run = useCallback(async ({ silent = false, appendLive = false } = {}) => {
     if (!target || !meta) return;
     if (appendLive && liveRequestActive.current) return;
     if (appendLive) liveRequestActive.current = true;
-    if (!silent) setLoading(true);
+    if (toolId === 'subdomains' && !appendLive) {
+      await runSubdomainStream();
+      return;
+    }
+    if (toolId === 'geo' && !appendLive) {
+      await runGeoStream();
+      return;
+    }
+    if (!silent) {
+      setLoading(true);
+      if (toolId === 'subdomains') {
+        setResults({
+          domain: target,
+          found: [],
+          total_checked: 0,
+          total_found: 0,
+          wildcard_detected: false,
+          wildcard_ips: [],
+          scan_time_ms: 0,
+          dns_time_ms: 0,
+          http_time_ms: 0,
+          scanning: true,
+        });
+      }
+    }
     try {
       const body = { [meta.param]: target };
       if (toolId === 'ping') body.count = count;
@@ -224,13 +470,17 @@ export default function GenericTool({ toolId }) {
       if (appendLive) liveRequestActive.current = false;
       if (!silent) setLoading(false);
     }
-  }, [count, maxHops, meta, target, toolId]);
+  }, [count, maxHops, meta, runGeoStream, runSubdomainStream, target, toolId]);
 
   useEffect(() => {
     if (!['ping', 'traceroute'].includes(toolId) || !liveMode || !target) return undefined;
     const id = window.setInterval(() => run({ silent: true, appendLive: true }), toolId === 'traceroute' ? 7000 : 3000);
     return () => window.clearInterval(id);
   }, [toolId, liveMode, target, run]);
+
+  useEffect(() => () => {
+    streamAbortRef.current?.abort();
+  }, []);
 
   if (!meta) return <div className="text-gray-500 text-center mt-20">Tool not found: {toolId}</div>;
 
@@ -262,6 +512,16 @@ export default function GenericTool({ toolId }) {
     await navigator.clipboard.writeText(text);
     setCopied(label);
     window.setTimeout(() => setCopied(''), 1200);
+  };
+
+  const downloadText = (filename, content, type = 'text/plain') => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const toggleLiveMode = () => {
@@ -447,6 +707,7 @@ export default function GenericTool({ toolId }) {
   };
 
   const renderGeoResults = (data) => {
+    const isScanning = Boolean(data.scanning);
     const resolvedRows = Array.isArray(data.ip_results) && data.ip_results.length ? data.ip_results : [data];
     const confidencePct = data.confidence === 'high' ? 86 : data.confidence === 'medium' ? 62 : 34;
 
@@ -464,7 +725,7 @@ export default function GenericTool({ toolId }) {
                 )}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {geoPill(<><span className="h-2 w-2 rounded-full bg-[#56dc4f]" /> Lookup Completed</>, 'good')}
+                {geoPill(<><span className={`h-2 w-2 rounded-full ${isScanning ? 'animate-pulse bg-[#b79aff]' : 'bg-[#56dc4f]'}`} /> {isScanning ? 'Lookup Running' : 'Lookup Completed'}</>, isScanning ? 'info' : 'good')}
                 {geoPill(<><MapPin className="h-3 w-3" /> {geoText(data.ip)}</>, 'info')}
                 {geoPill(<><Timer className="h-3 w-3" /> 1.3s</>, 'info')}
                 {geoPill(<><Database className="h-3 w-3" /> {data.cached ? 'Cached (IPWHOIS)' : 'Fresh (IPWHOIS)'}</>, 'info')}
@@ -472,10 +733,10 @@ export default function GenericTool({ toolId }) {
             </div>
           </div>
 
-          {(data.infrastructure_note || data.summary) && (
+          {(isScanning || data.infrastructure_note || data.summary) && (
             <div className="mt-5 flex gap-4 rounded-xl border border-[#6f4a9a] bg-[#44206d]/82 px-6 py-6 text-[#ded4e9]">
-              <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#b79aff]" />
-              <p className="text-sm leading-6">{data.infrastructure_note || data.summary}</p>
+              {isScanning ? <Activity className="mt-0.5 h-5 w-5 shrink-0 animate-pulse text-[#b79aff]" /> : <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#b79aff]" />}
+              <p className="text-sm leading-6">{isScanning ? data.scan_message || 'GeoIP lookup is running...' : data.infrastructure_note || data.summary}</p>
             </div>
           )}
 
@@ -1148,6 +1409,321 @@ export default function GenericTool({ toolId }) {
     );
   };
 
+  const formatMs = (value) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '0 ms';
+    if (number >= 1000) return `${(number / 1000).toFixed(number >= 10000 ? 0 : 1)} s`;
+    return `${Math.round(number)} ms`;
+  };
+
+  const subStatus = (row) => {
+    if (row?.resolved && row?.http?.alive) return `HTTP ${row.http.status || 'OK'}`;
+    if (row?.resolved) return 'RESOLVED';
+    return row?.error || 'NXDOMAIN';
+  };
+
+  const subTone = (row) => {
+    if (row?.resolved && row?.verified) return 'good';
+    if (row?.resolved) return 'warn';
+    return 'bad';
+  };
+
+  const subToneClasses = (tone) => {
+    const tones = {
+      good: 'border-[#42cf70] bg-[#14301f] text-[#6df68a]',
+      warn: 'border-[#d7b449] bg-[#2d2515] text-[#ffd86f]',
+      bad: 'border-[#ff4f5f] bg-[#2a1119] text-[#ff6673]',
+      neutral: 'border-[#63516e] bg-[#13091f] text-[#d6cbe2]',
+    };
+    return tones[tone] || tones.neutral;
+  };
+
+  const sectionTitle = (title, IconCmp = CircleDot) => (
+    <div className="mb-7 flex items-center gap-3 text-[13px] font-medium uppercase text-[#b79aff]">
+      <IconCmp className="h-5 w-5" />
+      <span>{title}</span>
+    </div>
+  );
+
+  const renderSubdomainResults = (data) => {
+    const isScanning = Boolean(data.scanning);
+    const rows = Array.isArray(data.found)
+      ? data.found
+      : Array.isArray(data.subdomains_found)
+        ? data.subdomains_found
+        : Array.isArray(data.results)
+          ? data.results
+          : [];
+    const checkedCount = Number(data.checked_count ?? data.total_checked ?? rows.length ?? 0);
+    const totalCandidates = Number(data.total_candidates ?? data.total_checked ?? rows.length ?? 0);
+    const resolvedRows = rows.filter((row) => row?.resolved);
+    const failedRows = rows.filter((row) => !row?.resolved);
+    const totalFound = Number(data.total_found ?? resolvedRows.length);
+    const verifiedCount = rows.filter((row) => row?.verified).length;
+    const wildcard = Boolean(data.wildcard_detected);
+    const avgDns = rows.length
+      ? rows.reduce((sum, row) => sum + (Number(row?.dns_ms) || 0), 0) / rows.length
+      : Number(data.dns_time_ms || 0);
+    const maxDns = Math.max(1, ...rows.map((row) => Number(row?.dns_ms) || 0));
+    const scanSeconds = isScanning ? 'Scanning' : Number(data.scan_time_ms) ? `${(Number(data.scan_time_ms) / 1000).toFixed(1)}s` : '0s';
+    const domain = data.domain || target;
+    const foundPct = checkedCount ? Math.round((totalFound / checkedCount) * 100) : 0;
+    const failedPct = checkedCount ? 100 - foundPct : 0;
+    const recordCounts = rows.reduce((acc, row) => {
+      const records = row?.records || {};
+      Object.entries(records).forEach(([type, values]) => {
+        if (Array.isArray(values) && values.length) acc[type] = (acc[type] || 0) + values.length;
+      });
+      return acc;
+    }, {});
+    const errorCounts = rows.reduce((acc, row) => {
+      const key = row?.resolved ? 'RESOLVED' : (row?.error || 'NXDOMAIN');
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const tableRows = rows.slice(0, 10);
+    const csv = [
+      ['#', 'Subdomain', 'Status', 'Resolved', 'DNS Time', 'Error', 'Source', 'Verified', 'Confidence'].join(','),
+      ...rows.map((row, index) => [
+        index + 1,
+        row.subdomain || row.name || '',
+        subStatus(row),
+        row.resolved ? 'yes' : 'no',
+        row.dns_ms ?? '',
+        row.error || '',
+        Array.isArray(row.source) ? row.source.join('|') : row.source || '',
+        row.verified ? 'yes' : 'no',
+        row.confidence ?? 0,
+      ].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')),
+    ].join('\n');
+
+    const summaryItems = [
+      [CheckCircle2, `${checkedCount}/${totalCandidates} Candidates Checked`],
+      [Search, `${totalFound} Live Subdomains Found`],
+      [Zap, `Wildcard : ${wildcard ? 'Detected' : 'Not detected'}`],
+      [Timer, scanSeconds],
+    ];
+    const metricItems = [
+      [Globe2, 'Checked', `${checkedCount}/${totalCandidates}`],
+      [BarChart3, 'Found', totalFound],
+      [WifiOff, 'Failed', failedRows.length],
+      [Database, 'Wildcard', wildcard ? 'Yes' : 'No'],
+      [Activity, 'Avg DNS', formatMs(avgDns)],
+      [Timer, 'Scan Time', scanSeconds],
+    ];
+    const findingItems = [
+      [isScanning ? 'Waiting for subdomain candidates' : `${totalFound ? totalFound : 'No'} exposed subdomains found`, isScanning || totalFound === 0],
+      [isScanning ? 'Wildcard DNS check pending' : `${wildcard ? 'Wildcard DNS detected' : 'No wildcard DNS detected'}`, isScanning || !wildcard],
+      [isScanning ? 'DNS records will appear as scan completes' : `${Object.values(recordCounts).reduce((sum, value) => sum + value, 0) ? 'DNS records discovered' : 'No DNS records discovered'}`, isScanning || Object.values(recordCounts).reduce((sum, value) => sum + value, 0) === 0],
+    ];
+
+    return (
+      <div className="space-y-8 p-1 md:p-2">
+        <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+          <div className="flex flex-wrap items-center gap-3">
+            {isScanning ? <Activity className="h-7 w-7 animate-pulse text-[#b79aff]" /> : <CheckCircle2 className="h-7 w-7 text-[#5add56]" />}
+            <h2 className="text-[26px] font-medium text-[#f4eef7]">{isScanning ? 'Subdomain Enumeration Running' : 'Subdomain Enumeration Completed'}</h2>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            {summaryItems.map(([IconCmp, label]) => (
+              <span key={label} className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#63516e]/80 bg-[#13091f]/74 px-3 text-[11px] text-[#d6cbe2]">
+                <IconCmp className="h-3.5 w-3.5 text-[#f4eef7]" />
+                {label}
+              </span>
+            ))}
+          </div>
+          <div className="mt-6 grid grid-cols-1 gap-1.5 md:grid-cols-2 xl:grid-cols-6">
+            {metricItems.map(([IconCmp, label, value]) => (
+              <div key={label} className="min-h-[78px] rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-4">
+                <div className="flex items-center gap-2 text-[10px] font-bold text-[#efe9f5]">
+                  <IconCmp className="h-3.5 w-3.5" />
+                  <span>{label}</span>
+                </div>
+                <div className="mt-4 text-[13px] font-semibold text-[#f4eef7]">{value}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 gap-8 rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8 xl:grid-cols-2">
+          <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-8">
+            {sectionTitle('Discovery Overview')}
+            <div className="flex flex-col items-center">
+              <div
+                className="grid h-32 w-32 place-items-center rounded-full"
+                style={{ background: `conic-gradient(#5add56 0deg ${foundPct * 3.6}deg, #ff4f5f ${foundPct * 3.6}deg 360deg)` }}
+              >
+                <div className="grid h-24 w-24 place-items-center rounded-full border border-[#4a3857] bg-[#13091f] text-center">
+                  <div>
+                    <div className="text-[13px] text-[#5add56]">{totalFound} Found</div>
+                    <div className="text-[18px] font-semibold text-[#ff4f5f]">{failedRows.length} Failed</div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-8 w-full max-w-md space-y-5 border-t border-[#63516e]/70 pt-5">
+                <div className="flex items-center justify-center gap-4 text-sm text-[#d6cbe2]"><span className="h-3 w-3 rounded-full bg-[#5add56]" /> {totalFound} Found</div>
+                <div className="flex items-center justify-center gap-4 text-sm text-[#d6cbe2]"><span className="h-3 w-3 rounded-full bg-[#ff4f5f]" /> {failedRows.length} Failed</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-8">
+            {sectionTitle('Enumeration Summary')}
+            <div>
+              {[
+                ['Domain', domain],
+                ['Technique', 'Worldwide Enumeration'],
+                ['Wildcard DNS', wildcard ? 'Enabled' : 'Disabled'],
+                ['Verified Hosts', verifiedCount],
+              ].map(([label, value]) => (
+                <div key={label} className="grid grid-cols-[150px_minmax(0,1fr)] border-b border-[#554365]/70 py-4 text-sm last:border-b-0">
+                  <span className="text-[#92859d]">{label}</span>
+                  <span className="text-[#d8cce6] break-words">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+          <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-8">
+            {sectionTitle('DNS Response (Lower is better)')}
+            <div className="grid grid-cols-1 gap-x-12 gap-y-4 xl:grid-cols-2">
+              {rows.length === 0 && (
+                <div className="col-span-full rounded-lg border border-[#4f3b63] bg-[#1a1029] px-5 py-6 text-sm text-[#92859d]">
+                  {isScanning ? 'Waiting for DNS responses...' : 'No DNS response samples available.'}
+                </div>
+              )}
+              {rows.slice(0, 14).map((row) => {
+                const dns = Number(row?.dns_ms) || 0;
+                const tone = row?.resolved ? '#69f08a' : '#ff4f5f';
+                return (
+                  <div key={row.subdomain || row.name} className="grid grid-cols-[minmax(120px,1fr)_minmax(120px,260px)_58px] items-center gap-4">
+                    <span className="truncate text-[11px] text-[#8f839b]">{row.subdomain || row.name}</span>
+                    <div className="h-1.5 rounded-full bg-[#43364b]">
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(8, (dns / maxDns) * 100)}%`, background: tone }} />
+                    </div>
+                    <span className="text-right text-[11px] text-[#d8cce6]">{formatMs(dns)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+          <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-8">
+            {sectionTitle('Enumerated Subdomains')}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-[#554365]/80 text-[11px] text-[#92859d]">
+                    {['#', 'Subdomain', 'Status', 'Resolved', 'DNS Time', 'Error', 'Source', 'Verified', 'Confidence'].map((head) => (
+                      <th key={head} className="px-3 py-3 font-medium">{head}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows.length === 0 && (
+                    <tr>
+                      <td colSpan="9" className="px-3 py-8 text-center text-sm text-[#92859d]">
+                        {isScanning ? 'Scan started. Enumerated subdomains will fill in here.' : 'No subdomains were enumerated.'}
+                      </td>
+                    </tr>
+                  )}
+                  {tableRows.map((row, index) => (
+                    <tr key={row.subdomain || row.name || index} className="border-b border-[#382748] text-[11px] text-[#d8cce6] last:border-b-0">
+                      <td className="px-3 py-4 text-[#92859d]">{index + 1}</td>
+                      <td className="px-3 py-4 font-mono text-[10px]">{row.subdomain || row.name}</td>
+                      <td className="px-3 py-4">
+                        <span className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase ${subToneClasses(subTone(row))}`}>{subStatus(row)}</span>
+                      </td>
+                      <td className="px-3 py-4">{row.resolved ? <CheckCircle2 className="h-4 w-4 text-[#5add56]" /> : <X className="h-4 w-4 text-[#ff4f5f]" />}</td>
+                      <td className="px-3 py-4 text-[#69f08a]">{formatMs(row.dns_ms)}</td>
+                      <td className="px-3 py-4 text-[#ff6673]">{row.error || '-'}</td>
+                      <td className="px-3 py-4">{Array.isArray(row.source) ? row.source.join(', ') : row.source || 'wordlist'}</td>
+                      <td className="px-3 py-4">{row.verified ? <CheckCircle2 className="h-4 w-4 text-[#5add56]" /> : <X className="h-4 w-4 text-[#ff4f5f]" />}</td>
+                      <td className="px-3 py-4 text-[#ff6673]">{Math.round(Number(row.confidence || 0) * 100)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 gap-6 rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8 xl:grid-cols-3">
+          <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-6">
+            {sectionTitle('DNS Record Summary')}
+            {['A', 'MX', 'AAAA', 'TXT', 'CNAME', 'NS'].map((type) => (
+              <div key={type} className="flex items-center justify-between border-b border-[#554365]/70 py-3 text-sm last:border-b-0">
+                <span className="text-[#92859d]">{type} Records</span>
+                <span className="text-[#d8cce6]">{recordCounts[type] || 0}</span>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-6">
+            {sectionTitle('Contact Information')}
+            <div className="flex flex-col items-center">
+              <div
+                className="h-24 w-24 rounded-full"
+                style={{ background: `conic-gradient(#ff4f5f 0deg ${failedPct * 3.6}deg, #5add56 ${failedPct * 3.6}deg 360deg)` }}
+              />
+              <div className="mt-6 w-full space-y-3">
+                {Object.entries(errorCounts).length === 0 && (
+                  <div className="text-center text-sm text-[#92859d]">{isScanning ? 'No response classes yet' : 'No response classes recorded'}</div>
+                )}
+                {Object.entries(errorCounts).slice(0, 5).map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between text-sm">
+                    <span className="text-[#92859d]">{label}</span>
+                    <span className="text-[#d8cce6]">{value} ({Math.round((value / Math.max(1, rows.length)) * 100)}%)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-6">
+            {sectionTitle('Findings')}
+            <div className="space-y-3">
+              {findingItems.map(([text, ok]) => (
+                <div key={text} className="flex items-center justify-between border-b border-[#554365]/70 pb-3 text-sm text-[#d8cce6] last:border-b-0">
+                  <span>{text}</span>
+                  {ok ? <CheckCircle2 className="h-4 w-4 text-[#5add56]" /> : <ShieldAlert className="h-4 w-4 text-[#ffbf6b]" />}
+                </div>
+              ))}
+            </div>
+            <div className="mt-8 rounded-lg border border-[#4f3b63] bg-[#24183b] p-4 text-xs leading-5 text-[#b7abc5]">
+              {isScanning
+                ? 'The scan is in progress. This dashboard starts empty and updates when enumeration data returns.'
+                : totalFound === 0
+                ? 'All checked subdomains returned unresolved results. No active assets were discovered.'
+                : `${totalFound} candidate host${totalFound === 1 ? '' : 's'} resolved. Review verified hosts first.`}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+          <div className="mb-2 text-[18px] font-medium uppercase text-[#b79aff]">Export & Share</div>
+          <p className="text-sm text-[#d2c5dc]">Download or share your scan report.</p>
+          <div className="mt-7 grid grid-cols-1 gap-4 md:grid-cols-4">
+            <button type="button" onClick={() => window.print()} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]">
+              <FileText className="h-4 w-4" /> Export PDF
+            </button>
+            <button type="button" onClick={() => downloadText(`${domain || 'subdomains'}-subdomains.json`, JSON.stringify(data, null, 2), 'application/json')} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]">
+              <FileText className="h-4 w-4" /> Export JSON
+            </button>
+            <button type="button" onClick={() => downloadText(`${domain || 'subdomains'}-subdomains.csv`, csv, 'text/csv')} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]">
+              <FileText className="h-4 w-4" /> Export CSV
+            </button>
+            <button type="button" onClick={() => copyText('subdomain-share', `${domain}: ${totalFound}/${totalCandidates} subdomains found`)} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]">
+              <Share2 className="h-4 w-4" /> {copied === 'subdomain-share' ? 'Copied' : 'Share report'}
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  };
+
   const renderProbabilityBars = (items = []) => (
     <div className="space-y-3">
       {items.map((item) => (
@@ -1461,6 +2037,8 @@ export default function GenericTool({ toolId }) {
           </div>
         ) : results.error ? (
           <div className="p-6 text-red-400 font-mono text-sm">{results.error}</div>
+        ) : toolId === 'subdomains' ? (
+          renderSubdomainResults(results)
         ) : toolId === 'geo' ? (
           renderGeoResults(results)
         ) : toolId === 'osfingerprint' ? (

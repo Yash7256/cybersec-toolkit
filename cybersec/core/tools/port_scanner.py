@@ -4,7 +4,7 @@ import os
 import re
 import socket
 import ssl
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from ipaddress import ip_address
 from typing import List
 import time
@@ -2113,6 +2113,146 @@ async def scan_ports(
         recommendations_error=recommendations_error,
         error=None
     )
+
+
+async def stream_port_scan_events(
+    target: str,
+    ports: List[int] | None = None,
+    timeout: float = 2.0,
+    max_concurrent: int = 100,
+):
+    """Yield port scan events as individual port checks complete."""
+    start_time = time.time()
+
+    if ports is None:
+        ports = list(COMMON_PORTS.keys())
+
+    yield {
+        "type": "init",
+        "data": {
+            "target": target,
+            "total_scanned": len(ports),
+            "open_ports_count": 0,
+            "open_ports": [],
+            "scan_duration_seconds": 0.0,
+            "packets_sent": 0,
+            "avg_latency_ms": None,
+            "scanning": True,
+        },
+    }
+
+    try:
+        loop = asyncio.get_running_loop()
+        ip = (await loop.getaddrinfo(target, None, family=socket.AF_INET))[0][4][0]
+    except Exception as e:
+        yield {"type": "error", "error": f"DNS resolution failed: {e}"}
+        return
+
+    semaphore = asyncio.Semaphore(max_concurrent)
+    attempt_latencies_ms: list[float] = []
+    open_ports: list[OpenPortDetail] = []
+
+    async def scan_with_semaphore(port: int) -> tuple[int, OpenPortDetail | None, float]:
+        async with semaphore:
+            attempt_start = time.perf_counter()
+            detail = await check_port(ip, port, timeout, hostname=target)
+            elapsed_ms = (time.perf_counter() - attempt_start) * 1000
+            attempt_latencies_ms.append(elapsed_ms)
+            return port, detail, elapsed_ms
+
+    tasks = [asyncio.create_task(scan_with_semaphore(port)) for port in ports]
+    checked_count = 0
+    for task in asyncio.as_completed(tasks):
+        port, detail, elapsed_ms = await task
+        checked_count += 1
+        if detail:
+            open_ports.append(detail)
+            yield {
+                "type": "port",
+                "port": asdict(detail),
+                "progress": {
+                    "checked": checked_count,
+                    "total": len(ports),
+                    "open": len(open_ports),
+                    "last_port": port,
+                    "latency_ms": round(elapsed_ms, 2),
+                },
+            }
+        else:
+            yield {
+                "type": "progress",
+                "progress": {
+                    "checked": checked_count,
+                    "total": len(ports),
+                    "open": len(open_ports),
+                    "last_port": port,
+                    "latency_ms": round(elapsed_ms, 2),
+                },
+            }
+
+    avg_latency_ms = (
+        sum(attempt_latencies_ms) / len(attempt_latencies_ms)
+        if attempt_latencies_ms
+        else None
+    )
+    add_service_fingerprints(open_ports)
+
+    version_strings = [p.version for p in open_ports if p.version]
+    if version_strings:
+        from cybersec.core.tools.cve_detect import detect_cves_batch
+        cve_results = await detect_cves_batch(version_strings)
+        for port in open_ports:
+            if port.version and port.version in cve_results:
+                port.cve_result = cve_results[port.version]
+                port.cve_count = port.cve_result.total_count
+                port.cve_critical_count = port.cve_result.critical_count
+                port.cve_high_count = port.cve_result.high_count
+                port.cve_medium_count = port.cve_result.medium_count
+                port.cve_low_count = port.cve_result.low_count
+                scored_cves = [
+                    cve for cve in port.cve_result.cves
+                    if cve.cvss_score is not None
+                ]
+                if scored_cves:
+                    top_cve = max(scored_cves, key=lambda cve: float(cve.cvss_score or 0))
+                    port.max_cvss_score = float(top_cve.cvss_score)
+                    port.max_cvss_severity = top_cve.severity
+                    port.max_cvss_cve = top_cve.cve_id
+
+    add_exploit_availability(open_ports)
+    misconfiguration_summary = await detect_misconfigurations(target, open_ports, timeout)
+    await capture_web_port_screenshots(target, open_ports)
+    threat_intelligence = await check_threat_intelligence(ip)
+    exposure_summary = calculate_exposure_severity(ip, open_ports, threat_intelligence)
+    attack_paths = build_attack_path_visualization(open_ports, exposure_summary)
+    attack_simulations = build_attack_simulation_recommendations(open_ports, exposure_summary)
+    add_mitre_attack_mapping(open_ports)
+    security_score, security_score_factors = await calculate_security_score(target, open_ports)
+    attack_surface = calculate_attack_surface(open_ports)
+    recommendations_error = await add_ai_recommendations(target, open_ports)
+    all_technologies = merge_technologies(*(p.technologies for p in open_ports))
+
+    result = PortScanResult(
+        target=target,
+        total_scanned=len(ports),
+        open_ports_count=len(open_ports),
+        open_ports=open_ports,
+        detected_technologies=all_technologies,
+        scan_duration_seconds=time.time() - start_time,
+        packets_sent=len(ports),
+        avg_latency_ms=avg_latency_ms,
+        security_score=security_score,
+        security_score_factors=security_score_factors,
+        attack_surface=attack_surface,
+        threat_intelligence=threat_intelligence,
+        misconfiguration_summary=misconfiguration_summary,
+        exposure_summary=exposure_summary,
+        attack_paths=attack_paths,
+        attack_simulations=attack_simulations,
+        recommendations_error=recommendations_error,
+        error=None,
+    )
+    yield {"type": "done", "result": result}
 
 
 async def scan_port_range(

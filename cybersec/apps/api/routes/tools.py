@@ -3,10 +3,12 @@ Tools router implementation.
 """
 import logging
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from cybersec.apps.api.deps import get_db, get_optional_user
 from cybersec.database.models import User, ToolResult
 import dataclasses
+import json
 
 from cybersec.apps.api.schemas.tool import (
     DnsRequest, WhoisRequest, PingRequest, TracerouteRequest,
@@ -21,10 +23,10 @@ from cybersec.core.tools.ping import ping_host
 from cybersec.core.tools.traceroute import traceroute
 from cybersec.core.tools.ssl import ssl_audit
 from cybersec.core.tools.http_headers import check_http_headers
-from cybersec.core.tools.subdomain import find_subdomains
+from cybersec.core.tools.subdomain import find_subdomains, stream_subdomain_events
 from cybersec.core.tools.geoip import geoip_lookup
 from cybersec.core.tools.os_fingerprint import os_fingerprint
-from cybersec.core.tools.port_scanner import scan_ports, scan_port_range
+from cybersec.core.tools.port_scanner import scan_ports, scan_port_range, stream_port_scan_events
 
 
 def _port_scan_to_dict(result: PortScanResult) -> dict:
@@ -134,6 +136,36 @@ async def run_whois(
     return {"tool_result_id": tool_result_id, "data": result_dict}
 
 
+@router.post("/whois/stream")
+async def stream_whois(
+    body: WhoisRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user)
+):
+    async def stream_response():
+        try:
+            yield f"data: {json.dumps({'type': 'init', 'data': {'target': body.target, 'domain': body.target, 'scanning': True, 'scan_stage': 'init', 'scan_message': 'Starting WHOIS lookup'}})}\n\n"
+            yield f"data: {json.dumps({'type': 'stage', 'stage': 'normalize', 'message': 'Normalizing domain target'})}\n\n"
+            yield f"data: {json.dumps({'type': 'stage', 'stage': 'whois', 'message': 'Querying WHOIS and RDAP sources'})}\n\n"
+            result = await whois_lookup(body.target)
+            result_dict = dataclasses.asdict(result)
+            tool_result_id = await _save_tool_result(db, current_user, "whois", body.target, result_dict)
+            yield f"data: {json.dumps({'type': 'done', 'data': result_dict, 'tool_result_id': tool_result_id})}\n\n"
+        except Exception as e:
+            logger.exception("WHOIS stream failed for %s", body.target)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 @router.get("/whois")
 async def run_whois_get(
     target: str = Query(...),
@@ -223,6 +255,34 @@ async def run_subdomain(
     tool_result_id = await _save_tool_result(db, current_user, "subdomain", body.domain, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
 
+
+@router.post("/subdomain/stream")
+async def stream_subdomain(
+    body: SubdomainRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user)
+):
+    async def stream_response():
+        try:
+            async for event in stream_subdomain_events(body.domain, body.wordlist, body.strictness):
+                if event.get("type") == "done":
+                    tool_result_id = await _save_tool_result(db, current_user, "subdomain", body.domain, event["data"])
+                    event["tool_result_id"] = tool_result_id
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            logger.exception("Subdomain stream failed for %s", body.domain)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
 @router.post("/geoip")
 async def run_geoip(
     body: GeoipRequest,
@@ -233,6 +293,36 @@ async def run_geoip(
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "geoip", body.target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
+
+
+@router.post("/geoip/stream")
+async def stream_geoip(
+    body: GeoipRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user)
+):
+    async def stream_response():
+        try:
+            yield f"data: {json.dumps({'type': 'init', 'data': {'target': body.target, 'ip': None, 'resolved_ips': [], 'ip_results': [], 'provider': 'ipwhois', 'cached': False, 'scanning': True, 'scan_stage': 'init', 'scan_message': 'Starting GeoIP lookup'}})}\n\n"
+            yield f"data: {json.dumps({'type': 'stage', 'stage': 'resolve', 'message': 'Resolving target address'})}\n\n"
+            yield f"data: {json.dumps({'type': 'stage', 'stage': 'provider', 'message': 'Querying GeoIP provider and RDAP registry'})}\n\n"
+            result = await geoip_lookup(body.target)
+            result_dict = dataclasses.asdict(result)
+            tool_result_id = await _save_tool_result(db, current_user, "geoip", body.target, result_dict)
+            yield f"data: {json.dumps({'type': 'done', 'data': result_dict, 'tool_result_id': tool_result_id})}\n\n"
+        except Exception as e:
+            logger.exception("GeoIP stream failed for %s", body.target)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.get("/geoip")
@@ -294,3 +384,44 @@ async def run_port_scan(
     result_dict = _port_scan_to_dict(result)
     tool_result_id = await _save_tool_result(db, current_user, "port_scan", body.target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
+
+
+@router.post("/port_scan/stream")
+async def stream_port_scan(
+    body: PortScanRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user)
+):
+    if body.ports:
+        ports = body.ports
+    elif body.start_port is not None and body.end_port is not None:
+        ports = list(range(body.start_port, body.end_port + 1))
+    else:
+        ports = None
+
+    async def stream_response():
+        try:
+            async for event in stream_port_scan_events(
+                body.target,
+                ports=ports,
+                timeout=body.timeout,
+                max_concurrent=body.max_concurrent,
+            ):
+                if event.get("type") == "done":
+                    result_dict = _port_scan_to_dict(event["result"])
+                    tool_result_id = await _save_tool_result(db, current_user, "port_scan", body.target, result_dict)
+                    event = {"type": "done", "data": result_dict, "tool_result_id": tool_result_id}
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            logger.exception("Port scan stream failed for %s", body.target)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
