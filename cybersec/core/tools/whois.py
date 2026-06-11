@@ -1,40 +1,54 @@
 import asyncio
 import re
 import time
-from dataclasses import dataclass
+import threading
+import json
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 import whois as python_whois
 
 
-WHOIS_CACHE_TTL_SECONDS = 3600
+from cybersec.config.settings import settings
+
+logger = logging.getLogger(__name__)
+
 _CACHE: dict[str, tuple[float, "WHOISResult"]] = {}
+_CACHE_LOCK = threading.Lock()
+MAX_CACHE_SIZE = 1000
 
-PRIVACY_PATTERNS = (
-    "privacy",
-    "redacted",
-    "whoisguard",
-    "domains by proxy",
-    "contact privacy",
-    "data protected",
-    "private registration",
-    "withheld",
+_WHOIS_EXECUTOR = ThreadPoolExecutor(
+    max_workers=10,
+    thread_name_prefix="whois_worker"
 )
 
-SUSPICIOUS_STATUS_TOKENS = (
-    "hold",
-    "pendingdelete",
-    "redemptionperiod",
-    "serverdeleteprohibited",
-    "clienthold",
-)
+_redis = None
 
-COMMON_TLDS = {
-    "com", "org", "net", "edu", "gov", "io", "co", "in", "uk", "de", "fr", "au",
-    "ca", "us", "info", "biz", "dev", "app", "ai", "me", "xyz",
-}
+
+async def _get_redis():
+    global _redis
+    if _redis is None:
+        try:
+            import redis.asyncio as aioredis
+            _redis = aioredis.from_url(
+                settings.REDIS_URL,
+                decode_responses=True,
+                socket_connect_timeout=2.0,
+                socket_timeout=3.0,
+            )
+        except Exception as e:
+            logger.debug("Redis unavailable for WHOIS cache: %s", e)
+            _redis = False  # sentinel
+    return _redis if _redis is not False else None
+
+PRIVACY_PATTERNS = tuple(settings.whois_privacy_patterns_list)
+SUSPICIOUS_STATUS_TOKENS = tuple(settings.whois_suspicious_status_tokens_list)
+COMMON_TLDS = settings.whois_common_tlds_set
 
 STATUS_EXPLANATIONS = {
     "clienttransferprohibited": "Domain transfer is locked by the registrar.",
@@ -104,20 +118,33 @@ class WHOISResult:
 
 
 def clear_whois_cache() -> None:
-    _CACHE.clear()
+    with _CACHE_LOCK:
+        _CACHE.clear()
 
 
 def _normalize_target(target: str) -> str:
     normalized = target.strip().lower()
-    normalized = re.sub(r"^https?://", "", normalized)
-    normalized = normalized.split("/")[0].split(":")[0].strip(".")
-    if not normalized:
+    
+    # Prefix with http:// if no scheme exists, so urlparse can correctly parse host
+    if not re.match(r"^[a-zA-Z]+://", normalized):
+        parsed = urlparse("http://" + normalized)
+    else:
+        parsed = urlparse(normalized)
+        
+    domain = parsed.hostname or parsed.path
+    if not domain:
         raise ValueError("Target is required")
-    if len(normalized) > 253:
-        raise ValueError("Target is too long")
-    if any(ch.isspace() for ch in normalized):
-        raise ValueError("Target must be a single domain")
-    return normalized
+        
+    domain = domain.strip().strip(".")
+    
+    # Strict validation of domain name characters to prevent command/argument/flag injection
+    if not re.match(r"^[a-z0-9.-]+$", domain):
+        raise ValueError("Invalid target domain format: only alphanumeric characters, dots, and hyphens are allowed")
+        
+    if len(domain) > 253:
+        raise ValueError("Target domain is too long")
+        
+    return domain
 
 
 def _tld(domain: str) -> str | None:
@@ -207,7 +234,7 @@ def _status_explanations(statuses: list[str]) -> list[dict[str, str]]:
 
 def _privacy_detected(*values: Any) -> bool:
     haystack = " ".join(str(value).lower() for value in values if value)
-    return any(pattern in haystack for pattern in PRIVACY_PATTERNS)
+    return any(pattern in haystack for pattern in settings.whois_privacy_patterns_list)
 
 
 def _expiry_status(expiry: datetime | None, now: datetime) -> str | None:
@@ -242,9 +269,9 @@ def _risk_indicators(
         risks.append({"id": "privacy_protected", "severity": "info", "label": "Registrant details appear privacy-protected or redacted"})
     if updated and (now - updated).days <= 14:
         risks.append({"id": "recently_updated", "severity": "info", "label": "WHOIS record was recently updated"})
-    if any(any(token in _status_key(status) for token in SUSPICIOUS_STATUS_TOKENS) for status in statuses):
+    if any(any(token in _status_key(status) for token in settings.whois_suspicious_status_tokens_list) for status in statuses):
         risks.append({"id": "suspicious_status", "severity": "high", "label": "Domain has a restrictive or suspicious registry status"})
-    if tld and tld not in COMMON_TLDS:
+    if tld and tld not in settings.whois_common_tlds_set:
         risks.append({"id": "unusual_tld", "severity": "info", "label": f"Less common TLD: .{tld}"})
     return risks
 
@@ -258,32 +285,38 @@ def _extract_rdap_contact(entities: list[dict] | None, role: str) -> dict[str, A
     if not entities:
         return None
     for entity in entities:
-        roles = {str(item).lower() for item in entity.get("roles", [])}
+        if not isinstance(entity, dict):
+            continue
+        roles = {str(item).lower() for item in entity.get("roles", []) if item is not None}
         nested = _extract_rdap_contact(entity.get("entities"), role)
         if role not in roles and nested:
             return nested
         if role not in roles:
             continue
         name = org = email = phone = None
-        for item in entity.get("vcardArray", [None, []])[1]:
-            if len(item) < 4:
-                continue
-            key = item[0]
-            if key == "fn":
-                name = item[3]
-            elif key == "org":
-                org = item[3]
-            elif key == "email":
-                email = item[3]
-            elif key == "tel":
-                phone = item[3]
+        vcard_array = entity.get("vcardArray")
+        if isinstance(vcard_array, list) and len(vcard_array) > 1 and isinstance(vcard_array[1], list):
+            for item in vcard_array[1]:
+                if not isinstance(item, list) or len(item) < 4:
+                    continue
+                key = item[0]
+                val = item[3]
+                if key == "fn":
+                    name = val
+                elif key == "org":
+                    org = val
+                elif key == "email":
+                    email = val
+                elif key == "tel":
+                    phone = val
         return _contact(email=email, phone=phone, name=name, org=org)
     return None
 
 
 async def _fetch_rdap(domain: str) -> dict[str, Any] | None:
-    url = f"https://rdap.org/domain/{domain}"
-    async with httpx.AsyncClient(timeout=8) as client:
+    bootstrap = settings.RDAP_BOOTSTRAP_URL.rstrip("/")
+    url = f"{bootstrap}/domain/{domain}"
+    async with httpx.AsyncClient(timeout=settings.WHOIS_TIMEOUT) as client:
         resp = await client.get(url)
     if resp.status_code == 404:
         return None
@@ -383,17 +416,45 @@ async def whois_lookup(target: str) -> WHOISResult:
         return _empty_result(target, str(exc))
 
     now_ts = time.time()
-    cached = _CACHE.get(domain)
-    if cached and cached[0] > now_ts:
-        return _clone(cached[1], cached=True)
+    with _CACHE_LOCK:
+        cached = _CACHE.get(domain)
+        if cached and cached[0] > now_ts:
+            logger.info("WHOIS cache hit (local memory) for: %s", domain)
+            return _clone(cached[1], cached=True)
 
-    loop = asyncio.get_event_loop()
+    r = await _get_redis()
+    if r is not None:
+        try:
+            raw = await r.get(f"whois:{domain}")
+            if raw is not None:
+                logger.info("WHOIS cache hit (Redis) for: %s", domain)
+                result_dict = json.loads(raw)
+                result = WHOISResult(**result_dict)
+                with _CACHE_LOCK:
+                    if len(_CACHE) >= MAX_CACHE_SIZE:
+                        oldest_key = next(iter(_CACHE))
+                        _CACHE.pop(oldest_key, None)
+                    _CACHE[domain] = (now_ts + settings.WHOIS_CACHE_TTL_SECONDS, result)
+                return _clone(result, cached=True)
+        except Exception as exc:
+            logger.warning("Redis WHOIS cache read failed for %s: %s", domain, exc)
+
+    logger.info("WHOIS cache miss for %s. Executing queries.", domain)
+    loop = asyncio.get_running_loop()
     now = datetime.now(timezone.utc)
     try:
-        w = await loop.run_in_executor(None, python_whois.whois, domain)
+        w = await asyncio.wait_for(
+            loop.run_in_executor(_WHOIS_EXECUTOR, python_whois.whois, domain),
+            timeout=settings.WHOIS_TIMEOUT
+        )
+    except asyncio.TimeoutError:
+        w = None
+        whois_error = "WHOIS query timed out"
+        logger.warning("WHOIS lookup timed out for: %s", domain)
     except Exception as exc:
         w = None
         whois_error = str(exc)
+        logger.warning("WHOIS lookup failed for %s: %s", domain, exc)
     else:
         whois_error = None
 
@@ -403,6 +464,7 @@ async def whois_lookup(target: str) -> WHOISResult:
         rdap = await _fetch_rdap(domain)
     except Exception as exc:
         rdap_error = str(exc)
+        logger.warning("RDAP lookup failed for %s: %s", domain, exc)
 
     tld = _tld(domain)
     rdap_entities = (rdap or {}).get("entities", [])
@@ -512,5 +574,19 @@ async def whois_lookup(target: str) -> WHOISResult:
         cached=False,
         error=None if (w or rdap or available is True) else whois_error or rdap_error or "WHOIS lookup failed",
     )
-    _CACHE[domain] = (now_ts + WHOIS_CACHE_TTL_SECONDS, _clone(result, cached=False))
+    with _CACHE_LOCK:
+        if len(_CACHE) >= MAX_CACHE_SIZE:
+            oldest_key = next(iter(_CACHE))
+            _CACHE.pop(oldest_key, None)
+        _CACHE[domain] = (now_ts + settings.WHOIS_CACHE_TTL_SECONDS, _clone(result, cached=False))
+
+    r = await _get_redis()
+    if r is not None:
+        try:
+            raw = json.dumps(asdict(result))
+            await r.setex(f"whois:{domain}", settings.WHOIS_CACHE_TTL_SECONDS, raw)
+            logger.info("Populated Redis WHOIS cache for %s", domain)
+        except Exception as exc:
+            logger.warning("Redis WHOIS cache write failed for %s: %s", domain, exc)
+
     return result
