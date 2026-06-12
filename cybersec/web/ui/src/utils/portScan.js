@@ -128,7 +128,7 @@ export function mapOpenPort(p) {
     recommendation_reason: recommendationReason,
     recommendation_priority: ['critical', 'high', 'medium', 'low'].includes(recommendationPriority)
       ? recommendationPriority
-      : riskLevel,
+      : '',
     mitre_attack: mitreAttack,
     potential_threat: potentialThreat,
     exploit_availability: exploitAvailability,

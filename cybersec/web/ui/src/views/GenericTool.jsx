@@ -185,6 +185,7 @@ export default function GenericTool({ toolId }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [copied, setCopied] = useState('');
+  const [activeOsTab, setActiveOsTab] = useState('security');
   const liveRequestActive = useRef(false);
   const streamAbortRef = useRef(null);
 
@@ -1724,25 +1725,6 @@ export default function GenericTool({ toolId }) {
     );
   };
 
-  const renderProbabilityBars = (items = []) => (
-    <div className="space-y-3">
-      {items.map((item) => (
-        <div key={item.name} className="space-y-1.5">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-gray-200">{item.name}</span>
-            <span className="text-xs font-mono text-purple-200">{pct(item.probability)}%</span>
-          </div>
-          <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
-            <div
-              className="h-full rounded-full"
-              style={{ width: `${pct(item.probability)}%`, background: 'linear-gradient(90deg, #8b5cf6, #22d3ee)' }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
   const renderOsFingerprintResults = (data) => {
     const confidence = pct(data.confidence);
     const risk = data.risk_score || {};
@@ -1750,226 +1732,427 @@ export default function GenericTool({ toolId }) {
     const exposure = data.internet_exposure || {};
     const geo = data.geolocation || {};
     const sourceSections = Array.isArray(data.fingerprint_sources) ? data.fingerprint_sources : [];
+    const probabilities = Array.isArray(data.os_probabilities) ? data.os_probabilities : [];
+    const timeline = Array.isArray(data.fingerprint_timeline) ? data.fingerprint_timeline : [];
+    const openPorts = Array.isArray(data.open_ports) ? data.open_ports : [];
+    const scanDuration = Number.isFinite(Number(data.scan_duration_seconds)) ? `${Number(data.scan_duration_seconds).toFixed(1)}s` : '—';
+    const hostingLabel = data.hosting_provider || geo.provider || geo.org || geo.isp || '—';
+    const hostingSubtext = [geo.asn, geo.org].filter(Boolean).join(' · ') || '—';
+    const detectionQuality = data.confidence_label || data.scan_quality?.label || '—';
+    const sourcesByName = new Map(sourceSections.map((source) => [String(source.name || '').toLowerCase(), source]));
+    const sourceCard = (label, keys, IconCmp) => {
+      const source = keys.map((key) => sourcesByName.get(key)).find(Boolean);
+      const observed = source && !['not observed', 'limited'].includes(String(source.status || '').toLowerCase());
+      return (
+        <div className="rounded-lg border border-[#4f3b63] bg-[#24183b]/80 p-5 min-h-[210px]">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 text-[12px] font-medium text-[#e9d5ff]">
+              <IconCmp className="h-4 w-4" />
+              <span>{label}</span>
+            </div>
+            <span className={`text-[10px] ${observed ? 'text-[#69f08a]' : 'text-[#ff4f5f]'}`}>
+              {source?.status || 'Not observed'}
+            </span>
+          </div>
+          {source?.inference && <p className="text-[11px] leading-relaxed text-[#b7abc5]">{source.inference}</p>}
+          {source?.observed_ttl !== undefined && (
+            <div className="mt-5 border-t border-[#554365]/70 pt-3 text-[11px] text-[#d8cce6]">
+              ICMP TTL {source.observed_ttl}
+            </div>
+          )}
+          {Array.isArray(source?.items) && source.items.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {source.items.slice(0, 4).map((item, index) => (
+                <div key={`${label}-${index}`} className="border-b border-[#554365]/70 pb-2 text-[11px] text-[#d8cce6] last:border-b-0">
+                  <span className="text-[#b79aff]">{item.service || 'Signal'}</span>: {item.reason || item.os_signal || '—'}
+                </div>
+              ))}
+            </div>
+          )}
+          {source?.details && (
+            <div className="mt-4 text-[11px] text-[#b7abc5]">
+              {Object.entries(source.details).slice(0, 3).map(([key, value]) => (
+                <div key={key} className="flex justify-between gap-3 border-b border-[#554365]/70 py-2 last:border-b-0">
+                  <span>{key}</span>
+                  <span>{String(value)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+    const fieldRow = (label, value) => (
+      <div className="flex items-center justify-between gap-4 border-b border-[#554365]/70 py-3 text-[12px] text-[#d8cce6] last:border-b-0">
+        <span>{label}</span>
+        <span className="text-right text-[#f4eef7]">{value === undefined || value === null || value === '' ? '—' : Array.isArray(value) ? value.join(', ') || '—' : String(value)}</span>
+      </div>
+    );
+    const analysisCard = (title, children, extraClass = '') => (
+      <div className={`rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7 ${extraClass}`}>
+        <div className="mb-6 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]">
+          <CircleDot className="h-4 w-4" />
+          <span>{title}</span>
+        </div>
+        {children}
+      </div>
+    );
+    const renderOsTabContent = () => {
+      if (activeOsTab === 'security') {
+        const securityRows = [
+          ['Firewall', data.firewall_detection?.possible ? 'Possible' : 'Not obvious'],
+          ['Honeypot', data.honeypot_detection?.possible ? 'Possible' : 'No obvious signal'],
+          ['Quality', data.scan_quality?.label || '—'],
+          ['ICMP Response', data.ttl == null ? 'Not observed' : `TTL ${data.ttl}`],
+        ];
+        const correlationItems = [...(data.eol_findings || []), ...(data.vulnerability_correlation || [])];
+        return (
+          <>
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+              {analysisCard('Security Indicators', (
+                <div>
+                  {securityRows.map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between gap-4 border-b border-[#554365]/70 py-3 text-[12px] text-[#d8cce6] last:border-b-0">
+                      <span>{label}</span>
+                      <span className={label === 'Firewall' && value === 'Possible' ? 'text-[#fb923c]' : label === 'Honeypot' && value === 'No obvious signal' ? 'text-[#69f08a]' : 'text-[#f4eef7]'}>
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {analysisCard('Attack Surface by OS', (
+                <div className="space-y-4">
+                  {(data.attack_surface_by_os || []).length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
+                  {(data.attack_surface_by_os || []).slice(0, 4).map((item) => (
+                    <div key={item} className="rounded-lg bg-[#2a1a3d] p-4 text-[12px] leading-relaxed text-[#d8cce6]">{item}</div>
+                  ))}
+                </div>
+              ))}
+              {analysisCard('MITRE ATT&CK Mapping', (
+                <div className="relative space-y-5 before:absolute before:left-2 before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-[#6b5790]">
+                  {(data.mitre_attack || []).length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
+                  {(data.mitre_attack || []).slice(0, 4).map((item) => (
+                    <div key={`${item.id}-${item.name}`} className="relative grid grid-cols-[20px_minmax(0,1fr)] gap-3 text-[12px]">
+                      <span className="mt-1 h-4 w-4 rounded-full bg-[#b89cff]" />
+                      <span>
+                        <strong className="block text-[#f4eef7]">{item.id}</strong>
+                        <span className="block text-[#d8cce6]">{item.name}</span>
+                        <span className="text-[#92859d]">{item.tactic}{item.reason ? ` · ${item.reason}` : ''}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_1fr]">
+              {analysisCard('CPE Mapping', (
+                <div className="space-y-5">
+                  {(data.cpe_matches || []).length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
+                  {(data.cpe_matches || []).slice(0, 4).map((item) => (
+                    <div key={item.cpe}>
+                      <div className="mb-2 flex items-center justify-between gap-4 text-[12px] text-[#d8cce6]">
+                        <span className="break-all">{item.cpe}</span>
+                        <span>{pct(item.confidence)}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-[#3f3348]"><div className="h-full rounded-full bg-[#b89cff]" style={{ width: `${pct(item.confidence)}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {analysisCard('EOL & Vulnerability Correlation', (
+                <div className="space-y-4">
+                  {correlationItems.length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
+                  {correlationItems.slice(0, 5).map((item, index) => (
+                    <div key={`${item.component || item.name || index}`} className="rounded-lg bg-[#2a1a3d] p-4">
+                      <div className="text-[13px] font-semibold text-[#f4eef7]">{item.component || item.name || 'Finding'}</div>
+                      <div className="mt-1 text-[11px] leading-relaxed text-[#92859d]">{item.reason || item.finding || item.detail || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      }
+
+      if (activeOsTab === 'services') {
+        return (
+          <div className="space-y-6">
+            {analysisCard('Open Services', (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-[#554365]/80 text-[11px] text-[#92859d]">
+                      {['Port', 'Service', 'Version / Detail', 'Actions', 'Risk'].map((head) => (
+                        <th key={head} className="px-4 py-3 font-medium">{head}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {openPorts.length === 0 && (
+                      <tr><td colSpan="5" className="px-4 py-10 text-center text-sm text-[#92859d]">—</td></tr>
+                    )}
+                    {openPorts.map((port) => (
+                      <tr key={port.port} className="border-b border-[#382748] text-[12px] text-[#d8cce6] last:border-b-0">
+                        <td className="px-4 py-5 font-mono text-[#ddd6fe]">{port.port}</td>
+                        <td className="px-4 py-5">{port.service || '—'}</td>
+                        <td className="px-4 py-5">
+                          <div className="font-semibold text-[#f4eef7]">{port.version || port.fingerprint?.detected || '—'}</div>
+                          {port.fingerprint?.method && <div className="mt-1 text-[10px] text-[#92859d]">{port.fingerprint.method}</div>}
+                        </td>
+                        <td className="px-4 py-5">
+                          <button type="button" className="rounded-md bg-[#b89cff] px-4 py-2 text-[11px] font-semibold text-[#24183b]">
+                            View Details
+                          </button>
+                        </td>
+                        <td className="px-4 py-5">
+                          <span className="rounded-full border border-[#743248]/80 bg-[#351222]/72 px-3 py-1 text-[10px] font-semibold uppercase text-[#ff4f5f]">
+                            {port.risk_level || '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+            {analysisCard('Historical Fingerprint Comparison', (
+              <div className="grid min-h-[180px] place-items-center text-center">
+                <div>
+                  <FileText className="mx-auto mb-4 h-10 w-10 text-[#8d7aa8]" />
+                  <p className="text-[13px] text-[#d8cce6]">{data.historical_comparison?.summary || '—'}</p>
+                  {data.historical_comparison?.available === false && (
+                    <p className="mt-1 text-[11px] text-[#92859d]">First fingerprint baseline.</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      return (
+        <>
+          <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+            <div className="mb-7 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]"><CircleDot className="h-4 w-4" />Fingerprinting Sources Breakdown</div>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {sourceCard('TTL Analysis', ['ttl analysis', 'ttl'], Timer)}
+              {sourceCard('Banner Analysis', ['banner analysis', 'banner'], Database)}
+              {sourceCard('Port Behaviour', ['port behaviour', 'port behavior', 'port'], Radio)}
+              {sourceCard('TCP/IP Stack', ['tcp/ip stack', 'tcp stack'], Network)}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+              <div className="mb-5 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]"><CircleDot className="h-4 w-4" />TCP/IP Stack Fingerprinting</div>
+              {fieldRow('Window Size', tcp.window_size)}
+              {fieldRow('MSS', tcp.mss)}
+              {fieldRow('SACK Permitted', tcp.sack_permitted)}
+              <div className="mt-6 rounded-lg bg-[#2a1a3d] p-4 text-[11px] text-[#d8cce6]">
+                TCP Options {(Array.isArray(tcp.tcp_options) ? tcp.tcp_options : []).join(', ') || '—'}
+              </div>
+            </div>
+            <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+              <div className="mb-5 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]"><CircleDot className="h-4 w-4" />Environment</div>
+              <div className="space-y-4">
+                <div className="rounded-lg bg-[#2a1a3d] p-4">
+                  <div className="text-[12px] font-semibold text-[#f4eef7]">Virtual Machine</div>
+                  <div className="mt-1 text-[11px] text-[#b7abc5]">{data.environment || '—'}</div>
+                </div>
+                <div className="rounded-lg bg-[#2a1a3d] p-4">
+                  <div className="text-[12px] font-semibold text-[#f4eef7]">Uptime</div>
+                  <div className="mt-1 text-[11px] text-[#b7abc5]">{data.uptime_estimate?.value || data.uptime_estimate?.confidence || '—'}</div>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+              <div className="mb-5 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]"><CircleDot className="h-4 w-4" />Internet Exposure Context</div>
+              {fieldRow('Classification', exposure.classification)}
+              {fieldRow('Country', [geo.country, geo.country_code && `(${geo.country_code})`].filter(Boolean).join(' '))}
+              {fieldRow('SACK Permitted', tcp.sack_permitted)}
+            </div>
+          </div>
+        </>
+      );
+    };
+    const csv = [
+      ['Field', 'Value'].join(','),
+      ['Target', data.target],
+      ['IP', data.ip],
+      ['Detected OS', data.detected_os],
+      ['Family', data.family],
+      ['Confidence', data.confidence],
+      ['Kernel', data.kernel_estimate],
+      ['Hosting', hostingLabel],
+    ].map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
 
     return (
-      <div className="p-6 space-y-6">
-        <section className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-4">
-          <div className="border border-purple-400/25 bg-dark-800/70 rounded-lg p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 text-purple-200 text-xs font-mono uppercase">
-                  <Fingerprint className="w-4 h-4" />
-                  Visual OS Card
-                </div>
-                <h2 className="text-2xl font-semibold text-gray-100 mt-4 break-words">{data.detected_os || 'Unknown OS'}</h2>
-                <p className="text-sm text-gray-400 mt-1">{data.os_version_estimate || data.distribution_family || 'Version estimate unavailable'}</p>
-              </div>
-              <div
-                className="w-24 h-24 rounded-full grid place-items-center shrink-0"
-                style={{ background: `conic-gradient(#a78bfa ${confidence * 3.6}deg, rgba(55,48,80,0.9) 0deg)` }}
-                title={`${confidence}% confidence`}
-              >
-                <div className="w-[72px] h-[72px] rounded-full bg-dark-900 grid place-items-center border border-dark-600">
-                  <span className="text-lg font-mono text-gray-100">{confidence}%</span>
-                </div>
-              </div>
+      <div className="flex-1 overflow-y-auto p-1 md:p-2">
+        <div className="space-y-8">
+          <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <CheckCircle2 className="h-6 w-6 text-[#5add56]" />
+              <h2 className="text-[26px] font-medium text-[#f4eef7]">OS Fingerprinting Completed</h2>
             </div>
-            <div className="flex flex-wrap gap-2 mt-5">
-              {chip(data.confidence_label || 'Unknown confidence', confidence >= 70 ? 'good' : confidence >= 45 ? 'warn' : 'bad')}
-              {chip(data.detection_mode || data.method || 'Passive Fingerprinting', 'info')}
-              {data.family && chip(data.family, 'neutral')}
+            <div className="mb-7 inline-flex h-7 items-center gap-1.5 rounded-full border border-[#63516e]/80 bg-[#13091f]/74 px-3 text-[11px] text-[#d6cbe2]">
+              <Timer className="h-3.5 w-3.5 text-[#f4eef7]" /> {scanDuration}
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            {renderMetricCard(Cpu, 'Kernel', data.kernel_estimate, 'Kernel fingerprinting')}
-            {renderMetricCard(Server, 'Device Type', data.device_type, 'Server/router/firewall/NAS/printer signal')}
-            {renderMetricCard(Cloud, 'Hosting', data.hosting_provider || geo.provider, [geo.asn, geo.org].filter(Boolean).join(' · '))}
-            {renderMetricCard(ShieldAlert, 'Exposure Score', risk.score != null ? `${risk.score}/100` : 'Unknown', risk.level)}
-          </div>
-        </section>
-
-        {data.ai_summary && (
-          <section className="border border-dark-600 bg-dark-800/55 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-2">AI Summary</div>
-            <p className="text-sm leading-6 text-gray-200">{data.ai_summary}</p>
-          </section>
-        )}
-
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">
-              <Gauge className="w-4 h-4" />
-              OS Probability Engine
-            </div>
-            {renderProbabilityBars(data.os_probabilities || [])}
-          </div>
-
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">
-              <Network className="w-4 h-4" />
-              Network Distance
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {renderField('observed_ttl', data.network_distance?.observed_ttl)}
-              {renderField('initial_ttl', data.network_distance?.estimated_initial_ttl)}
-              {renderField('hop_range', data.network_distance?.range)}
-              {renderField('method', data.method)}
-            </div>
-          </div>
-        </section>
-
-        <section className="border border-dark-600 bg-dark-800/45 rounded-lg p-5 space-y-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Fingerprinting Sources Breakdown</div>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-            {sourceSections.map((source) => (
-              <div key={source.name} className="border border-dark-600 bg-dark-900/30 rounded-lg p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold text-gray-100">{source.name}</h3>
-                  {chip(source.status || 'observed', source.status === 'limited' || source.status === 'not observed' ? 'warn' : 'good')}
-                </div>
-                {source.inference && <p className="text-sm text-gray-300 mt-3">{source.inference}</p>}
-                {source.observed_ttl !== undefined && (
-                  <div className="grid grid-cols-2 gap-2 mt-3">
-                    {renderField('observed_ttl', source.observed_ttl)}
-                    {renderField('initial_ttl', source.estimated_initial_ttl)}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr]">
+              <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-6">
+                <div className="mb-7 flex items-start gap-3">
+                  <Fingerprint className="mt-1 h-6 w-6 text-[#ff7a3d]" />
+                  <div>
+                    <div className="text-[18px] font-semibold text-[#f4eef7]">{data.detected_os || '—'}</div>
+                    <div className="text-[12px] text-[#b7abc5]">{data.os_version_estimate || data.distribution_family || '—'}</div>
                   </div>
-                )}
-                {Array.isArray(source.items) && source.items.length > 0 && (
-                  <div className="space-y-2 mt-3">
-                    {source.items.map((item, index) => (
-                      <div key={`${item.service}-${index}`} className="text-xs text-gray-300 border border-dark-700 rounded-lg p-3">
-                        <span className="text-purple-200">{item.service}</span>: {item.reason}
+                </div>
+                <div className="grid grid-cols-1 items-center gap-7 md:grid-cols-[150px_minmax(0,1fr)]">
+                  <div className="grid h-36 w-36 place-items-center rounded-full" style={{ background: `conic-gradient(#69f08a 0deg ${confidence * 2.2}deg, #ffea5f ${confidence * 2.2}deg ${confidence * 3.05}deg, #ff7a3d ${confidence * 3.05}deg ${confidence * 3.6}deg, #4a3857 0deg)` }}>
+                    <div className="grid h-24 w-24 place-items-center rounded-full bg-[#13091f] text-center">
+                      <strong className="text-2xl text-[#69f08a]">{confidence}%<span className="block text-[10px] uppercase text-[#69f08a]">Confidence</span></strong>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-[54px_minmax(0,1fr)] gap-4">
+                      <div className="grid h-12 w-12 place-items-center rounded-lg bg-[#281743] text-[#b79aff]"><ShieldCheck className="h-6 w-6" /></div>
+                      <div>
+                        <div className="text-[16px] font-semibold text-[#f4eef7]">{detectionQuality}</div>
+                        <div className="text-[12px] text-[#92859d]">Detection Quality</div>
                       </div>
-                    ))}
+                    </div>
+                    <div className="grid grid-cols-[54px_minmax(0,1fr)] gap-4">
+                      <div className="grid h-12 w-12 place-items-center rounded-lg bg-[#281743] text-[#b79aff]"><Fingerprint className="h-6 w-6" /></div>
+                      <div>
+                        <div className="text-[16px] font-semibold text-[#f4eef7]">{data.detection_mode || data.method || '—'}</div>
+                        <div className="text-[12px] text-[#92859d]">Fingerprinting</div>
+                      </div>
+                    </div>
                   </div>
-                )}
-                {source.details && <pre className="text-xs text-gray-300 mt-3 whitespace-pre-wrap">{JSON.stringify(source.details, null, 2)}</pre>}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">TCP/IP Stack Fingerprint</div>
-            {renderField('window_size', tcp.window_size)}
-            {renderField('mss', tcp.mss)}
-            {renderField('sack', tcp.sack_permitted)}
-            {renderField('timestamps', tcp.timestamps_enabled)}
-            {renderField('tcp_options', tcp.tcp_options)}
-          </div>
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">Environment</div>
-            {renderField('virtualization', data.environment)}
-            {renderField('signals', data.virtualization_signals)}
-            {renderField('uptime', data.uptime_estimate?.value || data.uptime_estimate?.confidence)}
-            {data.uptime_estimate?.note && <p className="text-xs text-gray-500 mt-3">{data.uptime_estimate.note}</p>}
-          </div>
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">Internet Exposure Context</div>
-            {renderField('classification', exposure.classification)}
-            {renderField('public', exposure.is_public)}
-            {renderField('country', [geo.country, geo.country_code && `(${geo.country_code})`].filter(Boolean).join(' '))}
-            {renderField('asn', geo.asn)}
-          </div>
-        </section>
-
-        <section className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">Timeline / Detection Flow</div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            {(data.fingerprint_timeline || []).map((step, index) => (
-              <div key={step.step} className="relative border border-dark-600 bg-dark-900/30 rounded-lg p-4">
-                <div className="text-[10px] font-mono text-purple-300">Step {index + 1}</div>
-                <div className="text-sm font-semibold text-gray-100 mt-2">{step.step}</div>
-                <div className="text-xs text-gray-400 mt-2">{step.detail}</div>
-                <div className="text-xs font-mono text-gray-300 mt-3">{pct(step.confidence_after)}%</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">
-              <ShieldCheck className="w-4 h-4" />
-              Security Indicators
-            </div>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {chip(`Firewall: ${data.firewall_detection?.possible ? 'Possible' : 'Not obvious'}`, data.firewall_detection?.possible ? 'warn' : 'good')}
-              {chip(`Honeypot: ${data.honeypot_detection?.possible ? 'Possible' : 'No obvious signal'}`, data.honeypot_detection?.possible ? 'warn' : 'good')}
-              {chip(`Quality: ${data.scan_quality?.label || 'Unknown'}`, 'info')}
-            </div>
-            {(data.hardening_indicators || []).map((item) => (
-              <div key={item.name} className="text-sm text-gray-300 border border-dark-700 rounded-lg p-3 mb-2">
-                <span className="text-purple-200">{item.name}</span>: {item.detail}
-              </div>
-            ))}
-            {data.scan_quality?.reason && <p className="text-xs text-gray-500 mt-3">{data.scan_quality.reason}</p>}
-          </div>
-
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">
-              <Activity className="w-4 h-4" />
-              Attack Surface by OS
-            </div>
-            <div className="space-y-2">
-              {(data.attack_surface_by_os || []).map((item) => (
-                <div key={item} className="text-sm text-gray-300 border border-dark-700 rounded-lg p-3">{item}</div>
-              ))}
-              {(!data.attack_surface_by_os || data.attack_surface_by_os.length === 0) && <p className="text-sm text-gray-500">No OS-specific attack surface rules matched.</p>}
-            </div>
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">CPE Mapping</div>
-            {(data.cpe_matches || []).map((item) => (
-              <div key={item.cpe} className="flex items-center justify-between gap-3 border border-dark-700 rounded-lg p-3 mb-2">
-                <span className="text-xs font-mono text-gray-200 break-all">{item.cpe}</span>
-                <span className="text-xs text-purple-200">{item.confidence}%</span>
-              </div>
-            ))}
-          </div>
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">MITRE ATT&CK Mapping</div>
-            {(data.mitre_attack || []).map((item, index) => (
-              <div key={`${item.id}-${index}`} className="border border-dark-700 rounded-lg p-3 mb-2">
-                <div className="text-sm text-gray-100">{item.id} · {item.name}</div>
-                <div className="text-xs text-gray-500 mt-1">{item.tactic} · {item.reason}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">EOL & Vulnerability Correlation</div>
-            {[...(data.eol_findings || []), ...(data.vulnerability_correlation || [])].map((item, index) => (
-              <div key={`${item.component}-${index}`} className="border border-dark-700 rounded-lg p-3 mb-2">
-                <div className="text-sm text-gray-100">{item.component}</div>
-                <div className="text-xs text-gray-400 mt-1">{item.reason || item.finding}</div>
-              </div>
-            ))}
-          </div>
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">Open Services</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {(data.open_ports || []).map((port) => (
-                <div key={port.port} className="border border-dark-700 rounded-lg p-3">
-                  <div className="text-sm text-gray-100">TCP/{port.port} · {port.service}</div>
-                  <div className="text-xs text-gray-500 mt-1 break-words">{port.version || port.fingerprint?.detected || 'No version captured'}</div>
                 </div>
+              </div>
+              <div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-5">
+                    <div className="mb-4 flex items-center gap-2 text-[11px] font-bold text-[#efe9f5]"><Globe2 className="h-4 w-4" />OS Family</div>
+                    <div className="text-[17px] text-[#f4eef7]">{data.family || '—'}</div>
+                  </div>
+                  <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-5">
+                    <div className="mb-4 flex items-center gap-2 text-[11px] font-bold text-[#efe9f5]"><Cpu className="h-4 w-4" />Kernel</div>
+                    <div className="text-[17px] text-[#f4eef7]">{data.kernel_estimate || '—'}</div>
+                  </div>
+                  <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-5">
+                    <div className="mb-4 flex items-center gap-2 text-[11px] font-bold text-[#efe9f5]"><ShieldAlert className="h-4 w-4" />Exposure Score</div>
+                    <div className="text-[17px] text-[#fb923c]">{risk.level || '—'}</div>
+                    <div className="text-[12px] text-[#b7abc5]">{risk.score != null ? `${risk.score}/100` : '—'}</div>
+                  </div>
+                  <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-5">
+                    <div className="mb-4 flex items-center gap-2 text-[11px] font-bold text-[#efe9f5]"><Building2 className="h-4 w-4" />Hosting</div>
+                    <div className="text-[17px] text-[#f4eef7]">{hostingLabel}</div>
+                    <div className="text-[12px] text-[#b7abc5]">{hostingSubtext}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[#5b3f78] bg-[#3a1760]/82 p-8">
+            <div className="mb-7 flex items-center gap-4">
+              <div className="grid h-11 w-11 place-items-center rounded-full bg-[#b89cff] text-[#1b0d2b]">
+                <Zap className="h-5 w-5" />
+              </div>
+              <div className="text-[18px] font-medium uppercase text-[#c4b5fd]">AI Summary</div>
+            </div>
+            <p className="text-[15px] leading-7 text-[#eee6f6]">{data.ai_summary || '—'}</p>
+            <div className="mt-7 flex flex-wrap gap-8">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-lg bg-[#6d45aa] text-[#d8c7ff]"><ShieldCheck className="h-5 w-5" /></div>
+                <div>
+                  <div className="text-sm font-semibold text-[#f4eef7]">Hosting</div>
+                  <div className="text-xs text-[#d8cce6]">{hostingLabel}</div>
+                </div>
+              </div>
+              <div className="h-10 w-px bg-[#8d6ab8]/70" />
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-lg bg-[#6d45aa] text-[#d8c7ff]"><Fingerprint className="h-5 w-5" /></div>
+                <div>
+                  <div className="text-sm font-semibold text-[#f4eef7]">Open Services</div>
+                  <div className="text-xs text-[#d8cce6]">{openPorts.length ? openPorts.slice(0, 4).map((port) => `${port.service} / TCP ${port.port}`).join(' ') : '—'}</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+                <div className="mb-7 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]"><CircleDot className="h-4 w-4" />OS Probability Engine</div>
+                <div className="space-y-5">
+                  {(probabilities.length ? probabilities : [{ name: '—', probability: 0 }]).map((item) => (
+                    <div key={item.name}>
+                      <div className="mb-2 flex items-center justify-between text-[12px] text-[#d8cce6]">
+                        <span>{item.name}</span>
+                        <span>{pct(item.probability)}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-[#3f3348]"><div className="h-full rounded-full bg-[#b89cff]" style={{ width: `${pct(item.probability)}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-7">
+                <div className="mb-7 flex items-center gap-3 text-[12px] font-medium uppercase text-[#b79aff]"><CircleDot className="h-4 w-4" />Timeline/Detection Flow</div>
+                <div className="relative space-y-5 before:absolute before:left-2 before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-[#6b5790]">
+                  {(timeline.length ? timeline : [{ step: '—', detail: '—', confidence_after: 0 }]).map((step) => (
+                    <div key={step.step} className="relative grid grid-cols-[20px_minmax(0,1fr)_44px] gap-3 text-[12px]">
+                      <span className="mt-1 h-4 w-4 rounded-full bg-[#b89cff]" />
+                      <span>
+                        <strong className="block text-[#f4eef7]">{step.step}</strong>
+                        <span className="text-[#92859d]">{step.detail}</span>
+                      </span>
+                      <span className="text-right text-[#b89cff]">{pct(step.confidence_after)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78">
+            <div className="grid grid-cols-1 overflow-hidden rounded-t-lg border-b border-[#4f3b63] bg-[#24183b] text-center text-sm text-[#b7abc5] md:grid-cols-3">
+              {[
+                ['identity', 'Fingerprinting & Identification'],
+                ['security', 'Security & Vulnerability Analysis'],
+                ['services', 'Service discovery & History'],
+              ].map(([key, label], index) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveOsTab(key)}
+                  aria-pressed={activeOsTab === key}
+                  className={`px-4 py-4 transition hover:bg-[#382748] ${activeOsTab === key ? 'bg-[#654f90] text-[#f4eef7]' : index > 0 ? 'border-l border-[#4f3b63]' : ''}`}
+                >
+                  <Globe2 className="mr-2 inline h-4 w-4" />{label}
+                </button>
               ))}
             </div>
-          </div>
-        </section>
+            <div className="space-y-8 p-8">
+              {renderOsTabContent()}
+            </div>
+          </section>
 
-        <section className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">Historical Fingerprint Comparison</div>
-          <p className="text-sm text-gray-300">{data.historical_comparison?.summary || 'No baseline available.'}</p>
-        </section>
+          <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
+            <div className="mb-2 text-[18px] font-medium uppercase text-[#b79aff]">Export & Share</div>
+            <p className="text-sm text-[#d2c5dc]">Download or share your scan report.</p>
+            <div className="mt-7 grid grid-cols-1 gap-4 md:grid-cols-4">
+              <button type="button" onClick={() => window.print()} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"><FileText className="h-4 w-4" /> Export PDF</button>
+              <button type="button" onClick={() => downloadText(`${data.target || 'os-fingerprint'}-os.json`, JSON.stringify(data, null, 2), 'application/json')} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"><FileText className="h-4 w-4" /> Export JSON</button>
+              <button type="button" onClick={() => downloadText(`${data.target || 'os-fingerprint'}-os.csv`, csv, 'text/csv')} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"><FileText className="h-4 w-4" /> Export CSV</button>
+              <button type="button" onClick={() => copyText('os-share', `${data.target}: ${data.detected_os || 'OS unknown'} (${confidence}% confidence)`)} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 text-sm text-[#ded4e9] transition hover:border-[#9f7aea]"><Share2 className="h-4 w-4" /> {copied === 'os-share' ? 'Copied' : 'Share report'}</button>
+            </div>
+          </section>
+        </div>
       </div>
     );
   };

@@ -274,7 +274,7 @@ function RecommendedActionsFocusPanel({ rows }) {
           </div>
         )}
         {recommendations.map((row) => {
-          const priority = row.recommendation_priority || row.risk_level || 'medium';
+          const priority = row.recommendation_priority;
           return (
             <div key={`focus-rec-${row.port}`} className="grid grid-cols-[44px_minmax(0,1fr)] gap-4 rounded-lg border border-[#743248]/80 bg-[#351222]/72 p-5">
               <div className="grid h-10 w-10 place-items-center rounded-lg bg-[#4a1730] text-[#ff4f5f]">
@@ -285,7 +285,7 @@ function RecommendedActionsFocusPanel({ rows }) {
                   <div className="text-[13px] font-semibold text-[#ff4f5f]">
                     Port {row.port} ({row.service || 'Unknown'})
                   </div>
-                  <RiskBadge label={priority} color={priority} />
+                  {priority ? <RiskBadge label={priority} color={priority} /> : <span className="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded-full border border-[#7c3aed]/30 bg-[#7c3aed]/10 text-[#a78bfa]">AI</span>}
                 </div>
                 <p className="text-[11px] leading-relaxed text-[#d8cce6]">
                   {row.recommendation_reason || '—'}

@@ -123,7 +123,10 @@ def clear_whois_cache() -> None:
 
 
 def _normalize_target(target: str) -> str:
+    if target is None:
+        raise ValueError("Target is required")
     normalized = target.strip().lower()
+
     
     # Prefix with http:// if no scheme exists, so urlparse can correctly parse host
     if not re.match(r"^[a-zA-Z]+://", normalized):
