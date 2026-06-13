@@ -705,6 +705,41 @@ async def os_fingerprint(target: str, timeout: float = 2.0) -> OsFingerprintResu
     )
 
 
+async def stream_os_fingerprint_events(target: str, timeout: float = 2.0):
+    """Yield OS fingerprinting progress events and the final result."""
+    started_at = time.time()
+    yield {
+        "type": "init",
+        "data": {
+            "target": target,
+            "detected_os": None,
+            "family": None,
+            "confidence": 0,
+            "scan_duration_seconds": 0,
+            "scan_stage": "init",
+            "scan_message": "Starting OS fingerprinting",
+            "scanning": True,
+        },
+    }
+
+    for stage, message in [
+        ("resolve", "Resolving target address"),
+        ("ttl", "Collecting TTL and network distance signals"),
+        ("ports", "Scanning fingerprinting ports and banners"),
+        ("analysis", "Correlating OS, service, and TCP/IP stack signals"),
+    ]:
+        yield {
+            "type": "stage",
+            "stage": stage,
+            "message": message,
+            "elapsed_ms": round((time.time() - started_at) * 1000),
+        }
+        await asyncio.sleep(0)
+
+    result = await os_fingerprint(target, timeout=timeout)
+    yield {"type": "done", "result": result}
+
+
 def _is_public_ip(ip: str | None) -> bool:
     if not ip:
         return False

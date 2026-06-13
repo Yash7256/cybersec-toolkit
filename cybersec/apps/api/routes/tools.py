@@ -25,7 +25,7 @@ from cybersec.core.tools.ssl import ssl_audit
 from cybersec.core.tools.http_headers import check_http_headers
 from cybersec.core.tools.subdomain import find_subdomains, stream_subdomain_events
 from cybersec.core.tools.geoip import geoip_lookup
-from cybersec.core.tools.os_fingerprint import os_fingerprint
+from cybersec.core.tools.os_fingerprint import os_fingerprint, stream_os_fingerprint_events
 from cybersec.core.tools.port_scanner import scan_ports, scan_port_range, stream_port_scan_events
 
 
@@ -348,6 +348,36 @@ async def run_os_fingerprint(
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "os_fingerprint", body.target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
+
+
+@router.post("/os-fingerprint/stream")
+@router.post("/os_fingerprint/stream")
+async def stream_os_fingerprint(
+    body: OsFingerprintRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user)
+):
+    async def stream_response():
+        try:
+            async for event in stream_os_fingerprint_events(body.target, timeout=body.timeout):
+                if event.get("type") == "done":
+                    result_dict = dataclasses.asdict(event["result"])
+                    tool_result_id = await _save_tool_result(db, current_user, "os_fingerprint", body.target, result_dict)
+                    event = {"type": "done", "data": result_dict, "tool_result_id": tool_result_id}
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            logger.exception("OS fingerprint stream failed for %s", body.target)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 @router.post("/port_scan")
 async def run_port_scan(

@@ -350,6 +350,105 @@ export default function GenericTool({ toolId }) {
     }
   }, [target]);
 
+  const applyOsStreamEvent = useCallback((event) => {
+    if (!event || typeof event !== 'object') return;
+    if (event.type === 'init') {
+      setResults({
+        ...event.data,
+        os_probabilities: [],
+        fingerprint_timeline: [],
+        fingerprint_sources: [],
+        open_ports: [],
+        scanning: true,
+      });
+      return;
+    }
+    if (event.type === 'stage') {
+      setResults((previous) => ({
+        ...(previous || { target }),
+        scan_stage: event.stage,
+        scan_message: event.message,
+        scan_duration_seconds: Number(event.elapsed_ms || 0) / 1000,
+        scanning: true,
+      }));
+      return;
+    }
+    if (event.type === 'done') {
+      setResults({
+        ...(event.data || {}),
+        scanning: false,
+      });
+      return;
+    }
+    if (event.type === 'error') {
+      setResults({ error: event.error || 'OS fingerprint stream failed' });
+    }
+  }, [target]);
+
+  const runOsStream = useCallback(async () => {
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+    setLoading(true);
+    setResults({
+      target,
+      detected_os: null,
+      family: null,
+      confidence: 0,
+      os_probabilities: [],
+      fingerprint_timeline: [],
+      fingerprint_sources: [],
+      open_ports: [],
+      scan_duration_seconds: 0,
+      scan_stage: 'init',
+      scan_message: 'Starting OS fingerprinting',
+      scanning: true,
+    });
+    try {
+      const response = await fetch('/api/tools/os-fingerprint/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`OS fingerprint stream failed with HTTP ${response.status}`);
+      }
+      if (!response.body) {
+        throw new Error('OS fingerprint stream is unavailable in this browser.');
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let done = false;
+      while (!done) {
+        const chunk = await reader.read();
+        done = chunk.done;
+        buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !done });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+        parts.forEach((part) => {
+          const dataLine = part.split('\n').find((line) => line.startsWith('data:'));
+          if (!dataLine) return;
+          try {
+            applyOsStreamEvent(JSON.parse(dataLine.slice(5).trim()));
+          } catch (error) {
+            console.warn('Invalid OS fingerprint stream event', error);
+          }
+        });
+      }
+      if (buffer.trim()) {
+        const dataLine = buffer.split('\n').find((line) => line.startsWith('data:'));
+        if (dataLine) applyOsStreamEvent(JSON.parse(dataLine.slice(5).trim()));
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') setResults({ error: error.message });
+    } finally {
+      if (streamAbortRef.current === controller) streamAbortRef.current = null;
+      setLoading(false);
+    }
+  }, [applyOsStreamEvent, target]);
+
   const runGeoStream = useCallback(async () => {
     streamAbortRef.current?.abort();
     const controller = new AbortController();
@@ -423,6 +522,10 @@ export default function GenericTool({ toolId }) {
       await runGeoStream();
       return;
     }
+    if (toolId === 'osfingerprint' && !appendLive) {
+      await runOsStream();
+      return;
+    }
     if (!silent) {
       setLoading(true);
       if (toolId === 'subdomains') {
@@ -471,7 +574,7 @@ export default function GenericTool({ toolId }) {
       if (appendLive) liveRequestActive.current = false;
       if (!silent) setLoading(false);
     }
-  }, [count, maxHops, meta, runGeoStream, runSubdomainStream, target, toolId]);
+  }, [count, maxHops, meta, runGeoStream, runOsStream, runSubdomainStream, target, toolId]);
 
   useEffect(() => {
     if (!['ping', 'traceroute'].includes(toolId) || !liveMode || !target) return undefined;
@@ -1726,15 +1829,21 @@ export default function GenericTool({ toolId }) {
   };
 
   const renderOsFingerprintResults = (data) => {
+    const asArray = (value) => (Array.isArray(value) ? value : []);
     const confidence = pct(data.confidence);
     const risk = data.risk_score || {};
     const tcp = data.tcp_ip_stack || {};
     const exposure = data.internet_exposure || {};
     const geo = data.geolocation || {};
-    const sourceSections = Array.isArray(data.fingerprint_sources) ? data.fingerprint_sources : [];
-    const probabilities = Array.isArray(data.os_probabilities) ? data.os_probabilities : [];
-    const timeline = Array.isArray(data.fingerprint_timeline) ? data.fingerprint_timeline : [];
-    const openPorts = Array.isArray(data.open_ports) ? data.open_ports : [];
+    const sourceSections = asArray(data.fingerprint_sources);
+    const probabilities = asArray(data.os_probabilities);
+    const timeline = asArray(data.fingerprint_timeline);
+    const openPorts = asArray(data.open_ports);
+    const attackSurfaceByOs = asArray(data.attack_surface_by_os);
+    const mitreAttack = asArray(data.mitre_attack);
+    const cpeMatches = asArray(data.cpe_matches);
+    const eolFindings = asArray(data.eol_findings);
+    const vulnerabilityCorrelation = asArray(data.vulnerability_correlation);
     const scanDuration = Number.isFinite(Number(data.scan_duration_seconds)) ? `${Number(data.scan_duration_seconds).toFixed(1)}s` : '—';
     const hostingLabel = data.hosting_provider || geo.provider || geo.org || geo.isp || '—';
     const hostingSubtext = [geo.asn, geo.org].filter(Boolean).join(' · ') || '—';
@@ -1769,7 +1878,7 @@ export default function GenericTool({ toolId }) {
               ))}
             </div>
           )}
-          {source?.details && (
+          {source?.details && typeof source.details === 'object' && !Array.isArray(source.details) && (
             <div className="mt-4 text-[11px] text-[#b7abc5]">
               {Object.entries(source.details).slice(0, 3).map(([key, value]) => (
                 <div key={key} className="flex justify-between gap-3 border-b border-[#554365]/70 py-2 last:border-b-0">
@@ -1805,7 +1914,7 @@ export default function GenericTool({ toolId }) {
           ['Quality', data.scan_quality?.label || '—'],
           ['ICMP Response', data.ttl == null ? 'Not observed' : `TTL ${data.ttl}`],
         ];
-        const correlationItems = [...(data.eol_findings || []), ...(data.vulnerability_correlation || [])];
+        const correlationItems = [...eolFindings, ...vulnerabilityCorrelation];
         return (
           <>
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -1823,16 +1932,16 @@ export default function GenericTool({ toolId }) {
               ))}
               {analysisCard('Attack Surface by OS', (
                 <div className="space-y-4">
-                  {(data.attack_surface_by_os || []).length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
-                  {(data.attack_surface_by_os || []).slice(0, 4).map((item) => (
+                  {attackSurfaceByOs.length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
+                  {attackSurfaceByOs.slice(0, 4).map((item) => (
                     <div key={item} className="rounded-lg bg-[#2a1a3d] p-4 text-[12px] leading-relaxed text-[#d8cce6]">{item}</div>
                   ))}
                 </div>
               ))}
               {analysisCard('MITRE ATT&CK Mapping', (
                 <div className="relative space-y-5 before:absolute before:left-2 before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-[#6b5790]">
-                  {(data.mitre_attack || []).length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
-                  {(data.mitre_attack || []).slice(0, 4).map((item) => (
+                  {mitreAttack.length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
+                  {mitreAttack.slice(0, 4).map((item) => (
                     <div key={`${item.id}-${item.name}`} className="relative grid grid-cols-[20px_minmax(0,1fr)] gap-3 text-[12px]">
                       <span className="mt-1 h-4 w-4 rounded-full bg-[#b89cff]" />
                       <span>
@@ -1848,8 +1957,8 @@ export default function GenericTool({ toolId }) {
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_1fr]">
               {analysisCard('CPE Mapping', (
                 <div className="space-y-5">
-                  {(data.cpe_matches || []).length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
-                  {(data.cpe_matches || []).slice(0, 4).map((item) => (
+                  {cpeMatches.length === 0 && <p className="text-[12px] text-[#b7abc5]">—</p>}
+                  {cpeMatches.slice(0, 4).map((item) => (
                     <div key={item.cpe}>
                       <div className="mb-2 flex items-center justify-between gap-4 text-[12px] text-[#d8cce6]">
                         <span className="break-all">{item.cpe}</span>
@@ -1978,7 +2087,7 @@ export default function GenericTool({ toolId }) {
       );
     };
     const csv = [
-      ['Field', 'Value'].join(','),
+      ['Field', 'Value'],
       ['Target', data.target],
       ['IP', data.ip],
       ['Detected OS', data.detected_os],
@@ -1993,11 +2102,18 @@ export default function GenericTool({ toolId }) {
         <div className="space-y-8">
           <section className="rounded-lg border border-[#382748] bg-[#1b0d2b]/78 p-8">
             <div className="mb-6 flex flex-wrap items-center gap-3">
-              <CheckCircle2 className="h-6 w-6 text-[#5add56]" />
-              <h2 className="text-[26px] font-medium text-[#f4eef7]">OS Fingerprinting Completed</h2>
+              {data.scanning ? <Activity className="h-6 w-6 animate-pulse text-[#b79aff]" /> : <CheckCircle2 className="h-6 w-6 text-[#5add56]" />}
+              <h2 className="text-[26px] font-medium text-[#f4eef7]">{data.scanning ? 'OS Fingerprinting Running' : 'OS Fingerprinting Completed'}</h2>
             </div>
-            <div className="mb-7 inline-flex h-7 items-center gap-1.5 rounded-full border border-[#63516e]/80 bg-[#13091f]/74 px-3 text-[11px] text-[#d6cbe2]">
-              <Timer className="h-3.5 w-3.5 text-[#f4eef7]" /> {scanDuration}
+            <div className="mb-7 flex flex-wrap gap-3">
+              <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#63516e]/80 bg-[#13091f]/74 px-3 text-[11px] text-[#d6cbe2]">
+                <Timer className="h-3.5 w-3.5 text-[#f4eef7]" /> {scanDuration}
+              </span>
+              {data.scan_message && (
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#63516e]/80 bg-[#13091f]/74 px-3 text-[11px] text-[#d6cbe2]">
+                  <Activity className="h-3.5 w-3.5 text-[#f4eef7]" /> {data.scan_message}
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr]">
               <div className="rounded-lg border border-[#63516e]/80 bg-[#13091f]/72 p-6">
