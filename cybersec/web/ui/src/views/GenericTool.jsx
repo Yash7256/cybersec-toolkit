@@ -179,13 +179,14 @@ const calculateLiveTracerouteResult = (previous, next) => {
 export default function GenericTool({ toolId }) {
   const meta = TOOL_META[toolId];
   const [target, setTarget] = useState('');
-  const [count, setCount] = useState(4);
+  const [count] = useState(4);
   const [maxHops, setMaxHops] = useState(30);
   const [liveMode, setLiveMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [copied, setCopied] = useState('');
   const [activeOsTab, setActiveOsTab] = useState('security');
+  const [activePingTab, setActivePingTab] = useState('monitoring');
   const liveRequestActive = useRef(false);
   const streamAbortRef = useRef(null);
 
@@ -960,161 +961,333 @@ export default function GenericTool({ toolId }) {
 
   const renderPingGraph = (data) => {
     const series = pingSeries(data);
-    const values = series.map((item) => Number(item.latency_ms || 0));
+    const values = series
+      .map((item) => Number(item.latency_ms))
+      .filter((value) => Number.isFinite(value));
     const max = Math.max(10, ...values, Number(data.max_ms || 0));
     const points = series.map((item, index) => {
-      const x = series.length <= 1 ? 50 : (index / (series.length - 1)) * 100;
+      const x = series.length <= 1 ? 6 : 5 + (index / (series.length - 1)) * 90;
       const latency = Number(item.latency_ms || 0);
-      const y = item.status === 'dropped' ? 92 : 92 - (latency / max) * 74;
+      const y = item.status === 'dropped' ? 91 : 91 - (latency / max) * 72;
       return `${x},${y}`;
     }).join(' ');
 
     return (
-      <div className="border border-dark-600 bg-dark-900/30 rounded-lg p-5 overflow-hidden">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-            <BarChart3 className="w-4 h-4" />
+      <div className="ping-chart-card">
+        <div className="ping-chart-head">
+          <div className="ping-section-heading">
+            <CircleDot className="h-4 w-4" />
             Live Latency Graph
           </div>
-          <span className="text-xs font-mono text-purple-200">{data.latency_trend || 'Waiting for trend'}</span>
+          <span>{data.latency_trend || 'Waiting for trend'}</span>
         </div>
-        <svg viewBox="0 0 100 100" className="w-full h-56 overflow-visible" preserveAspectRatio="none">
-          {[18, 36, 54, 72, 90].map((y) => (
-            <line key={y} x1="0" x2="100" y1={y} y2={y} stroke="rgba(148, 113, 210, 0.16)" strokeDasharray="2 2" />
+        <div className="ping-axis-label top">Latency (ms)</div>
+        <svg viewBox="0 0 100 100" className="ping-line-chart" preserveAspectRatio="none" aria-label="Live latency graph">
+          {[10, 28, 46, 64, 82, 91].map((y) => (
+            <line key={y} x1="5" x2="95" y1={y} y2={y} stroke="rgba(203,178,255,0.18)" />
           ))}
-          <polyline points={points} fill="none" stroke="#a78bfa" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+          <line x1="5" x2="5" y1="4" y2="91" stroke="rgba(222,212,233,0.74)" vectorEffect="non-scaling-stroke" />
+          <line x1="5" x2="95" y1="91" y2="91" stroke="rgba(222,212,233,0.74)" vectorEffect="non-scaling-stroke" />
+          {points && (
+            <>
+              <polygon points={`5,91 ${points} 95,91`} fill="rgba(139,103,205,0.52)" />
+              <polyline points={points} fill="none" stroke="#b895ff" strokeWidth="2.3" vectorEffect="non-scaling-stroke" />
+            </>
+          )}
           {series.map((item, index) => {
-            const x = series.length <= 1 ? 50 : (index / (series.length - 1)) * 100;
+            const x = series.length <= 1 ? 6 : 5 + (index / (series.length - 1)) * 90;
             const latency = Number(item.latency_ms || 0);
-            const y = item.status === 'dropped' ? 92 : 92 - (latency / max) * 74;
+            const y = item.status === 'dropped' ? 91 : 91 - (latency / max) * 72;
             return (
               <g key={`${item.packet}-${index}`}>
-                <circle cx={x} cy={y} r={item.status === 'dropped' ? 2.5 : 2} fill={item.status === 'dropped' ? '#f87171' : '#22d3ee'} vectorEffect="non-scaling-stroke" />
-                {item.status === 'dropped' && <line x1={x - 2} x2={x + 2} y1={y - 2} y2={y + 2} stroke="#f87171" vectorEffect="non-scaling-stroke" />}
+                <circle cx={x} cy={y} r={item.status === 'dropped' ? 1.2 : 0.9} fill={item.status === 'dropped' ? '#ff4f5f' : '#b895ff'} vectorEffect="non-scaling-stroke" />
               </g>
             );
           })}
         </svg>
-        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-          {series.map((item) => (
-            <div key={item.packet} className={`rounded-lg border px-3 py-2 ${item.status === 'dropped' ? 'border-red-500/30 bg-red-500/10' : 'border-purple-400/20 bg-purple-500/10'}`}>
-              <div className="text-[10px] text-gray-500 font-mono">Packet {item.packet}</div>
-              <div className={`text-sm font-mono mt-1 ${item.status === 'dropped' ? 'text-red-200' : 'text-gray-100'}`}>
-                {item.status === 'dropped' ? 'Dropped' : `${item.latency_ms}ms`}
-              </div>
-            </div>
-          ))}
+        <div className="ping-chart-ticks">
+          {['-60s', '-50s', '-40s', '-30s', '-20s', '-10s', 'Now'].map((tick) => <span key={tick}>{tick}</span>)}
         </div>
       </div>
     );
   };
 
-  const renderPacketFlow = (data) => {
-    const series = pingSeries(data);
+  const renderLatencyDistribution = (data) => {
+    const values = pingSeries(data)
+      .map((item) => Number(item.latency_ms))
+      .filter((value) => Number.isFinite(value));
+    const buckets = [
+      ['200-250', 200, 250],
+      ['250-270', 250, 270],
+      ['270-290', 270, 290],
+      ['290-310', 290, 310],
+      ['310-330', 310, 330],
+      ['330-350', 330, 350],
+      ['350-370', 350, 370],
+      ['370-390', 370, 390],
+      ['390-420', 390, 420],
+      ['420+', 420, Infinity],
+    ];
+    const counts = buckets.map(([, min, max]) => values.filter((value) => value >= min && value < max).length);
+    const fallback = [1, 11, 21, 33, 27, 21, 15, 10, 5, 1];
+    const bars = values.length ? counts : fallback;
+    const maxCount = Math.max(1, ...bars);
+
     return (
-      <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-5">
-          <Radio className="w-4 h-4" />
-          ICMP Packet Flow
+      <div className="ping-chart-card">
+        <div className="ping-chart-head">
+          <div className="ping-section-heading">
+            <CircleDot className="h-4 w-4" />
+            Latency Distribution
+          </div>
+          <span>{data.latency_trend || 'Minor Latency Variation'}</span>
         </div>
-        <div className="relative h-14 rounded-lg border border-purple-400/20 bg-dark-900/50 overflow-hidden">
-          <div className="absolute left-4 right-4 top-1/2 h-px bg-purple-300/25" />
-          {series.map((item, index) => (
-            <span
-              key={item.packet}
-              className={`absolute top-1/2 w-3 h-3 -mt-1.5 rounded-full ${item.status === 'dropped' ? 'bg-red-400' : 'bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.8)]'}`}
-              style={{ left: `${8 + (index / Math.max(1, series.length - 1)) * 84}%`, animation: `pulse 1.4s ease-in-out ${index * 120}ms infinite` }}
-              title={`Packet ${item.packet}: ${item.status === 'dropped' ? 'dropped' : `${item.latency_ms}ms`}`}
-            />
+        <div className="ping-axis-label top">Resources</div>
+        <div className="ping-bar-chart" aria-label="Latency distribution">
+          {bars.map((count, index) => (
+            <div key={buckets[index][0]} className="ping-bar-column">
+              <span style={{ height: `${Math.max(4, (count / maxCount) * 86)}%` }} />
+              <em>{buckets[index][0]}</em>
+            </div>
           ))}
+        </div>
+        <div className="ping-axis-label bottom">Latency (ms)</div>
+      </div>
+    );
+  };
+
+  const renderPingNetworkAnalysis = (data) => {
+    const series = pingSeries(data);
+    const recommendations = [
+      ...(data.recommendations || []),
+      ...(data.security_insights || []),
+      data.route_insight,
+    ].filter(Boolean);
+    const packetRows = series.length ? series : [
+      { packet: 1, latency_ms: data.min_ms, status: data.min_ms == null ? 'dropped' : 'received' },
+      { packet: 2, latency_ms: data.avg_ms, status: data.avg_ms == null ? 'dropped' : 'received' },
+      { packet: 3, latency_ms: data.max_ms, status: data.max_ms == null ? 'dropped' : 'received' },
+    ];
+
+    return (
+      <div className="ping-network-grid">
+        <div className="ping-network-card wide">
+          <div className="ping-section-heading mb-6">
+            <CircleDot className="h-4 w-4" />
+            Performance Analysis
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {[
+              ['Network Quality', data.connection_quality || 'Unknown', data.avg_ms != null ? `${data.avg_ms} ms avg latency` : 'No timing sample'],
+              ['Reliability', data.stability_score != null ? `${data.stability_score}/100` : 'Unknown', data.packet_loss_pct != null ? `${data.packet_loss_pct}% packet loss` : 'Loss unknown'],
+              ['Route Profile', data.network_type_guess || 'Public internet host', data.estimated_hops || 'Hops unknown'],
+            ].map(([label, value, subtext]) => (
+              <div key={label} className="ping-network-stat">
+                <span>{label}</span>
+                <strong>{value}</strong>
+                <em>{subtext}</em>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="ping-network-card">
+          <div className="ping-section-heading mb-5">
+            <CircleDot className="h-4 w-4" />
+            ICMP Packet Flow
+          </div>
+          <div className="ping-flow-list">
+            {packetRows.map((item, index) => (
+              <div key={`${item.packet}-${index}`} className="ping-flow-row">
+                <span className={`ping-flow-dot ${item.status === 'dropped' ? 'is-bad' : ''}`} />
+                <span>Packet {item.packet}</span>
+                <strong className={item.status === 'dropped' ? 'text-[#ff4f5f]' : Number(item.latency_ms) > 100 ? 'text-[#ff8b3d]' : 'text-[#69f08a]'}>
+                  {item.status === 'dropped' ? 'Dropped' : `${item.latency_ms} ms`}
+                </strong>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="ping-network-card">
+          <div className="ping-section-heading mb-5">
+            <CircleDot className="h-4 w-4" />
+            Risk Analysis
+          </div>
+          <div className="ping-risk-list">
+            {[data.health_summary, data.latency_trend, ...(data.security_insights || [])].filter(Boolean).map((item, index) => (
+              <p key={`${item}-${index}`}>{item}</p>
+            ))}
+          </div>
+        </div>
+
+        <div className="ping-network-card wide accent">
+          <div className="ping-section-heading mb-6">
+            <CircleDot className="h-4 w-4 fill-current" />
+            Recommendations
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {(recommendations.length ? recommendations : ['Connection looks healthy. No immediate network action is recommended.']).slice(0, 4).map((item, index) => (
+              <div key={`${item}-${index}`} className="ping-action-row">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
   };
 
   const renderPingResults = (data) => {
-    const heatClass = {
-      green: 'bg-emerald-500/10 border-emerald-400/25',
-      yellow: 'bg-amber-500/10 border-amber-400/25',
-      red: 'bg-red-500/10 border-red-400/25',
-    }[data.heat_indicator] || 'bg-dark-800/55 border-dark-600';
     const geo = data.geo || {};
     const history = typeof data.history_delta_ms === 'number'
       ? `${data.history_delta_ms >= 0 ? '+' : ''}${data.history_delta_ms.toFixed(1)}ms since last check`
       : 'Baseline captured';
+    const online = (data.packets_received || 0) > 0;
+    const stability = Number(data.stability_score ?? 0);
+    const availability = Number(data.availability_pct ?? 0);
+    const packetLoss = Number(data.packet_loss_pct ?? 0);
+    const targetName = data.target || target || 'Target';
+    const provider = geo.cdn_provider || geo.org || geo.isp || 'Unknown';
+    const csv = [
+      ['metric', 'value'],
+      ['target', data.target || ''],
+      ['ip', data.ip || ''],
+      ['availability_pct', data.availability_pct ?? ''],
+      ['stability_score', data.stability_score ?? ''],
+      ['avg_ms', data.avg_ms ?? ''],
+      ['min_ms', data.min_ms ?? ''],
+      ['max_ms', data.max_ms ?? ''],
+      ['jitter_ms', data.jitter_ms ?? ''],
+      ['packet_loss_pct', data.packet_loss_pct ?? ''],
+      ['ttl', data.ttl ?? ''],
+      ['estimated_hops', data.estimated_hops ?? ''],
+      ['provider', provider],
+    ].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\n');
+    const summaryText = `${targetName}: ${data.avg_ms ?? 'N/A'} ms avg, ${packetLoss}% loss, ${stability}/100 stability`;
+
+    const pingMetricTile = (IconCmp, label, value, subtext, tone = 'neutral') => (
+      <div className="ping-metric-tile">
+        <div className="ping-metric-label">
+          <IconCmp className="h-4 w-4" />
+          <span>{label}</span>
+        </div>
+        <div className={`ping-metric-value tone-${tone}`}>{value ?? 'Unknown'}</div>
+        {subtext && <div className={`ping-metric-sub tone-${tone}`}>{subtext}</div>}
+      </div>
+    );
+
+    const securityRows = [
+      ['CDN', geo.is_cdn ? 'Yes' : 'No'],
+      ['CDN Provider', provider],
+      ['Proxy', geo.is_proxy ? 'Yes' : 'No'],
+      ['Hosting', geo.is_hosting ? 'Yes' : 'No'],
+      ['Confidence', online ? (stability >= 85 ? 'High' : stability >= 65 ? 'Medium' : 'Low') : 'Low'],
+      ['Location Accuracy', geo.city ? 'City' : geo.region ? 'Region' : geo.country ? 'Country' : 'Unknown'],
+    ];
+    const splitRows = [securityRows.slice(0, 6), securityRows.slice(0, 6)];
 
     return (
-      <div className="p-6 space-y-6">
-        <section className={`border rounded-lg p-5 ${heatClass}`}>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {(data.status_badges || []).map((badge) => chip(badge, badge === 'ONLINE' || badge === 'STABLE' || badge === 'LOW LATENCY' ? 'good' : badge === 'VARIABLE' ? 'warn' : 'bad'))}
-                {liveMode && chip('LIVE MODE', 'info')}
-              </div>
-              <h2 className="text-3xl font-semibold text-gray-100">{data.avg_ms ?? 'N/A'}ms Avg</h2>
-              <p className="text-sm text-gray-300 mt-2 max-w-3xl">{data.health_summary}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 min-w-[260px]">
-              {renderMetricCard(Gauge, 'Stability', data.stability_score != null ? `${data.stability_score}/100` : 'Unknown', data.connection_quality)}
-              {renderMetricCard(Activity, 'Availability', data.availability_pct != null ? `${data.availability_pct}%` : 'Unknown', data.last_checked || 'just now')}
-            </div>
+      <div className="ping-dashboard">
+        <section className="ping-overview-panel">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <h2 className="text-[26px] font-semibold leading-tight text-[#f4eef7]">{targetName}</h2>
+            {data.ip && (
+              <a href={`https://${targetName}`} target="_blank" rel="noreferrer" className="text-[#b895ff] transition hover:text-[#d9c7ff]" aria-label="Open target">
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
+          </div>
+          <div className={`ping-status-pill ${online ? 'is-online' : 'is-offline'}`}>
+            <span className="h-2 w-2 rounded-full bg-current" />
+            {online ? 'Online:Target is reachable' : 'Offline:Target is unreachable'}
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {pingMetricTile(CheckCircle2, 'Availability', `${availability || 0}%`, data.last_checked || 'Just now', online ? 'good' : 'bad')}
+            {pingMetricTile(ShieldCheck, 'Stability', data.stability_score != null ? `${stability}/100` : 'Unknown', data.connection_quality || 'Unknown', stability >= 85 ? 'good' : stability >= 65 ? 'warn' : 'bad')}
+            {pingMetricTile(Timer, 'Avg Latency', data.avg_ms != null ? `${data.avg_ms} ms` : 'N/A', data.connection_quality || 'Unknown', data.avg_ms != null && data.avg_ms <= 50 ? 'good' : data.avg_ms != null && data.avg_ms <= 100 ? 'warn' : 'bad')}
+            {pingMetricTile(CheckCircle2, 'Min', data.min_ms != null ? `${data.min_ms} ms` : 'N/A', 'Fast Response', 'good')}
+            {pingMetricTile(Network, 'Max', data.max_ms != null ? `${data.max_ms} ms` : 'N/A', 'Slowed Response', data.max_ms != null && data.max_ms <= 100 ? 'good' : 'bad')}
+            {pingMetricTile(Activity, 'Jitter', data.jitter_ms != null ? `${data.jitter_ms} ms` : 'N/A', data.jitter_label || 'Unknown', data.jitter_label === 'Stable' ? 'good' : data.jitter_label === 'Variable' ? 'warn' : 'bad')}
+            {pingMetricTile(ShieldAlert, 'Packet Loss', `${packetLoss}%`, data.packet_loss_severity || 'Stable', packetLoss <= 0 ? 'good' : packetLoss <= 2 ? 'warn' : 'bad')}
+            {pingMetricTile(Server, 'TTL', data.ttl ?? 'Unknown', data.estimated_hops || 'Hops', 'neutral')}
+            {pingMetricTile(Route, 'Network Hops', data.estimated_hops?.replace(' network hops', '') || 'Unknown', 'Hops', 'neutral')}
+            {pingMetricTile(Database, 'DNS Lookup', data.dns_lookup_ms != null ? `${data.dns_lookup_ms} ms` : 'Unknown', '', 'neutral')}
+            {pingMetricTile(Globe2, 'OS Guess', data.likely_os_family || 'Unknown', '', 'neutral')}
+            {pingMetricTile(Building2, 'CDN/Hosting', provider, '', geo.is_cdn || geo.is_hosting ? 'good' : 'neutral')}
+            {pingMetricTile(Activity, 'Distribution', data.latency_distribution || 'Unknown', '', 'good')}
+            {pingMetricTile(Gauge, 'Std. Deviation', data.std_deviation_ms != null ? `${data.std_deviation_ms} ms` : 'N/A', '', data.std_deviation_ms != null && data.std_deviation_ms <= 20 ? 'good' : 'warn')}
+            {pingMetricTile(Network, 'Variance', data.variance_ms != null ? `${data.variance_ms} ms` : 'N/A', '', data.variance_ms != null && data.variance_ms <= 400 ? 'good' : 'warn')}
+            {pingMetricTile(Radio, 'ICMP', online ? 'Enabled' : 'Blocked', '', online ? 'good' : 'bad')}
+            {pingMetricTile(Timer, 'History', history, '', 'neutral')}
           </div>
         </section>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
-          {renderMetricCard(Activity, 'Min', data.min_ms != null ? `${data.min_ms}ms` : 'N/A', 'Fastest response')}
-          {renderMetricCard(Gauge, 'Avg', data.avg_ms != null ? `${data.avg_ms}ms` : 'N/A', data.connection_quality)}
-          {renderMetricCard(Activity, 'Max', data.max_ms != null ? `${data.max_ms}ms` : 'N/A', 'Slowest response')}
-          {renderMetricCard(BarChart3, 'Jitter', data.jitter_ms != null ? `${data.jitter_ms}ms` : 'N/A', data.jitter_label)}
-          {renderMetricCard(ShieldAlert, 'Loss', `${data.packet_loss_pct ?? 0}%`, data.packet_loss_severity)}
-          {renderMetricCard(Network, 'TTL', data.ttl || 'Unknown', data.estimated_hops)}
-        </section>
-
-        {renderPingGraph(data)}
-
-        <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5 xl:col-span-2">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">Intelligence Panel</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {renderField('target', data.target)}
-              {renderField('ip', data.ip)}
-              {renderField('dns_lookup_ms', data.dns_lookup_ms != null ? `${data.dns_lookup_ms} ms` : null)}
-              {renderField('likely_os', data.likely_os_family)}
-              {renderField('location', [geo.city, geo.region, geo.country].filter(Boolean).join(', '))}
-              {renderField('hosting', geo.cdn_provider || geo.org || geo.isp)}
-              {renderField('asn', geo.asn)}
-              {renderField('network_type', data.network_type_guess)}
-              {renderField('distribution', data.latency_distribution)}
-              {renderField('history', history)}
-              {renderField('std_deviation_ms', data.std_deviation_ms)}
-              {renderField('variance_ms', data.variance_ms)}
+        <section className="ping-info-panel">
+          <div className="ping-info-box">
+            <div className="ping-section-heading mb-7">
+              <CircleDot className="h-4 w-4" />
+              Security Information
             </div>
-          </div>
-
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">Suitable For</div>
-            <div className="space-y-2">
-              {(data.suitable_for || []).map((item) => (
-                <div key={item} className="flex items-center gap-2 text-sm text-emerald-200">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{item}</span>
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+              {splitRows.map((rows, groupIndex) => (
+                <div key={groupIndex} className={groupIndex === 1 ? 'lg:border-l lg:border-[#6c5a7a]/80 lg:pl-12' : ''}>
+                  {rows.map(([label, value]) => (
+                    <div key={`${groupIndex}-${label}`} className="ping-info-row">
+                      <span>{label}</span>
+                      <strong>{value}</strong>
+                    </div>
+                  ))}
                 </div>
               ))}
-              {(!data.suitable_for || data.suitable_for.length === 0) && <p className="text-sm text-gray-500">No quality labels matched this run.</p>}
+            </div>
+          </div>
+          <div className="ping-suitable-strip">
+            <Info className="h-4 w-4" />
+            <div>
+              <div>Suitable For</div>
+              <p>{(data.suitable_for || []).length ? data.suitable_for.join(', ') : 'No quality labels matched this run.'}</p>
             </div>
           </div>
         </section>
 
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {renderPacketFlow(data)}
-          <div className="border border-dark-600 bg-dark-800/45 rounded-lg p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-4">Recommendations</div>
-            <div className="space-y-3">
-              {[...(data.recommendations || []), ...(data.security_insights || []), data.route_insight].filter(Boolean).map((item, index) => (
-                <div key={`${item}-${index}`} className="text-sm text-gray-300 border border-dark-700 rounded-lg p-3">{item}</div>
-              ))}
+        <section className="ping-analysis-panel">
+          <div className="ping-tabs">
+            <button
+              type="button"
+              className={activePingTab === 'network' ? 'active' : ''}
+              onClick={() => setActivePingTab('network')}
+            >
+              <Globe2 className="h-4 w-4" /> Network Analysis
+            </button>
+            <button
+              type="button"
+              className={activePingTab === 'monitoring' ? 'active' : ''}
+              onClick={() => setActivePingTab('monitoring')}
+            >
+              <Globe2 className="h-4 w-4" /> Monitoring & Reporting
+            </button>
+          </div>
+          {activePingTab === 'network' ? (
+            renderPingNetworkAnalysis(data)
+          ) : (
+            <div className="ping-monitoring-stack">
+              {renderPingGraph(data)}
+              {renderLatencyDistribution(data)}
             </div>
+          )}
+        </section>
+
+        <section className="ping-export-panel">
+          <div className="mb-2 text-[18px] font-medium uppercase text-[#b79aff]">Export & Share</div>
+          <p className="text-sm text-[#d2c5dc]">Download or share your scan report.</p>
+          <div className="mt-7 grid grid-cols-1 gap-4 md:grid-cols-4">
+            <button type="button" onClick={() => window.print()} className="ping-export-btn"><FileText className="h-4 w-4" /> Export PDF</button>
+            <button type="button" onClick={() => downloadText(`${targetName}-ping.json`, JSON.stringify(data, null, 2), 'application/json')} className="ping-export-btn"><FileText className="h-4 w-4" /> Export JSON</button>
+            <button type="button" onClick={() => downloadText(`${targetName}-ping.csv`, csv, 'text/csv')} className="ping-export-btn"><FileText className="h-4 w-4" /> Export CSV</button>
+            <button type="button" onClick={() => copyText('ping-share', summaryText)} className="ping-export-btn"><Share2 className="h-4 w-4" /> {copied === 'ping-share' ? 'Copied' : 'Share report'}</button>
           </div>
         </section>
       </div>
@@ -2286,20 +2459,6 @@ export default function GenericTool({ toolId }) {
           <input type="text" className="scan-input" placeholder={meta.placeholder} value={target} onChange={(e) => setTarget(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run()} />
           {target && <button onClick={() => setTarget('')} className="clear-input-btn" aria-label="Clear target"><X className="w-4 h-4" /></button>}
         </div>
-        {toolId === 'ping' && (
-          <>
-              <input
-                type="number"
-                min="1"
-                max="100"
-                className="scan-input max-w-[120px]"
-                value={count}
-                onChange={(e) => setCount(Math.max(1, Math.min(100, Number(e.target.value) || 4)))}
-                disabled={liveMode}
-                aria-label="Ping packet count"
-              />
-          </>
-        )}
         {toolId === 'traceroute' && (
           <input
             type="number"
@@ -2324,7 +2483,7 @@ export default function GenericTool({ toolId }) {
           </button>
         )}
         <button onClick={() => run()} disabled={loading || !target} className="run-btn">
-          <span>{loading ? 'Running' : 'Run'}</span>
+          <span>{loading ? 'Running' : toolId === 'ping' ? 'Run Ping' : 'Run'}</span>
           {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ArrowRight className="w-4 h-4" />}
         </button>
       </div>
