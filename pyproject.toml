@@ -36,6 +36,7 @@ respx = "^0.23.1"
 pytest = "^8.4"
 pytest-cov = "^7.1"
 pytest-asyncio = "^0.24"
+fakeredis = "^2.26"
 
 [tool.poetry.scripts]
 cybersec = "cybersec.apps.cli.main:cli"

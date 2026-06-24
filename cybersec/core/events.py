@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 STREAM_MAXLEN = 10_000      # max events per scan stream
 POLL_TIMEOUT = 55_000       # ms — matches SSE keepalive (55s)
+STREAM_KEY_TTL_SECONDS = 3600  # streams auto-expire 1h after their last write
+REDIS_FAILURE_SENTINEL = "[REDIS_UNAVAILABLE]"
 
 # In-memory fallback
 _local_queues: dict[str, asyncio.Queue] = {}
@@ -62,6 +64,10 @@ async def publish_event(scan_id: str, event: str) -> None:
             from cybersec.core.metrics_registry import redis_publish_duration
             _t0 = __import__("time").monotonic()
             await r.xadd(key, {"event": event}, maxlen=STREAM_MAXLEN, approximate=True)
+            try:
+                await r.expire(key, STREAM_KEY_TTL_SECONDS)
+            except Exception as e:
+                logger.debug("Failed to set TTL on stream key %s: %s", key, e)
             redis_publish_duration().observe(__import__("time").monotonic() - _t0)
             await breaker.record_success()
             return
@@ -125,6 +131,12 @@ async def subscribe_events(scan_id: str, last_id: str = "$",
                         except Exception as e:
                             await breaker.record_failure()
                             logger.warning("Redis xread failed for %s: %s", scan_id, e)
+                            try:
+                                q.put_nowait(REDIS_FAILURE_SENTINEL)
+                            except asyncio.QueueFull:
+                                logger.warning(
+                                    "Could not signal Redis failure for scan %s — queue full", scan_id
+                                )
                             return  # exit loop to fall back
 
                         if not results:

@@ -8,6 +8,16 @@ from cybersec.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+ACQUIRE_SLOT_SCRIPT = """
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local limit = tonumber(ARGV[1])
+if current < limit then
+    return redis.call('INCR', KEYS[1])
+else
+    return -1
+end
+"""
+
 
 class RedisKeys:
     """Centralized Redis key namespacing. All new Redis keys in the
@@ -115,6 +125,21 @@ class RedisCircuitBreaker:
 
 
 _breaker = RedisCircuitBreaker()
+
+
+async def try_acquire_slot(r, key: str, limit: int) -> bool:
+    """Atomically check-and-increment a Redis counter against a limit.
+    Returns True if the slot was acquired (counter incremented and is
+    within limit), False if the limit was already reached. This uses a
+    Lua script via EVAL so the check-and-increment is a single atomic
+    Redis operation — no race window exists between reading the current
+    count and incrementing it, unlike a separate GET then INCR.
+    Note: This still doesn't make release fully race-free against process
+    crashes (leak risk remains for crash scenarios), but it closes the specific
+    race where two concurrent acquires could both succeed past the limit.
+    """
+    result = await r.eval(ACQUIRE_SLOT_SCRIPT, 1, key, str(limit))
+    return result != -1
 
 
 def get_shared_breaker() -> RedisCircuitBreaker:

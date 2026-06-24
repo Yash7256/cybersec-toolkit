@@ -85,7 +85,7 @@ async def _fallback_release_user(user_id: str) -> None:
 
 async def acquire_global_scan_slot(timeout: float = 30.0) -> bool:
     """Acquire a global scan slot with Redis, falling back to in-memory if Redis is down."""
-    from cybersec.core.redis_client import get_shared_redis_client
+    from cybersec.core.redis_client import get_shared_redis_client, try_acquire_slot
     r = get_shared_redis_client()
     if r is None:
         # Redis unavailable — fall back to existing in-memory behavior
@@ -94,13 +94,12 @@ async def acquire_global_scan_slot(timeout: float = 30.0) -> bool:
     deadline = time.monotonic() + timeout
     key = RedisKeys.scan_global_active()
     while time.monotonic() < deadline:
-        current = int(await r.get(key) or 0)
-        if current < MAX_CONCURRENT_SCANS_GLOBAL:
-            new_val = await r.incr(key)
-            if new_val <= MAX_CONCURRENT_SCANS_GLOBAL:
+        try:
+            if await try_acquire_slot(r, key, MAX_CONCURRENT_SCANS_GLOBAL):
                 return True
-            # Lost the race — another process incremented first; back off
-            await r.decr(key)
+        except Exception as e:
+            logger.warning("Redis slot acquisition failed, falling back: %s", e)
+            return await _fallback_acquire_global()
         await asyncio.sleep(0.1)
     return False
 
@@ -117,7 +116,7 @@ async def release_global_scan_slot() -> None:
 
 async def acquire_user_scan_slot(user_id: str) -> bool:
     """Acquire a per-user scan slot with Redis, falling back to in-memory if Redis is down."""
-    from cybersec.core.redis_client import get_shared_redis_client
+    from cybersec.core.redis_client import get_shared_redis_client, try_acquire_slot
     r = get_shared_redis_client()
     if r is None:
         return await _fallback_acquire_user(user_id)
@@ -125,13 +124,12 @@ async def acquire_user_scan_slot(user_id: str) -> bool:
     key = RedisKeys.scan_user_active(user_id)
     deadline = time.monotonic() + 5.0
     while time.monotonic() < deadline:
-        current = int(await r.get(key) or 0)
-        if current < MAX_CONCURRENT_SCANS_PER_USER:
-            new_val = await r.incr(key)
-            if new_val <= MAX_CONCURRENT_SCANS_PER_USER:
+        try:
+            if await try_acquire_slot(r, key, MAX_CONCURRENT_SCANS_PER_USER):
                 return True
-            # Lost the race — another process incremented first; back off
-            await r.decr(key)
+        except Exception as e:
+            logger.warning("Redis user slot acquisition failed, falling back: %s", e)
+            return await _fallback_acquire_user(user_id)
         await asyncio.sleep(0.1)
     return False
 
@@ -172,13 +170,26 @@ async def acquire_scan_slot(user_id: str | None) -> bool:
     return True
 
 
-def release_scan_slot(user_id: str | None) -> None:
+async def release_scan_slot(user_id: str | None) -> None:
     """Release a scan slot, allowing the next queued scan to start."""
     scan_active().dec(1)
-    asyncio.create_task(release_global_scan_slot())
     scan_queue_depth().set(MAX_CONCURRENT_SCANS_GLOBAL - 1)
+    try:
+        await release_global_scan_slot()
+    except Exception as e:
+        logger.error(
+            "Failed to release global scan slot — this scan slot may leak: %s",
+            e
+        )
     if user_id:
-        asyncio.create_task(release_user_scan_slot(user_id))
+        try:
+            await release_user_scan_slot(user_id)
+        except Exception as e:
+            logger.error(
+                "Failed to release user scan slot for %s — this slot may leak: %s",
+                user_id,
+                e
+            )
 
 
 async def safe_queue_put(scan_id: str, event: str, critical: bool = False) -> None:
