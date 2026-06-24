@@ -19,11 +19,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cybersec.core.security.nvd_client import EnhancedCVELookup
 from cybersec.core.scanner.analysis.service_detect import ServiceDetectionResult
+from cybersec.core.redis_client import get_shared_breaker, RedisKeys
 
 logger = logging.getLogger(__name__)
 
-CVE_CACHE_TTL = 3600       # 1 hour
-CVE_CACHE_MAX_LOCAL = 500  # per-process in-memory cap
+CVE_CACHE_TTL = 3600           # 1 hour — for confirmed non-empty results
+CVE_CACHE_TTL_EMPTY = 300      # 5 minutes — for empty/failed results
+CVE_CACHE_MAX_LOCAL = 500      # per-process in-memory cap
 
 
 @dataclass
@@ -55,23 +57,10 @@ class CVELookup:
 
     def __init__(self, db_session: Optional[AsyncSession] = None):
         self.enhanced_lookup = EnhancedCVELookup(db_session)
-        self._redis = None
 
     async def _get_redis(self):
-        if self._redis is None:
-            try:
-                from cybersec.config.settings import settings
-                import redis.asyncio as aioredis
-                self._redis = aioredis.from_url(
-                    settings.REDIS_URL,
-                    decode_responses=True,
-                    socket_connect_timeout=2.0,
-                    socket_timeout=3.0,
-                )
-            except Exception as e:
-                logger.debug("Redis unavailable for CVE cache: %s", e)
-                self._redis = False  # sentinel
-        return self._redis if self._redis is not False else None
+        from cybersec.core.redis_client import get_shared_redis_client
+        return get_shared_redis_client()
 
     async def lookup(self, service: str, version: Optional[str] = None) -> List[CVEEntry]:
         """Lookup CVEs for (service, version).
@@ -89,17 +78,21 @@ class CVELookup:
             return cached
 
         # ── Tier 2: Redis (shared across workers) ────────────────────
-        r = await self._get_redis()
-        if r is not None:
-            try:
-                raw = await r.get(f"cve:{service}:{version or ''}")
-                if raw is not None:
-                    entries = [_from_dict(d) for d in json.loads(raw)]
-                    if len(self._local) < CVE_CACHE_MAX_LOCAL:
-                        self._local[key] = entries
-                    return entries
-            except Exception as e:
-                logger.debug("Redis CVE cache read failed: %s", e)
+        breaker = get_shared_breaker()
+        if not await breaker.is_open():
+            r = await self._get_redis()
+            if r is not None:
+                try:
+                    raw = await r.get(RedisKeys.cve(service, version))
+                    await breaker.record_success()
+                    if raw is not None:
+                        entries = [_from_dict(d) for d in json.loads(raw)]
+                        if len(self._local) < CVE_CACHE_MAX_LOCAL:
+                            self._local[key] = entries
+                        return entries
+                except Exception as e:
+                    await breaker.record_failure()
+                    logger.debug("Redis CVE cache read failed: %s", e)
 
         # ── Tier 3: deduplicate in-flight NVD requests ───────────────
         pending = self._pending.get(key)
@@ -116,11 +109,13 @@ class CVELookup:
 
     async def _fetch_and_cache(self, key: tuple, service: str, version: Optional[str]) -> List[CVEEntry]:
         """Fetch from NVD, store in both caches."""
+        lookup_failed = False
         try:
             cve_dicts = await self.enhanced_lookup.lookup(service, version)
         except Exception as e:
             logger.error("NVD lookup failed for %s/%s: %s", service, version, e)
-            return []
+            cve_dicts = []
+            lookup_failed = True
 
         entries = [CVEEntry(
             id=c.get("id", ""),
@@ -130,18 +125,25 @@ class CVELookup:
             confidence=c.get("confidence", 0.9),
         ) for c in cve_dicts]
 
-        # Populate local cache
-        if len(self._local) < CVE_CACHE_MAX_LOCAL:
+        # Only populate the local cache on a real (non-failed) result.
+        # A failed lookup should not poison the in-memory cache either —
+        # the next call should retry NVD, not silently reuse a failure.
+        if not lookup_failed and len(self._local) < CVE_CACHE_MAX_LOCAL:
             self._local[key] = entries
 
         # Populate Redis cache (best-effort)
-        r = await self._get_redis()
-        if r is not None:
-            try:
-                raw = json.dumps([_to_dict(e) for e in entries])
-                await r.setex(f"cve:{service}:{version or ''}", CVE_CACHE_TTL, raw)
-            except Exception as e:
-                logger.debug("Redis CVE cache write failed: %s", e)
+        breaker = get_shared_breaker()
+        if not await breaker.is_open():
+            r = await self._get_redis()
+            if r is not None:
+                try:
+                    raw = json.dumps([_to_dict(e) for e in entries])
+                    ttl = CVE_CACHE_TTL_EMPTY if (lookup_failed or not entries) else CVE_CACHE_TTL
+                    await r.setex(RedisKeys.cve(service, version), ttl, raw)
+                    await breaker.record_success()
+                except Exception as e:
+                    await breaker.record_failure()
+                    logger.debug("Redis CVE cache write failed: %s", e)
 
         return entries
 

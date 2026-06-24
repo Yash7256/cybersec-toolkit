@@ -47,6 +47,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Database init: %s", e)
     
+    # ── Scan state safety check ─────────────────────────────────────
+    from cybersec.config import settings
+    from cybersec.core.redis_client import get_shared_redis_client
+    if settings.WORKERS > 1:
+        r = get_shared_redis_client()
+        if r is None:
+            logger.critical(
+                "Running with multiple workers but Redis is unavailable — "
+                "scan quota enforcement will NOT work correctly across "
+                "workers. Fix Redis connectivity before scaling beyond 1 worker."
+            )
+    
     # ── Worker heartbeat + reaper ─────────────────────────────────
     import os
     worker_id = f"api-{os.getpid()}"
@@ -101,6 +113,14 @@ async def lifespan(app: FastAPI):
     
     await stop_workers()
     logger.info("Scan workers stopped")
+    
+    # Close shared Redis client
+    try:
+        from cybersec.core.redis_client import close_shared_redis_client
+        await close_shared_redis_client()
+        logger.info("Shared Redis client closed")
+    except Exception as e:
+        logger.warning("Failed to close Redis client: %s", e)
 
 def create_app() -> FastAPI:
     app = FastAPI(

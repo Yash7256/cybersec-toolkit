@@ -16,14 +16,29 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Redis is not exposed to the host. Only reachable by other containers
+  # on this network. Auth required via REDIS_PASSWORD.
+  # maxmemory: caps Redis at 256MB so it can never consume unbounded host
+  # memory. maxmemory-policy allkeys-lru: when full, evict the least-
+  # recently-used keys first (safe here since everything we store in
+  # Redis — CVE cache, WHOIS cache, SSE streams — is either reconstructable
+  # from source data or short-lived; nothing in Redis is the system of
+  # record). Adjust 256mb upward if cache hit-rate monitoring shows
+  # frequent evictions under real load.
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    command: [
+      "redis-server",
+      "--requirepass", "${REDIS_PASSWORD}",
+      "--maxmemory", "256mb",
+      "--maxmemory-policy", "allkeys-lru"
+    ]
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -37,12 +52,13 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/cybersec
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       APP_HOST: 0.0.0.0
       APP_PORT: 8000
       SCAN_TIMEOUT: 15.0
       OS_FINGERPRINT_TIMEOUT: 8.0
       SERVICE_DETECTION_TIMEOUT: 10.0
+      WORKERS: 1
     sysctls:
       - net.ipv4.ip_local_port_range=10000 65535
       - net.ipv4.tcp_fin_timeout=15

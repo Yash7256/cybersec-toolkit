@@ -16,6 +16,7 @@ import logging
 from typing import Optional
 
 from cybersec.config.settings import settings
+from cybersec.core.redis_client import get_shared_breaker, get_shared_redis_client, close_shared_redis_client, RedisKeys
 
 logger = logging.getLogger(__name__)
 
@@ -25,32 +26,13 @@ POLL_TIMEOUT = 55_000       # ms — matches SSE keepalive (55s)
 # In-memory fallback
 _local_queues: dict[str, asyncio.Queue] = {}
 
-_redis: Optional["Redis"] = None
-
-
-def _create_client():
-    try:
-        import redis.asyncio as aioredis
-        return aioredis.from_url(
-            settings.REDIS_URL,
-            decode_responses=True,
-            socket_connect_timeout=3.0,
-            socket_timeout=5.0,
-        )
-    except Exception as e:
-        logger.warning("Redis unavailable for events: %s", e)
-        return None
-
 
 async def _get_redis():
-    global _redis
-    if _redis is None:
-        _redis = _create_client()
-    return _redis
+    return get_shared_redis_client()
 
 
 def _stream_key(scan_id: str) -> str:
-    return f"scan:events:{scan_id}"
+    return RedisKeys.scan_events(scan_id)
 
 
 # ── Producer ────────────────────────────────────────────────────────────────
@@ -60,6 +42,19 @@ async def publish_event(scan_id: str, event: str) -> None:
 
     Falls back to in-memory queue if Redis is unavailable.
     """
+    breaker = get_shared_breaker()
+    if await breaker.is_open():
+        # Skip straight to fallback — don't even attempt Redis
+        q = _local_queues.get(scan_id)
+        if q is not None:
+            try:
+                q.put_nowait(event)
+                from cybersec.core.metrics_registry import sse_backlog
+                sse_backlog().set(q.qsize())
+            except asyncio.QueueFull:
+                logger.warning("Local event queue full for scan %s", scan_id)
+        return
+
     r = await _get_redis()
     if r is not None:
         try:
@@ -68,8 +63,10 @@ async def publish_event(scan_id: str, event: str) -> None:
             _t0 = __import__("time").monotonic()
             await r.xadd(key, {"event": event}, maxlen=STREAM_MAXLEN, approximate=True)
             redis_publish_duration().observe(__import__("time").monotonic() - _t0)
+            await breaker.record_success()
             return
         except Exception as e:
+            await breaker.record_failure()
             logger.warning("Redis XADD failed for %s: %s", scan_id, e)
 
     q = _local_queues.get(scan_id)
@@ -97,6 +94,13 @@ async def subscribe_events(scan_id: str, last_id: str = "$",
         asyncio.Queue — consumer reads events from this queue.
         Terminal event ("[DONE]") signals end.
     """
+    breaker = get_shared_breaker()
+    if await breaker.is_open():
+        # Skip straight to fallback
+        q = asyncio.Queue(maxsize=maxsize)
+        _local_queues[scan_id] = q
+        return q
+
     r = await _get_redis()
     if r is not None:
         try:
@@ -108,11 +112,21 @@ async def subscribe_events(scan_id: str, last_id: str = "$",
                 nonlocal current_id
                 try:
                     while True:
-                        results = await r.xread(
-                            streams={key: current_id},
-                            count=1,
-                            block=POLL_TIMEOUT,
-                        )
+                        if await breaker.is_open():
+                            # Breaker opened mid-poll — exit loop to let consumer retry
+                            return
+                        try:
+                            results = await r.xread(
+                                streams={key: current_id},
+                                count=1,
+                                block=POLL_TIMEOUT,
+                            )
+                            await breaker.record_success()
+                        except Exception as e:
+                            await breaker.record_failure()
+                            logger.warning("Redis xread failed for %s: %s", scan_id, e)
+                            return  # exit loop to fall back
+
                         if not results:
                             continue  # timeout, retry
 
@@ -136,6 +150,7 @@ async def subscribe_events(scan_id: str, last_id: str = "$",
             return q
 
         except Exception as e:
+            await breaker.record_failure()
             logger.warning("Redis stream subscribe failed for %s: %s", scan_id, e)
 
     # Fallback: local queue
@@ -151,10 +166,4 @@ async def unsubscribe_events(scan_id: str) -> None:
 
 async def close_redis():
     """Shut down Redis connection."""
-    global _redis
-    if _redis is not None:
-        try:
-            await _redis.aclose()
-        except Exception:
-            pass
-        _redis = None
+    await close_shared_redis_client()

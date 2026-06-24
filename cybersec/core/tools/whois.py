@@ -15,6 +15,7 @@ import whois as python_whois
 
 
 from cybersec.config.settings import settings
+from cybersec.core.redis_client import get_shared_breaker, RedisKeys
 
 logger = logging.getLogger(__name__)
 
@@ -27,24 +28,9 @@ _WHOIS_EXECUTOR = ThreadPoolExecutor(
     thread_name_prefix="whois_worker"
 )
 
-_redis = None
-
-
 async def _get_redis():
-    global _redis
-    if _redis is None:
-        try:
-            import redis.asyncio as aioredis
-            _redis = aioredis.from_url(
-                settings.REDIS_URL,
-                decode_responses=True,
-                socket_connect_timeout=2.0,
-                socket_timeout=3.0,
-            )
-        except Exception as e:
-            logger.debug("Redis unavailable for WHOIS cache: %s", e)
-            _redis = False  # sentinel
-    return _redis if _redis is not False else None
+    from cybersec.core.redis_client import get_shared_redis_client
+    return get_shared_redis_client()
 
 PRIVACY_PATTERNS = tuple(settings.whois_privacy_patterns_list)
 SUSPICIOUS_STATUS_TOKENS = tuple(settings.whois_suspicious_status_tokens_list)
@@ -425,22 +411,26 @@ async def whois_lookup(target: str) -> WHOISResult:
             logger.info("WHOIS cache hit (local memory) for: %s", domain)
             return _clone(cached[1], cached=True)
 
-    r = await _get_redis()
-    if r is not None:
-        try:
-            raw = await r.get(f"whois:{domain}")
-            if raw is not None:
-                logger.info("WHOIS cache hit (Redis) for: %s", domain)
-                result_dict = json.loads(raw)
-                result = WHOISResult(**result_dict)
-                with _CACHE_LOCK:
-                    if len(_CACHE) >= MAX_CACHE_SIZE:
-                        oldest_key = next(iter(_CACHE))
-                        _CACHE.pop(oldest_key, None)
-                    _CACHE[domain] = (now_ts + settings.WHOIS_CACHE_TTL_SECONDS, result)
-                return _clone(result, cached=True)
-        except Exception as exc:
-            logger.warning("Redis WHOIS cache read failed for %s: %s", domain, exc)
+    breaker = get_shared_breaker()
+    if not await breaker.is_open():
+        r = await _get_redis()
+        if r is not None:
+            try:
+                raw = await r.get(RedisKeys.whois(domain))
+                await breaker.record_success()
+                if raw is not None:
+                    logger.info("WHOIS cache hit (Redis) for: %s", domain)
+                    result_dict = json.loads(raw)
+                    result = WHOISResult(**result_dict)
+                    with _CACHE_LOCK:
+                        if len(_CACHE) >= MAX_CACHE_SIZE:
+                            oldest_key = next(iter(_CACHE))
+                            _CACHE.pop(oldest_key, None)
+                        _CACHE[domain] = (now_ts + settings.WHOIS_CACHE_TTL_SECONDS, result)
+                    return _clone(result, cached=True)
+            except Exception as exc:
+                await breaker.record_failure()
+                logger.warning("Redis WHOIS cache read failed for %s: %s", domain, exc)
 
     logger.info("WHOIS cache miss for %s. Executing queries.", domain)
     loop = asyncio.get_running_loop()
@@ -583,13 +573,17 @@ async def whois_lookup(target: str) -> WHOISResult:
             _CACHE.pop(oldest_key, None)
         _CACHE[domain] = (now_ts + settings.WHOIS_CACHE_TTL_SECONDS, _clone(result, cached=False))
 
-    r = await _get_redis()
-    if r is not None:
-        try:
-            raw = json.dumps(asdict(result))
-            await r.setex(f"whois:{domain}", settings.WHOIS_CACHE_TTL_SECONDS, raw)
-            logger.info("Populated Redis WHOIS cache for %s", domain)
-        except Exception as exc:
-            logger.warning("Redis WHOIS cache write failed for %s: %s", domain, exc)
+    breaker = get_shared_breaker()
+    if not await breaker.is_open():
+        r = await _get_redis()
+        if r is not None:
+            try:
+                raw = json.dumps(asdict(result))
+                await r.setex(RedisKeys.whois(domain), settings.WHOIS_CACHE_TTL_SECONDS, raw)
+                await breaker.record_success()
+                logger.info("Populated Redis WHOIS cache for %s", domain)
+            except Exception as exc:
+                await breaker.record_failure()
+                logger.warning("Redis WHOIS cache write failed for %s: %s", domain, exc)
 
     return result

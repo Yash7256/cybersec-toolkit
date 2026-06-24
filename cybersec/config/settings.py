@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8000
     APP_DEBUG: bool = False
+    WORKERS: int = 1
     APP_SECRET_KEY: str = "change-this-to-a-random-64-char-string-in-production"
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
     JWT_ALGORITHM: str = "HS256"

@@ -21,11 +21,15 @@ CREATE TABLE IF NOT EXISTS scans (
     user_id UUID REFERENCES users(id),
     target VARCHAR(255) NOT NULL,
     scan_type VARCHAR(50) NOT NULL,
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'timed_out')),
     port_range VARCHAR(100),
     options JSONB,
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
+    heartbeat_at TIMESTAMP WITH TIME ZONE,
+    worker_id VARCHAR(100),
+    progress_pct INTEGER DEFAULT 0,
+    error_message TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE
 );
@@ -67,6 +71,23 @@ CREATE TABLE IF NOT EXISTS reports (
     updated_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Worker heartbeats table (for scan recovery)
+CREATE TABLE IF NOT EXISTS worker_heartbeats (
+    worker_id VARCHAR(100) PRIMARY KEY,
+    hostname VARCHAR(255),
+    pid INTEGER,
+    active_scans INTEGER DEFAULT 0,
+    last_heartbeat TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+-- NVD CVE cache table
+CREATE TABLE IF NOT EXISTS nvd_cve_cache (
+    cve_id VARCHAR(20) PRIMARY KEY,
+    data JSONB NOT NULL,
+    fetched_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_scans_user_id ON scans(user_id);
 CREATE INDEX IF NOT EXISTS idx_scans_status ON scans(status);
@@ -75,6 +96,8 @@ CREATE INDEX IF NOT EXISTS idx_scan_results_scan_id ON scan_results(scan_id);
 CREATE INDEX IF NOT EXISTS idx_tool_results_user_id ON tool_results(user_id);
 CREATE INDEX IF NOT EXISTS idx_reports_scan_id ON reports(scan_id);
 CREATE INDEX IF NOT EXISTS idx_reports_user_id ON reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_nvd_cve_cache_expires_at ON nvd_cve_cache(expires_at);
+CREATE INDEX IF NOT EXISTS idx_worker_heartbeats_last_heartbeat ON worker_heartbeats(last_heartbeat);
 
 -- Verify tables created
 SELECT table_name FROM information_schema.tables 
