@@ -2,6 +2,7 @@ import asyncio
 
 import httpx
 import pytest
+import pytest_asyncio
 
 from cybersec.core.tools import geoip
 from cybersec.core.tools.geoip import GeoIPError, GeoIPResult
@@ -82,7 +83,7 @@ class FailingProvider:
         raise GeoIPError("provider said no")
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def clear_cache(monkeypatch):
     async def fake_rdap(ip):
         return {}
@@ -382,7 +383,7 @@ def test_geoip_fallback_primary_fails(monkeypatch):
     geoip._PROVIDERS["ipapi"].lookup = succeeding_lookup
     
     # Clear cache
-    geoip.clear_geoip_cache()
+    asyncio.run(geoip.clear_geoip_cache())
     
     # Perform lookup
     result = asyncio.run(geoip.geoip_lookup("8.8.8.8"))
@@ -417,7 +418,7 @@ def test_geoip_no_fallback_client_error(monkeypatch):
     geoip._PROVIDERS["ipapi"].lookup = tracking_lookup
     
     # Clear cache
-    geoip.clear_geoip_cache()
+    asyncio.run(geoip.clear_geoip_cache())
     
     # Perform lookup
     result = asyncio.run(geoip.geoip_lookup("invalid"))
@@ -440,7 +441,7 @@ def test_geoip_all_providers_fail(monkeypatch):
     geoip._PROVIDERS["ipapi"].lookup = failing_ipapi
     
     # Clear cache
-    geoip.clear_geoip_cache()
+    asyncio.run(geoip.clear_geoip_cache())
     
     # Perform lookup
     result = asyncio.run(geoip.geoip_lookup("8.8.8.8"))

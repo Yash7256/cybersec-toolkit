@@ -247,10 +247,10 @@ def isolate_geoip(monkeypatch):
     monkeypatch.setattr(geoip, "_reverse_dns", AsyncMock(return_value=None))
 
     geoip._http_client = None
-    geoip.clear_geoip_cache()
+    asyncio.run(geoip.clear_geoip_cache())
     yield fake
     geoip._http_client = None
-    geoip.clear_geoip_cache()
+    asyncio.run(geoip.clear_geoip_cache())
 
 
 # ── TIER 1: UNIT ──
@@ -624,7 +624,7 @@ def test_cache_separate_per_provider():
 @pytest.mark.unit
 def test_clear_cache_forces_fresh_fetch():
     first = asyncio.run(geoip.geoip_lookup("8.8.8.8", provider_name="fake"))
-    geoip.clear_geoip_cache()
+    asyncio.run(geoip.clear_geoip_cache())
     second = asyncio.run(geoip.geoip_lookup("8.8.8.8", provider_name="fake"))
     provider = geoip._PROVIDERS["fake"]
     assert provider.calls == 2
