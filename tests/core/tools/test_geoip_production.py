@@ -246,8 +246,10 @@ def isolate_geoip(monkeypatch):
     monkeypatch.setattr(geoip, "_fetch_rdap", AsyncMock(return_value={}))
     monkeypatch.setattr(geoip, "_reverse_dns", AsyncMock(return_value=None))
 
+    geoip._http_client = None
     geoip.clear_geoip_cache()
     yield fake
+    geoip._http_client = None
     geoip.clear_geoip_cache()
 
 
@@ -709,6 +711,7 @@ def test_ipwhois_happy_path_maps_all_fields(respx_mock):
     assert result.timezone == "America/Los_Angeles"
     assert result.local_time == "2026-01-01T00:00:00"
     assert result.timezone_utc == "-08:00"
+    assert result.currency == "USD"
     assert result.flag_emoji == "🇺🇸"
     assert result.is_proxy is False
     assert result.is_hosting is True
@@ -873,6 +876,29 @@ def test_ipwhois_null_timezone_dict(respx_mock):
 
     assert result.timezone is None
     assert result.local_time is None
+
+
+@pytest.mark.unit
+def test_ipwhois_null_currency_dict(respx_mock):
+    payload = {
+        "success": True,
+        "ip": "8.8.8.8",
+        "country": "United States",
+        "country_code": "US",
+        "latitude": 37.4056,
+        "longitude": -122.0775,
+        "connection": {},
+        "timezone": {},
+        "currency": None,
+        "flag": {},
+        "security": {}
+    }
+    respx_mock.get("https://ipwho.is/8.8.8.8").mock(return_value=httpx.Response(200, json=payload))
+
+    provider = IPWhoIsProvider()
+    result = asyncio.run(provider.lookup("8.8.8.8"))
+
+    assert result.currency is None
 
 
 @pytest.mark.unit

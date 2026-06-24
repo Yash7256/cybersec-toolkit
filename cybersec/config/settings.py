@@ -61,7 +61,11 @@ class Settings(BaseSettings):
     GEOIP_PROVIDER: str = "ipwhois"
     GEOIP_TIMEOUT: float = 5.0
     GEOIP_CACHE_TTL_SECONDS: int = 3600
+    GEOIP_CACHE_MAX_ENTRIES: int = 10000
+    GEOIP_CACHE_SWEEP_INTERVAL_SECONDS: int = 300
     GEOIP_ALLOW_PRIVATE_TARGETS: bool = False
+    GEOIP_MAX_CONCURRENT_LOOKUPS: int = 5
+    GEOIP_RATE_LIMIT_PER_MINUTE: int = 55
 
     # WHOIS configuration
     WHOIS_CACHE_TTL_SECONDS: int = 3600

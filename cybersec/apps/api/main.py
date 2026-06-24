@@ -86,6 +86,16 @@ async def lifespan(app: FastAPI):
     await start_workers()
     logger.info("Scan workers started")
     
+    # Register GeoIP providers
+    from cybersec.core.tools.geoip import IPWhoIsProvider, IPApiProvider, register_geoip_provider, start_geoip_cache_sweep
+    register_geoip_provider(IPWhoIsProvider())
+    register_geoip_provider(IPApiProvider())
+    logger.info("GeoIP providers registered: ipwhois, ipapi")
+    
+    # Start GeoIP cache sweep task
+    await start_geoip_cache_sweep()
+    logger.info("GeoIP cache sweep task started")
+    
     yield
     
     if hb_task:
@@ -121,6 +131,22 @@ async def lifespan(app: FastAPI):
         logger.info("Shared Redis client closed")
     except Exception as e:
         logger.warning("Failed to close Redis client: %s", e)
+    
+    # Close shared geoip http client
+    try:
+        from cybersec.core.tools.geoip import close_http_client, stop_geoip_cache_sweep
+        await close_http_client()
+        logger.info("GeoIP HTTP client closed")
+    except Exception as e:
+        logger.warning("Failed to close GeoIP HTTP client: %s", e)
+    
+    # Stop GeoIP cache sweep task
+    try:
+        from cybersec.core.tools.geoip import stop_geoip_cache_sweep
+        await stop_geoip_cache_sweep()
+        logger.info("GeoIP cache sweep task stopped")
+    except Exception as e:
+        logger.warning("Failed to stop GeoIP cache sweep task: %s", e)
 
 def create_app() -> FastAPI:
     app = FastAPI(
