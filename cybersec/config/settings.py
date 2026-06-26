@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     WHOIS_CACHE_TTL_SECONDS: int = 3600
     WHOIS_TIMEOUT: float = 8.0
     RDAP_BOOTSTRAP_URL: str = "https://rdap.org"
+    RDAP_FALLBACK_URLS: str = "https://rdap.iana.org"
+    RDAP_MAX_RETRIES: int = 2
+    RDAP_RETRY_DELAY_SECONDS: float = 0.5
     WHOIS_PRIVACY_PATTERNS: str = "privacy,redacted,whoisguard,domains by proxy,contact privacy,data protected,private registration,withheld"
     WHOIS_SUSPICIOUS_STATUS_TOKENS: str = "hold,pendingdelete,redemptionperiod,serverdeleteprohibited,clienthold"
     WHOIS_COMMON_TLDS: str = "com,org,net,edu,gov,io,co,in,uk,de,fr,au,ca,us,info,biz,dev,app,ai,me,xyz"

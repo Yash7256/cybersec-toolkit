@@ -11,7 +11,12 @@ class DnsRequest(BaseModel):
     record_type: str = "ALL"
     
 class WhoisRequest(BaseModel):
-    target: str
+    target: str = Field(
+        min_length=1,
+        max_length=253,
+        strip_whitespace=True,
+        description="Domain name or IP address to look up",
+    )
     
 class PingRequest(BaseModel):
     target: str

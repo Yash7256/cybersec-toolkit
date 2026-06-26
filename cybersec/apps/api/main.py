@@ -148,6 +148,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Failed to stop GeoIP cache sweep task: %s", e)
 
+    # Shut down WHOIS thread-pool executor
+    try:
+        from cybersec.core.tools.whois import shutdown_whois_executor
+        shutdown_whois_executor()
+        logger.info("WHOIS executor shut down")
+    except Exception as e:
+        logger.warning("Failed to shut down WHOIS executor: %s", e)
+
 def create_app() -> FastAPI:
     app = FastAPI(
         lifespan=lifespan,

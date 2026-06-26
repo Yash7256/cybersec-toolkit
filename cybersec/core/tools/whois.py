@@ -4,10 +4,11 @@ import time
 import threading
 import json
 import logging
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Awaitable, Callable
 from urllib.parse import urlparse
 
 import httpx
@@ -19,7 +20,7 @@ from cybersec.core.redis_client import get_shared_breaker, RedisKeys
 
 logger = logging.getLogger(__name__)
 
-_CACHE: dict[str, tuple[float, "WHOISResult"]] = {}
+_CACHE: OrderedDict[str, tuple[float, "WHOISResult"]] = OrderedDict()
 _CACHE_LOCK = threading.Lock()
 MAX_CACHE_SIZE = 1000
 
@@ -31,6 +32,10 @@ _WHOIS_EXECUTOR = ThreadPoolExecutor(
 async def _get_redis():
     from cybersec.core.redis_client import get_shared_redis_client
     return get_shared_redis_client()
+
+
+def shutdown_whois_executor() -> None:
+    _WHOIS_EXECUTOR.shutdown(wait=False, cancel_futures=True)
 
 PRIVACY_PATTERNS = tuple(settings.whois_privacy_patterns_list)
 SUSPICIOUS_STATUS_TOKENS = tuple(settings.whois_suspicious_status_tokens_list)
@@ -303,16 +308,31 @@ def _extract_rdap_contact(entities: list[dict] | None, role: str) -> dict[str, A
 
 
 async def _fetch_rdap(domain: str) -> dict[str, Any] | None:
-    bootstrap = settings.RDAP_BOOTSTRAP_URL.rstrip("/")
-    url = f"{bootstrap}/domain/{domain}"
+    bootstrap_urls = [settings.RDAP_BOOTSTRAP_URL] + [
+        u.strip()
+        for u in settings.RDAP_FALLBACK_URLS.split(",")
+        if u.strip()
+    ]
+    last_exc: Exception | None = None
     async with httpx.AsyncClient(timeout=settings.WHOIS_TIMEOUT) as client:
-        resp = await client.get(url)
-    if resp.status_code == 404:
-        return None
-    if resp.status_code == 429:
-        raise RuntimeError("RDAP rate limit reached")
-    resp.raise_for_status()
-    return resp.json()
+        for base_url in bootstrap_urls:
+            url = f"{base_url.rstrip('/')}/domain/{domain}"
+            try:
+                resp = await client.get(url)
+                if resp.status_code == 404:
+                    return None
+                if resp.status_code == 429:
+                    raise RuntimeError(f"RDAP rate limit reached at {base_url}")
+                resp.raise_for_status()
+                return resp.json()
+            except httpx.ConnectError as exc:
+                last_exc = exc
+                logger.warning("RDAP connection error for %s via %s: %s", domain, base_url, exc)
+            except RuntimeError as exc:
+                last_exc = exc
+                logger.warning("RDAP error for %s via %s: %s", domain, base_url, exc)
+            await asyncio.sleep(settings.RDAP_RETRY_DELAY_SECONDS)
+    raise last_exc or RuntimeError("All RDAP bootstrap URLs exhausted")
 
 
 def _rdap_date(rdap: dict[str, Any] | None, action: str) -> str | None:
@@ -398,17 +418,28 @@ def _clone(result: WHOISResult, *, cached: bool) -> WHOISResult:
     return WHOISResult(**data)
 
 
-async def whois_lookup(target: str) -> WHOISResult:
+async def whois_lookup(
+    target: str,
+    on_stage: Callable[[str, str], Awaitable[None]] | None = None,
+) -> WHOISResult:
+    async def _stage(stage: str, message: str) -> None:
+        if on_stage is not None:
+            await on_stage(stage, message)
+
     try:
         domain = _normalize_target(target)
     except ValueError as exc:
         return _empty_result(target, str(exc))
 
+    await _stage("normalize", "Normalizing domain target")
+
     now_ts = time.time()
+    await _stage("cache_check", "Checking cache")
     with _CACHE_LOCK:
         cached = _CACHE.get(domain)
         if cached and cached[0] > now_ts:
             logger.info("WHOIS cache hit (local memory) for: %s", domain)
+            _CACHE.move_to_end(domain)
             return _clone(cached[1], cached=True)
 
     breaker = get_shared_breaker()
@@ -426,7 +457,8 @@ async def whois_lookup(target: str) -> WHOISResult:
                         if len(_CACHE) >= MAX_CACHE_SIZE:
                             oldest_key = next(iter(_CACHE))
                             _CACHE.pop(oldest_key, None)
-                        _CACHE[domain] = (now_ts + settings.WHOIS_CACHE_TTL_SECONDS, result)
+                        _CACHE[domain] = (now_ts + settings.WHOIS_CACHE_TTL_SECONDS, _clone(result, cached=False))
+                        _CACHE.move_to_end(domain)
                     return _clone(result, cached=True)
             except Exception as exc:
                 await breaker.record_failure()
@@ -435,6 +467,7 @@ async def whois_lookup(target: str) -> WHOISResult:
     logger.info("WHOIS cache miss for %s. Executing queries.", domain)
     loop = asyncio.get_running_loop()
     now = datetime.now(timezone.utc)
+    await _stage("whois", "Querying WHOIS registry")
     try:
         w = await asyncio.wait_for(
             loop.run_in_executor(_WHOIS_EXECUTOR, python_whois.whois, domain),
@@ -453,6 +486,7 @@ async def whois_lookup(target: str) -> WHOISResult:
 
     rdap = None
     rdap_error = None
+    await _stage("rdap", "Querying RDAP bootstrap")
     try:
         rdap = await _fetch_rdap(domain)
     except Exception as exc:

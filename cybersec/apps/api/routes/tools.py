@@ -1,6 +1,7 @@
 """
 Tools router implementation.
 """
+import asyncio
 import logging
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -143,11 +144,30 @@ async def stream_whois(
     current_user: User | None = Depends(get_optional_user)
 ):
     async def stream_response():
+        queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+        async def on_stage(stage: str, message: str) -> None:
+            await queue.put(
+                f"data: {json.dumps({'type': 'stage', 'stage': stage, 'message': message})}\n\n"
+            )
+
         try:
             yield f"data: {json.dumps({'type': 'init', 'data': {'target': body.target, 'domain': body.target, 'scanning': True, 'scan_stage': 'init', 'scan_message': 'Starting WHOIS lookup'}})}\n\n"
-            yield f"data: {json.dumps({'type': 'stage', 'stage': 'normalize', 'message': 'Normalizing domain target'})}\n\n"
-            yield f"data: {json.dumps({'type': 'stage', 'stage': 'whois', 'message': 'Querying WHOIS and RDAP sources'})}\n\n"
-            result = await whois_lookup(body.target)
+
+            lookup_task = asyncio.create_task(whois_lookup(body.target, on_stage=on_stage))
+
+            while not lookup_task.done():
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=0.1)
+                    yield event
+                except asyncio.TimeoutError:
+                    continue
+
+            # Drain any remaining stage events enqueued before the task finished
+            while not queue.empty():
+                yield queue.get_nowait()
+
+            result = await lookup_task
             result_dict = dataclasses.asdict(result)
             tool_result_id = await _save_tool_result(db, current_user, "whois", body.target, result_dict)
             yield f"data: {json.dumps({'type': 'done', 'data': result_dict, 'tool_result_id': tool_result_id})}\n\n"

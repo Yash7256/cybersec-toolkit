@@ -269,7 +269,7 @@ function Whois() {
         </section>
 
         <section className="whois-two-col-panel">
-          <ScoreCard score={healthScore} />
+          <ScoreCard score={healthScore} data={data} />
           <RiskCard level={riskLevel} risks={risks} isHealthy={isHealthy} />
         </section>
 
@@ -283,8 +283,19 @@ function Whois() {
             <DataLine label="Registrant Organization" value={data.registrant_org} />
             <DataLine label="Registrant Country" value={data.registrant_country} />
             <DataLine label="Registrant Email" value={emails[0]} />
-            <DataLine label="Admin Contact" value={data.admin_contact ? 'Privacy Protected' : EMPTY} pill />
-            <DataLine label="Tech Contact" value={data.tech_contact ? 'Privacy Protected' : EMPTY} pill />
+            {(() => {
+              const contactLabel = (contact) => {
+                if (!contact) return EMPTY;
+                if (data.privacy_protected) return 'Privacy Protected';
+                return contact.name || contact.organization || contact.email || 'Present';
+              };
+              return (
+                <>
+                  <DataLine label="Admin Contact" value={contactLabel(data.admin_contact)} pill />
+                  <DataLine label="Tech Contact" value={contactLabel(data.tech_contact)} pill />
+                </>
+              );
+            })()}
           </CompactCard>
           <CompactCard title="Server Names">
             {(servers.length ? servers.slice(0, 5) : [EMPTY]).map((server) => (
@@ -419,17 +430,38 @@ function DataLine({ label, value, accent = false, pill = false, icon: Icon = nul
   );
 }
 
-function ScoreCard({ score }) {
+function ScoreCard({ score, data }) {
+  const isExpired = data.expiry_status === 'expired';
+  const hasTransferLock = asArray(data.status).some((s) => s.toLowerCase().includes('transferprohibited'));
+  const hasPrivacy = data.privacy_protected === true;
+  const isActive = data.available === false;
+
+  const checks = [
+    { label: 'Valid registration', pass: isActive },
+    { label: 'Domain is active', pass: isActive },
+    { label: 'Not expired', pass: !isExpired },
+    { label: 'Transfer lock is enabled', pass: hasTransferLock },
+    { label: 'Privacy protection is enabled', pass: hasPrivacy },
+    { label: 'No major risk indicators', pass: score >= 70 },
+  ];
+
+  const verdict = score >= 85 ? 'Excellent' : score >= 65 ? 'Good' : score >= 45 ? 'Fair' : 'At Risk';
+
   return (
     <article className="whois-health-card">
       <h3><CircleDot className="h-4 w-4" />Domain Health Score</h3>
       <div className="whois-score-ring" style={{ '--score': `${score}%` }}>
         <span>{score}<small>/100</small></span>
       </div>
-      <strong>Excellent</strong>
+      <strong>{verdict}</strong>
       <p>Domain appears stable with no major concerns detected.</p>
-      {['Valid registration', 'Domain is active', 'Not expired', 'Transfer lock is enabled', 'Privacy protection is enabled'].map((item) => (
-        <div className="whois-check-line" key={item}><Check className="h-4 w-4" />{item}</div>
+      {checks.map(({ label, pass }) => (
+        <div className="whois-check-line" key={label}>
+          {pass
+            ? <Check className="h-4 w-4" style={{ color: 'var(--color-success, #4ade80)' }} />
+            : <X className="h-4 w-4" style={{ color: 'var(--color-danger, #f87171)' }} />}
+          {label}
+        </div>
       ))}
     </article>
   );
