@@ -1,5 +1,7 @@
 import asyncio
+import ipaddress
 import os
+import pathlib
 import random
 import re
 import string
@@ -14,6 +16,27 @@ import dns.resolver
 import httpx
 
 warnings.filterwarnings("ignore", message=".*verify.*", category=ResourceWarning)
+
+
+def _is_safe_public_ip(ip_str: str) -> bool:
+    """Return True only if ip_str is a publicly routable address.
+
+    Blocks private, loopback, link-local, multicast, reserved, and
+    unspecified ranges to prevent SSRF via DNS-controlled targets.
+    """
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False
+    return not (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
 
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"]
 
@@ -40,8 +63,10 @@ SCREENSHOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "
 SCREENSHOT_VIEWPORT = {"width": 1280, "height": 720}
 SCREENSHOT_TIMEOUT = 15000
 SCREENSHOT_FULL_PAGE = False
+SCREENSHOT_CONCURRENCY = 5
 
 _dns_semaphore = asyncio.Semaphore(DNS_CONCURRENCY)
+_screenshot_semaphore = asyncio.Semaphore(SCREENSHOT_CONCURRENCY)
 
 _dns_resolver = dns.asyncresolver.Resolver()
 _dns_resolver.timeout = RESOLVE_TIMEOUT
@@ -109,11 +134,32 @@ class SubdomainResult:
     dns_time_ms: int = 0
     http_time_ms: int = 0
 
-WORDLISTS = {
+_WORDLIST_DIR = pathlib.Path(__file__).parent / "data" / "wordlists"
+
+
+def _load_wordlist(name: str) -> list[str]:
+    """Load a wordlist file, returning non-blank, non-comment lines."""
+    path = _WORDLIST_DIR / f"{name}.txt"
+    with open(path) as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+
+
+# Attempt to load from bundled data files; fall back to the small inline
+# lists if the files are missing (e.g. the package was installed without
+# the data directory, or in a stripped test environment).
+_WORDLIST_FALLBACK = {
     "small": ["www", "mail", "ftp", "api", "dev", "staging", "test", "admin", "blog", "shop", "app", "portal", "vpn", "remote", "secure"],
     "medium": ["www", "mail", "ftp", "api", "dev", "staging", "test", "admin", "blog", "shop", "app", "portal", "vpn", "remote", "secure", "db", "ns1", "ns2", "smtp", "pop", "imap", "m", "mobile", "cdn"],
-    "large": ["www", "mail", "ftp", "api", "dev", "staging", "test", "admin", "blog", "shop", "app", "portal", "vpn", "remote", "secure", "db", "ns1", "ns2", "smtp", "pop", "imap", "m", "mobile", "cdn", "beta", "alpha", "docs", "help", "support", "forum"]
+    "large": ["www", "mail", "ftp", "api", "dev", "staging", "test", "admin", "blog", "shop", "app", "portal", "vpn", "remote", "secure", "db", "ns1", "ns2", "smtp", "pop", "imap", "m", "mobile", "cdn", "beta", "alpha", "docs", "help", "support", "forum"],
 }
+try:
+    WORDLISTS = {
+        "small": _load_wordlist("small"),
+        "medium": _load_wordlist("medium"),
+        "large": _load_wordlist("large"),
+    }
+except FileNotFoundError:
+    WORDLISTS = _WORDLIST_FALLBACK
 
 
 def _generate_random_prefix(length: int = 8) -> str:
@@ -405,6 +451,34 @@ async def probe_subdomain_http(client: httpx.AsyncClient, hostname: str) -> dict
     return result
 
 
+async def _screenshot_one(browser, entry: dict, dir_path: str, vp: dict) -> None:
+    """Take a screenshot of a single alive subdomain entry, bounded by the semaphore."""
+    async with _screenshot_semaphore:
+        hostname = entry["subdomain"]
+        scheme = entry.get("http", {}).get("scheme", "https")
+        url = f"{scheme}://{hostname}"
+        filename = f"{hostname}.png".replace(":", "_")
+        filepath = os.path.join(dir_path, filename)
+        page = None  # initialise before try so finally can reference it safely
+        try:
+            page = await browser.newPage()
+            await page.setViewport(vp)
+            await asyncio.wait_for(
+                page.goto(url, waitUntil="networkidle0"),
+                timeout=SCREENSHOT_TIMEOUT / 1000,
+            )
+            await page.screenshot({"path": filepath, "fullPage": SCREENSHOT_FULL_PAGE})
+            entry["screenshot"] = filename
+        except Exception:
+            pass
+        finally:
+            if page is not None:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+
+
 async def capture_screenshots(
     results: list[dict],
     viewport: dict | None = None,
@@ -433,29 +507,9 @@ async def capture_screenshots(
         ],
     )
     try:
-        for entry in alive:
-            hostname = entry["subdomain"]
-            scheme = entry.get("http", {}).get("scheme", "https")
-            url = f"{scheme}://{hostname}"
-            filename = f"{hostname}.png".replace(":", "_")
-            filepath = os.path.join(dir_path, filename)
-
-            try:
-                page = await browser.newPage()
-                await page.setViewport(vp)
-                await asyncio.wait_for(
-                    page.goto(url, waitUntil="networkidle0"),
-                    timeout=SCREENSHOT_TIMEOUT / 1000,
-                )
-                await page.screenshot({"path": filepath, "fullPage": SCREENSHOT_FULL_PAGE})
-                entry["screenshot"] = filename
-            except Exception:
-                pass
-            finally:
-                try:
-                    await page.close()
-                except Exception:
-                    pass
+        await asyncio.gather(
+            *[_screenshot_one(browser, entry, dir_path, vp) for entry in alive]
+        )
     finally:
         try:
             await asyncio.wait_for(browser.close(), timeout=5.0)
@@ -469,6 +523,24 @@ async def find_subdomains(
     strictness: str = "medium",
     risk_keywords: dict[str, list[str]] | None = None,
 ) -> SubdomainResult:
+    # Input validation — mirrors the Pydantic schema guard in SubdomainRequest
+    # and also protects direct callers (e.g. the CLI) that bypass the API layer.
+    domain = domain.strip()
+    if not domain:
+        raise ValueError("domain is required")
+    if len(domain) > 253:
+        raise ValueError("domain is too long")
+    if any(ch.isspace() for ch in domain):
+        raise ValueError("domain must not contain whitespace")
+    try:
+        ipaddress.ip_address(domain)
+        raise ValueError("domain must be a hostname, not an IP address")
+    except ValueError as exc:
+        if "must be a hostname" in str(exc):
+            raise
+        # Not a valid IP — expected; fall through.
+    domain = domain.lower()
+
     scan_start = time.monotonic()
 
     if strictness not in WILDCARD_STRICTNESS_LEVELS:
@@ -506,19 +578,45 @@ async def find_subdomains(
     http_time_ms = 0
     resolved_indices = [i for i, r in enumerate(results) if r.get("resolved")]
     if resolved_indices:
+        # SSRF guard: exclude any hostname whose every resolved IP is non-public.
+        # Policy: ALL IPs must be public — a single private IP in a round-robin set
+        # is enough to block the probe, because we cannot control which IP httpx
+        # will actually connect to.
+        safe_indices = []
+        for i in resolved_indices:
+            all_ips = (
+                results[i]["records"].get("A", [])
+                + results[i]["records"].get("AAAA", [])
+            )
+            if all_ips and all(_is_safe_public_ip(ip) for ip in all_ips):
+                safe_indices.append(i)
+            else:
+                results[i]["http"] = {
+                    "alive": False,
+                    "skipped_reason": "resolves to non-public address, HTTP probe blocked for safety",
+                }
+
         http_start = time.monotonic()
-        limits = httpx.Limits(max_connections=50, max_keepalive_connections=20)
-        async with httpx.AsyncClient(
-            limits=limits,
-            timeout=httpx.Timeout(HTTP_PROBE_TIMEOUT, connect=5.0),
-            follow_redirects=True,
-            max_redirects=MAX_REDIRECTS,
-            verify=False,
-        ) as client:
-            http_tasks = [probe_subdomain_http(client, results[i]["subdomain"]) for i in resolved_indices]
-            http_results = await asyncio.gather(*http_tasks)
-            for i, http_data in zip(resolved_indices, http_results):
-                results[i]["http"] = http_data
+        if safe_indices:
+            limits = httpx.Limits(max_connections=50, max_keepalive_connections=20)
+            async with httpx.AsyncClient(
+                limits=limits,
+                timeout=httpx.Timeout(HTTP_PROBE_TIMEOUT, connect=5.0),
+                follow_redirects=True,
+                max_redirects=MAX_REDIRECTS,
+                # TLS verification intentionally disabled: this tool probes
+                # untrusted, often-internal subdomains that commonly use self-signed
+                # or otherwise invalid certificates (e.g. staging/dev hosts). This is
+                # a deliberate tradeoff for a recon tool, not an oversight. Cert
+                # validity itself is still useful signal and is captured separately
+                # by httpx's response object where possible — see the cert metadata
+                # capture below.
+                verify=False,
+            ) as client:
+                http_tasks = [probe_subdomain_http(client, results[i]["subdomain"]) for i in safe_indices]
+                http_results = await asyncio.gather(*http_tasks)
+                for i, http_data in zip(safe_indices, http_results):
+                    results[i]["http"] = http_data
         http_time_ms = round((time.monotonic() - http_start) * 1000)
 
     for r in results:
@@ -632,49 +730,73 @@ async def stream_subdomain_events(
     http_time_ms = 0
     resolved_rows = [row for row in results if row.get("resolved")]
     if resolved_rows:
-        yield {
-            "type": "stage",
-            "stage": "http",
-            "message": f"Probing {len(resolved_rows)} resolved host(s)",
-        }
-        http_start = time.monotonic()
-        limits = httpx.Limits(max_connections=50, max_keepalive_connections=20)
-        async with httpx.AsyncClient(
-            limits=limits,
-            timeout=httpx.Timeout(HTTP_PROBE_TIMEOUT, connect=5.0),
-            follow_redirects=True,
-            max_redirects=MAX_REDIRECTS,
-            verify=False,
-        ) as client:
-            async def probe_row(row: dict) -> tuple[dict, dict]:
-                return row, await probe_subdomain_http(client, row["subdomain"])
-
-            http_tasks = [
-                asyncio.create_task(probe_row(row))
-                for row in resolved_rows
-            ]
-            completed_http = 0
-            for task in asyncio.as_completed(http_tasks):
-                row, http_data = await task
-                row["http"] = http_data
-                row["risk"] = classify_subdomain_risk(
-                    row["subdomain"], row.get("http"), risk_keywords
-                )
-                verified, confidence = compute_confidence(row, wildcard_ips)
-                row["verified"] = verified
-                row["confidence"] = confidence
-                completed_http += 1
-                yield {
-                    "type": "candidate",
-                    "row": row,
-                    "progress": {
-                        "checked": checked_count,
-                        "total": len(entries),
-                        "found": sum(1 for item in results if item.get("resolved")),
-                        "http_checked": completed_http,
-                        "http_total": len(resolved_rows),
-                    },
+        # SSRF guard: same ALL-IPs-must-be-public policy as find_subdomains().
+        safe_rows = []
+        for row in resolved_rows:
+            all_ips = (
+                row["records"].get("A", [])
+                + row["records"].get("AAAA", [])
+            )
+            if all_ips and all(_is_safe_public_ip(ip) for ip in all_ips):
+                safe_rows.append(row)
+            else:
+                row["http"] = {
+                    "alive": False,
+                    "skipped_reason": "resolves to non-public address, HTTP probe blocked for safety",
                 }
+
+        if safe_rows:
+            yield {
+                "type": "stage",
+                "stage": "http",
+                "message": f"Probing {len(safe_rows)} resolved host(s)",
+            }
+        http_start = time.monotonic()
+        if safe_rows:
+            limits = httpx.Limits(max_connections=50, max_keepalive_connections=20)
+            async with httpx.AsyncClient(
+                limits=limits,
+                timeout=httpx.Timeout(HTTP_PROBE_TIMEOUT, connect=5.0),
+                follow_redirects=True,
+                max_redirects=MAX_REDIRECTS,
+                # TLS verification intentionally disabled: this tool probes
+                # untrusted, often-internal subdomains that commonly use self-signed
+                # or otherwise invalid certificates (e.g. staging/dev hosts). This is
+                # a deliberate tradeoff for a recon tool, not an oversight. Cert
+                # validity itself is still useful signal and is captured separately
+                # by httpx's response object where possible — see the cert metadata
+                # capture below.
+                verify=False,
+            ) as client:
+                async def probe_row(row: dict) -> tuple[dict, dict]:
+                    return row, await probe_subdomain_http(client, row["subdomain"])
+
+                http_tasks = [
+                    asyncio.create_task(probe_row(row))
+                    for row in safe_rows
+                ]
+                completed_http = 0
+                for task in asyncio.as_completed(http_tasks):
+                    row, http_data = await task
+                    row["http"] = http_data
+                    row["risk"] = classify_subdomain_risk(
+                        row["subdomain"], row.get("http"), risk_keywords
+                    )
+                    verified, confidence = compute_confidence(row, wildcard_ips)
+                    row["verified"] = verified
+                    row["confidence"] = confidence
+                    completed_http += 1
+                    yield {
+                        "type": "candidate",
+                        "row": row,
+                        "progress": {
+                            "checked": checked_count,
+                            "total": len(entries),
+                            "found": sum(1 for item in results if item.get("resolved")),
+                            "http_checked": completed_http,
+                            "http_total": len(safe_rows),
+                        },
+                    }
         http_time_ms = round((time.monotonic() - http_start) * 1000)
 
     for row in results:

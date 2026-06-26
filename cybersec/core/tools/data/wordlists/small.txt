@@ -1,0 +1,54 @@
+# Subdomain wordlist — small (50 entries)
+# Source: SecLists/Discovery/DNS/subdomains-top1million-5000.txt
+# License: MIT — Copyright (c) 2018 Daniel Miessler
+# https://github.com/danielmiessler/SecLists
+www
+mail
+ns2
+ns1
+ftp
+smtp
+webmail
+pop
+vpn
+api
+dev
+cdn
+m
+portal
+admin
+support
+git
+blog
+staging
+crm
+intranet
+backup
+shop
+beta
+app
+auth
+wiki
+docs
+test
+monitor
+grafana
+gitlab
+jenkins
+dashboard
+status
+login
+sso
+remote
+secure
+db
+ns3
+imap
+cloud
+autodiscover
+help
+mail2
+web
+email
+static
+mobile

@@ -1,7 +1,9 @@
 """
 Tool pydantic schemas.
 """
-from pydantic import BaseModel, ConfigDict, Field
+import ipaddress
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from uuid import UUID
 from typing import Any, Literal
 from datetime import datetime
@@ -38,6 +40,28 @@ class SubdomainRequest(BaseModel):
     domain: str
     wordlist: Literal["small", "medium", "large"] = "small"
     strictness: Literal["off", "low", "medium", "high"] = "medium"
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("domain is required")
+        if len(v) > 253:
+            raise ValueError("domain is too long")
+        if any(ch.isspace() for ch in v):
+            raise ValueError("domain must not contain whitespace")
+        # Reject bare IP addresses — this field is a base domain to enumerate
+        # subdomains under, not a single target. An IP produces nonsense like
+        # "www.8.8.8.8" and is not a valid DNS parent zone.
+        try:
+            ipaddress.ip_address(v)
+            raise ValueError("domain must be a hostname, not an IP address")
+        except ValueError as exc:
+            if "must be a hostname" in str(exc):
+                raise
+            # Not a valid IP address — this is what we want; fall through.
+        return v.lower()
     
 class GeoipRequest(BaseModel):
     target: str
