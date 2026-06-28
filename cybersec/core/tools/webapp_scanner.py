@@ -115,7 +115,6 @@ class WebAppScanner:
     XSS_PAYLOADS  = ["<script>alert(1)</script>", "<img src=x onerror=alert(1)>",
                      "'><svg onload=alert(1)>"]
     SSTI_PAYLOADS = ["{{7*7}}", "${7*7}", "#{7*7}", "<%= 7*7 %>", "{{config}}"]
-    CMD_PAYLOADS  = ["; ls", "| id", "$(id)", "`id`", "; whoami", "& whoami &"]
     TRAVERSAL_PAYLOADS = ["../etc/passwd", "../../etc/passwd", "../../../etc/passwd",
                           "....//....//etc/passwd", "%2e%2e%2fetc%2fpasswd"]
 
@@ -186,10 +185,50 @@ class WebAppScanner:
         return urljoin(base, href)
 
     # ------------------------------------------------------------------
+    # SSRF-safe redirect helper
+    # ------------------------------------------------------------------
+
+    _MAX_REDIRECT_HOPS = 5
+
+    @staticmethod
+    def _resolve_ip(url: str) -> str | None:
+        host = urlparse(url).hostname
+        if not host:
+            return None
+        try:
+            return socket.getaddrinfo(host, None)[0][4][0]
+        except OSError:
+            return None
+
+    async def _safe_get(
+        self,
+        url: str,
+        client: httpx.AsyncClient,
+        allow_private: bool = False,
+        **kwargs,
+    ) -> httpx.Response | None:
+        """GET with manual redirect following + SSRF re-validation on each hop."""
+        from cybersec.core.tools.port_scanner import _is_scan_target_allowed  # lazy import
+        current = url
+        for _ in range(self._MAX_REDIRECT_HOPS + 1):
+            if not allow_private:
+                ip = self._resolve_ip(current)
+                if ip is None or not _is_scan_target_allowed(ip):
+                    return None
+            resp = await client.get(current, follow_redirects=False, **kwargs)
+            if resp.status_code not in (301, 302, 303, 307, 308):
+                return resp
+            location = resp.headers.get("location")
+            if not location:
+                return resp
+            current = location if location.startswith(("http://", "https://")) else urljoin(current, location)
+        return None  # exceeded max hops
+
+    # ------------------------------------------------------------------
     # Crawl
     # ------------------------------------------------------------------
 
-    async def crawl(self, base_url: str, client: httpx.AsyncClient) -> List[CrawlResult]:
+    async def crawl(self, base_url: str, client: httpx.AsyncClient, allow_private: bool = False) -> List[CrawlResult]:
         queue = [base_url]
         results: List[CrawlResult] = []
         domain = self._base_domain(base_url)
@@ -201,7 +240,9 @@ class WebAppScanner:
             self.visited_urls.add(url)
 
             try:
-                response = await client.get(url, follow_redirects=True)
+                response = await self._safe_get(url, client, allow_private=allow_private)
+                if response is None:
+                    continue
                 text = response.text
 
                 href_pattern = r'href=["\'](https?://[^"\'<>\s]+|/[^"\'<>\s]*)["\']'
@@ -319,10 +360,12 @@ class WebAppScanner:
     # HTTP headers + cookies + protocol
     # ------------------------------------------------------------------
 
-    async def check_headers(self, url: str, client: httpx.AsyncClient) -> List[WebAppVulnerability]:
+    async def check_headers(self, url: str, client: httpx.AsyncClient, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
         try:
-            resp = await client.get(url, follow_redirects=True)
+            resp = await self._safe_get(url, client, allow_private=allow_private)
+            if resp is None:
+                return vulns
             hl = {k.lower(): v for k, v in resp.headers.items()}
 
             for header, (sev, desc) in self.SECURITY_HEADERS.items():
@@ -404,10 +447,10 @@ class WebAppScanner:
     # HTTP methods (TRACE, PUT, DELETE, etc.)
     # ------------------------------------------------------------------
 
-    async def check_http_methods(self, url: str, client: httpx.AsyncClient) -> List[WebAppVulnerability]:
+    async def check_http_methods(self, url: str, client: httpx.AsyncClient, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
         try:
-            resp = await client.options(url, follow_redirects=True)
+            resp = await client.options(url, follow_redirects=False)
             allow = resp.headers.get("Allow", resp.headers.get("allow", ""))
             methods = [m.strip().upper() for m in allow.split(",") if m.strip()]
         except Exception:
@@ -441,15 +484,17 @@ class WebAppScanner:
     # CORS
     # ------------------------------------------------------------------
 
-    async def check_cors(self, url: str, client: httpx.AsyncClient) -> List[WebAppVulnerability]:
+    async def check_cors(self, url: str, client: httpx.AsyncClient, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
         evil = "https://evil.com"
         for method in ("GET", "OPTIONS"):
             try:
                 if method == "OPTIONS":
-                    resp = await client.options(url, headers={"Origin": evil}, follow_redirects=True)
+                    resp = await client.options(url, headers={"Origin": evil}, follow_redirects=False)
                 else:
-                    resp = await client.get(url, headers={"Origin": evil}, follow_redirects=True)
+                    resp = await self._safe_get(url, client, allow_private=allow_private, headers={"Origin": evil})
+                    if resp is None:
+                        continue
             except Exception:
                 continue
 
@@ -510,13 +555,15 @@ class WebAppScanner:
     # Admin panel enumeration
     # ------------------------------------------------------------------
 
-    async def check_admin_panels(self, base_url: str, client: httpx.AsyncClient) -> List[WebAppVulnerability]:
+    async def check_admin_panels(self, base_url: str, client: httpx.AsyncClient, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
 
         async def _probe(path: str) -> Optional[WebAppVulnerability]:
             u = f"{base_url.rstrip('/')}{path}"
             try:
-                r = await client.get(u, follow_redirects=True)
+                r = await self._safe_get(u, client, allow_private=allow_private)
+                if r is None:
+                    return None
                 if r.status_code == 200:
                     body_lower = r.text.lower()
                     is_login = any(kw in body_lower for kw in (
@@ -632,7 +679,7 @@ class WebAppScanner:
     # Injection checks (SQL, XSS, SSTI, CMDi, path traversal)
     # ------------------------------------------------------------------
 
-    async def check_sqli(self, url: str, forms: List[dict], client: httpx.AsyncClient) -> List[WebAppVulnerability]:
+    async def check_sqli(self, url: str, forms: List[dict], client: httpx.AsyncClient, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
         for form in forms:
             for name in form["inputs"]:
@@ -640,9 +687,12 @@ class WebAppScanner:
                     try:
                         data = {k: "test" for k in form["inputs"]}
                         data[name] = payload
-                        r = (await client.post(form["action"], data=data, follow_redirects=True)
-                             if form["method"] == "POST"
-                             else await client.get(form["action"], params=data, follow_redirects=True))
+                        if form["method"] == "POST":
+                            r = await client.post(form["action"], data=data, follow_redirects=False)
+                        else:
+                            r = await self._safe_get(form["action"], client, allow_private=allow_private, params=data)
+                            if r is None:
+                                continue
                         for err in self.SQL_ERRORS:
                             if err.lower() in r.text.lower():
                                 idx = r.text.lower().find(err.lower())
@@ -659,7 +709,7 @@ class WebAppScanner:
                         pass
         return vulns
 
-    async def check_xss(self, url: str, forms: List[dict], client: httpx.AsyncClient) -> List[WebAppVulnerability]:
+    async def check_xss(self, url: str, forms: List[dict], client: httpx.AsyncClient, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
         # Also probe GET parameters from URL
         url_params: List[str] = []
@@ -670,9 +720,12 @@ class WebAppScanner:
         async def _probe_form(form, name, payload):
             data = {k: "test" for k in form["inputs"]}
             data[name] = payload
-            r = (await client.post(form["action"], data=data, follow_redirects=True)
-                 if form["method"] == "POST"
-                 else await client.get(form["action"], params=data, follow_redirects=True))
+            if form["method"] == "POST":
+                r = await client.post(form["action"], data=data, follow_redirects=False)
+            else:
+                r = await self._safe_get(form["action"], client, allow_private=allow_private, params=data)
+                if r is None:
+                    return None
             if payload in r.text:
                 return self._v("XSS", HIGH, url, name,
                     f"Payload reflected: {payload[:60]}",
@@ -681,7 +734,9 @@ class WebAppScanner:
 
         async def _probe_param(param, payload):
             u = re.sub(rf"([?&]{re.escape(param)}=)[^&]*", rf"\g<1>{payload}", url)
-            r = await client.get(u, follow_redirects=True)
+            r = await self._safe_get(u, client, allow_private=allow_private)
+            if r is None:
+                return None
             if payload in r.text:
                 return self._v("XSS", HIGH, url, param,
                     f"URL param reflected: {payload[:60]}",
@@ -718,7 +773,7 @@ class WebAppScanner:
                         "Add an unpredictable, per-session CSRF token to all state-changing forms.", "injection"))
         return vulns
 
-    async def check_ssti(self, url: str, forms: List[dict], client: httpx.AsyncClient) -> List[WebAppVulnerability]:
+    async def check_ssti(self, url: str, forms: List[dict], client: httpx.AsyncClient, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
         for form in forms:
             for name in form["inputs"]:
@@ -726,9 +781,12 @@ class WebAppScanner:
                     try:
                         data = {k: "test" for k in form["inputs"]}
                         data[name] = payload
-                        r = (await client.post(form["action"], data=data, follow_redirects=True)
-                             if form["method"] == "POST"
-                             else await client.get(form["action"], params=data, follow_redirects=True))
+                        if form["method"] == "POST":
+                            r = await client.post(form["action"], data=data, follow_redirects=False)
+                        else:
+                            r = await self._safe_get(form["action"], client, allow_private=allow_private, params=data)
+                            if r is None:
+                                continue
                         if "49" in r.text and payload in ("{{7*7}}", "${7*7}", "#{7*7}"):
                             vulns.append(self._v("SSTI", CRITICAL, url, name,
                                 f"Template expression '{payload}' evaluated to 49.",
@@ -738,13 +796,15 @@ class WebAppScanner:
                         pass
         return vulns
 
-    async def check_path_traversal(self, base_url: str, client: httpx.AsyncClient) -> List[WebAppVulnerability]:
+    async def check_path_traversal(self, base_url: str, client: httpx.AsyncClient, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
         for payload in self.TRAVERSAL_PAYLOADS:
             for param in ("file", "path", "page", "include", "template", "load", "doc"):
                 u = f"{base_url.rstrip('/')}/?{param}={payload}"
                 try:
-                    r = await client.get(u, follow_redirects=True)
+                    r = await self._safe_get(u, client, allow_private=allow_private)
+                    if r is None:
+                        continue
                     if r.status_code == 200 and (
                         "root:" in r.text or "[fonts]" in r.text or "daemon:" in r.text
                     ):
@@ -822,12 +882,12 @@ class WebAppScanner:
     # Robots.txt / sitemap analysis
     # ------------------------------------------------------------------
 
-    async def check_robots(self, base_url: str, client: httpx.AsyncClient) -> List[WebAppVulnerability]:
+    async def check_robots(self, base_url: str, client: httpx.AsyncClient, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
         robots_url = f"{base_url.rstrip('/')}/robots.txt"
         try:
-            r = await client.get(robots_url, follow_redirects=True)
-            if r.status_code != 200:
+            r = await self._safe_get(robots_url, client, allow_private=allow_private)
+            if r is None or r.status_code != 200:
                 return vulns
             text = r.text
             disallowed = re.findall(r"(?i)disallow:\s*(/\S+)", text)
@@ -888,80 +948,119 @@ class WebAppScanner:
     # Main scan entry point
     # ------------------------------------------------------------------
 
-    async def scan(self, target: str) -> WebAppScanResult:
+    async def scan(self, target: str, allow_private: bool = False) -> WebAppScanResult:
+        from cybersec.config.settings import settings
+        from cybersec.core.tools.port_scanner import _is_scan_target_allowed  # lazy import
+
         t0 = time.perf_counter()
         self.visited_urls.clear()
 
         base_url = target if target.startswith("http") else f"https://{target}"
         http_fallback = base_url.replace("https://", "http://", 1)
 
+        # SSRF guard: resolve host IP before opening any connection
+        if not allow_private:
+            ip = self._resolve_ip(base_url)
+            if ip is None or not _is_scan_target_allowed(ip):
+                return WebAppScanResult(
+                    target=target, base_url=base_url, pages_crawled=0,
+                    vulnerabilities=[], total_vulns=0,
+                    critical_count=0, high_count=0, medium_count=0, low_count=0, info_count=0,
+                    scan_duration=time.perf_counter() - t0,
+                    fingerprint=None,
+                    error="Scanning private, loopback, or cloud-metadata addresses is not permitted",
+                )
+
         all_vulns: List[WebAppVulnerability] = []
         crawl_error: Optional[str] = None
         pages: List[CrawlResult] = []
         fp: Optional[TechFingerprint] = None
 
-        async with httpx.AsyncClient(
-            timeout=self.timeout,
-            verify=False,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; CyberSec-Scanner/2.0)"},
-            follow_redirects=True,
-        ) as client:
-            # Crawl
-            try:
-                pages = await self.crawl(base_url, client)
-            except Exception as exc:
-                crawl_error = str(exc)
+        async def _do_scan() -> None:
+            nonlocal pages, crawl_error, fp
 
-            if not pages and not target.startswith("http"):
-                base_url = http_fallback
-                self.visited_urls.clear()
+            async with httpx.AsyncClient(
+                timeout=self.timeout,
+                verify=False,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; CyberSec-Scanner/2.0)"},
+                follow_redirects=False,
+            ) as client:
+                # Crawl
                 try:
-                    pages = await self.crawl(base_url, client)
-                    crawl_error = None
+                    pages = await self.crawl(base_url, client, allow_private=allow_private)
                 except Exception as exc:
                     crawl_error = str(exc)
 
-            # Fingerprint from crawl data
-            if pages:
-                fp = self.fingerprint(pages, base_url)
+                if not pages and not target.startswith("http"):
+                    _fb = http_fallback
+                    self.visited_urls.clear()
+                    try:
+                        pages = await self.crawl(_fb, client, allow_private=allow_private)
+                        crawl_error = None
+                        # update base_url used below
+                        nonlocal_base[0] = _fb
+                    except Exception as exc:
+                        crawl_error = str(exc)
 
-            # Run all passive/non-injection checks concurrently
-            passive = await asyncio.gather(
-                self.check_tls(base_url),
-                self.check_headers(base_url, client),
-                self.check_cors(base_url, client),
-                self.check_exposed_files(base_url, client),
-                self.check_admin_panels(base_url, client),
-                self.check_http_methods(base_url, client),
-                self.check_open_redirect(base_url, client),
-                self.check_robots(base_url, client),
-                self.check_dns_email_security(base_url),
-                self.check_path_traversal(base_url, client),
-                self.check_directory_listing(pages),
-                return_exceptions=True,
-            )
-            for r in passive:
-                if isinstance(r, list):
-                    all_vulns.extend(r)
+                _base = nonlocal_base[0]
 
-            # Form-based injection checks on each crawled page
-            form_tasks = []
-            for page in pages:
-                if page.forms:
-                    form_tasks += [
-                        self.check_sqli(page.url, page.forms, client),
-                        self.check_xss(page.url, page.forms, client),
-                        self.check_csrf(page.url, page.forms),
-                        self.check_ssti(page.url, page.forms, client),
-                    ]
-                # XSS on URL params even without forms
-                if "?" in page.url and not page.forms:
-                    form_tasks.append(self.check_xss(page.url, [], client))
+                # Fingerprint from crawl data
+                if pages:
+                    fp = self.fingerprint(pages, _base)
 
-            if form_tasks:
-                for r in await asyncio.gather(*form_tasks, return_exceptions=True):
+                # Run all passive/non-injection checks concurrently
+                passive = await asyncio.gather(
+                    self.check_tls(_base),
+                    self.check_headers(_base, client, allow_private=allow_private),
+                    self.check_cors(_base, client, allow_private=allow_private),
+                    self.check_exposed_files(_base, client),
+                    self.check_admin_panels(_base, client, allow_private=allow_private),
+                    self.check_http_methods(_base, client, allow_private=allow_private),
+                    self.check_open_redirect(_base, client),
+                    self.check_robots(_base, client, allow_private=allow_private),
+                    self.check_dns_email_security(_base),
+                    self.check_path_traversal(_base, client, allow_private=allow_private),
+                    self.check_directory_listing(pages),
+                    return_exceptions=True,
+                )
+                for r in passive:
                     if isinstance(r, list):
                         all_vulns.extend(r)
+
+                # Form-based injection checks on each crawled page
+                form_tasks = []
+                for page in pages:
+                    if page.forms:
+                        form_tasks += [
+                            self.check_sqli(page.url, page.forms, client, allow_private=allow_private),
+                            self.check_xss(page.url, page.forms, client, allow_private=allow_private),
+                            self.check_csrf(page.url, page.forms),
+                            self.check_ssti(page.url, page.forms, client, allow_private=allow_private),
+                        ]
+                    if "?" in page.url and not page.forms:
+                        form_tasks.append(self.check_xss(page.url, [], client, allow_private=allow_private))
+
+                if form_tasks:
+                    for r in await asyncio.gather(*form_tasks, return_exceptions=True):
+                        if isinstance(r, list):
+                            all_vulns.extend(r)
+
+        # nonlocal_base is a mutable container so the inner coroutine can update base_url
+        nonlocal_base = [base_url]
+
+        timeout_error: Optional[str] = None
+        try:
+            await asyncio.wait_for(
+                _do_scan(),
+                timeout=settings.WEBAPP_SCAN_MAX_DURATION_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            timeout_error = (
+                "Scan exceeded the maximum allowed duration and was stopped early; "
+                "results may be incomplete."
+            )
+
+        base_url = nonlocal_base[0]
 
         # Scan note if nothing found
         if not pages and not all_vulns:
@@ -979,8 +1078,10 @@ class WebAppScanner:
                 unique.append(v)
         unique.sort(key=lambda v: _SEV_RANK.get(v.severity.lower(), 5))
 
+        final_error = timeout_error or crawl_error
+
         return self._build_result(
             target=target, pages=pages, vulns=unique,
             base_url=base_url, scan_duration=time.perf_counter() - t0,
-            error=crawl_error, fp=fp,
+            error=final_error, fp=fp,
         )

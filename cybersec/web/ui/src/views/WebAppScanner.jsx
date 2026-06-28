@@ -161,13 +161,14 @@ function FingerprintPanel({ fp }) {
 // ---------------------------------------------------------------------------
 export default function WebAppScanner() {
   const [url, setUrl] = useState('');
+  const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [filter, setFilter] = useState('all');
   const [catFilter, setCatFilter] = useState('all');
 
   const run = async () => {
-    if (!url) return;
+    if (!url || !authorized) return;
     setLoading(true);
     setResults(null);
     setFilter('all');
@@ -176,7 +177,7 @@ export default function WebAppScanner() {
       const r = await fetch('/api/webapp/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: url, max_pages: 20 }),
+        body: JSON.stringify({ target: url, max_pages: 20, confirm_authorized: true }),
       });
       setResults(await r.json());
     } catch (e) {
@@ -218,13 +219,27 @@ export default function WebAppScanner() {
             onKeyDown={e => e.key === 'Enter' && run()} />
           {url && <button onClick={() => setUrl('')} className="clear-input-btn" aria-label="Clear"><X className="w-4 h-4" /></button>}
         </div>
-        <button onClick={run} disabled={loading || !url} className="run-btn">
+        <button onClick={run} disabled={loading || !url || !authorized} className="run-btn">
           <span>{loading ? 'Scanning' : 'Scan'}</span>
           {loading
             ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             : <ArrowRight className="w-4 h-4" />}
         </button>
       </div>
+
+      {/* authorization confirmation */}
+      <label className="flex items-start gap-2.5 px-1 pb-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          className="mt-0.5 accent-purple-500 shrink-0"
+          checked={authorized}
+          onChange={e => setAuthorized(e.target.checked)}
+        />
+        <span className="text-xs text-gray-400 leading-relaxed">
+          I confirm I am authorized to actively test this target and take full
+          responsibility for running injection payloads against it.
+        </span>
+      </label>
 
       {/* results */}
       <div className="scanner-results-panel flex-1 overflow-auto">

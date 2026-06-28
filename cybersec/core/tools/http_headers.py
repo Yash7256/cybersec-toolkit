@@ -62,7 +62,8 @@ class HTTPHeadersResult:
     timeline: list[dict]
     recommendations: list[str]
     ai_summary: str | None
-    error: str | None
+    tls_verification_skipped: bool = True
+    error: str | None = None
 
 
 SECURITY_HEADERS = [
@@ -514,13 +515,115 @@ def _summary(target: str, cdn: str | None, waf: str | None, protocol: str | None
     return " ".join(parts)
 
 
-async def check_http_headers(target: str, path: str = "/") -> HTTPHeadersResult:
+def _empty_result(target: str, url: str, error: str) -> "HTTPHeadersResult":
+    return HTTPHeadersResult(
+        target=target,
+        url=url,
+        final_url=None,
+        status_code=None,
+        protocol=None,
+        response_time_ms=None,
+        response_time_rating=None,
+        headers={},
+        security_headers={"present": [], "missing": []},
+        security_analysis=[],
+        technologies=[],
+        cdn=None,
+        waf=None,
+        cookies=[],
+        risk_score=None,
+        risk_level=None,
+        security_score=None,
+        server=None,
+        powered_by=None,
+        compression={},
+        caching={},
+        cors={},
+        csp={},
+        clickjacking={},
+        information_disclosure=[],
+        redirect_chain=[],
+        allowed_methods=[],
+        dangerous_methods=[],
+        api_detection=[],
+        cloud_provider=None,
+        compliance={},
+        timeline=[],
+        recommendations=[],
+        ai_summary=None,
+        tls_verification_skipped=True,
+        error=error,
+    )
+
+
+def _resolve_host(url: str) -> str | None:
+    """Return the resolved IP string for the host in *url*, or None on failure."""
+    import socket
+    host = urlparse(url).hostname
+    if not host:
+        return None
+    try:
+        return socket.getaddrinfo(host, None)[0][4][0]
+    except OSError:
+        return None
+
+
+async def check_http_headers(target: str, path: str = "/", allow_private: bool = False) -> HTTPHeadersResult:
     url = _normalize_target(target, path)
     start = time.perf_counter()
 
+    # --- SSRF guard: resolve the initial target and block private/loopback/metadata ---
+    if not allow_private:
+        from cybersec.core.tools.port_scanner import _is_scan_target_allowed  # lazy import
+        ip = _resolve_host(url)
+        if ip is None or not _is_scan_target_allowed(ip):
+            return _empty_result(
+                target, url,
+                "Checking headers on private, loopback, or cloud-metadata addresses is not permitted",
+            )
+
+    _MAX_REDIRECTS = 5
+
     try:
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True, verify=False) as client:
-            resp = await client.get(url)
+        # verify=False is deliberate: we want to retrieve and report headers even for
+        # sites with self-signed, expired, or otherwise misconfigured TLS certificates.
+        # tls_verification_skipped=True is surfaced in the result so callers know the
+        # certificate chain was not validated.
+        async with httpx.AsyncClient(
+            timeout=10,
+            follow_redirects=False,  # we follow manually so we can re-validate each hop
+            verify=False,            # see comment above
+        ) as client:
+            redirect_chain: list[dict] = []
+            current_url = url
+            resp = None
+
+            for _ in range(_MAX_REDIRECTS + 1):
+                resp = await client.get(current_url)
+                redirect_chain.append({
+                    "url": current_url,
+                    "status_code": resp.status_code,
+                    "location": resp.headers.get("location"),
+                })
+                if resp.status_code not in (301, 302, 303, 307, 308):
+                    break
+                location = resp.headers.get("location")
+                if not location:
+                    break
+                # Resolve the redirect target relative to the current URL
+                next_url = str(resp.url.copy_with()).rstrip("/")
+                # httpx URL resolution
+                next_url = str(httpx.URL(current_url).copy_with()).rstrip("/")
+                next_url = location if location.startswith(("http://", "https://")) else str(httpx.URL(current_url).copy_with(path=location))
+                # SSRF re-validation on each hop
+                if not allow_private:
+                    hop_ip = _resolve_host(next_url)
+                    if hop_ip is None or not _is_scan_target_allowed(hop_ip):
+                        return _empty_result(
+                            target, url,
+                            "Redirect chain led to a private, loopback, or cloud-metadata address; stopped following.",
+                        )
+                current_url = next_url
 
         response_time_ms = round((time.perf_counter() - start) * 1000, 2)
         headers_dict = {key.lower(): value for key, value in resp.headers.items()}
@@ -553,7 +656,11 @@ async def check_http_headers(target: str, path: str = "/") -> HTTPHeadersResult:
         )
 
         protocol = resp.http_version.replace("HTTP/", "HTTP/") if resp.http_version else None
-        ai_summary = _summary(target, cdn, waf, protocol, security_score, len(security_headers["missing"]), csp)
+        ai_summary = (
+            _summary(target, cdn, waf, protocol, security_score, len(security_headers["missing"]), csp)
+            + " Note: header data was retrieved without TLS certificate verification."
+        )
+        hop_count = len(redirect_chain) - 1  # hops before the final response
 
         return HTTPHeadersResult(
             target=target,
@@ -581,53 +688,18 @@ async def check_http_headers(target: str, path: str = "/") -> HTTPHeadersResult:
             csp=csp,
             clickjacking=clickjacking,
             information_disclosure=disclosure,
-            redirect_chain=_redirect_chain(resp.history, resp),
+            redirect_chain=redirect_chain,
             allowed_methods=allowed_methods,
             dangerous_methods=dangerous_methods,
             api_detection=api_detection,
             cloud_provider=cloud_provider,
             compliance=compliance,
-            timeline=_timeline(response_time_ms, len(resp.history)),
+            timeline=_timeline(response_time_ms, hop_count),
             recommendations=recommendations,
             ai_summary=ai_summary,
+            tls_verification_skipped=True,
             error=None,
         )
 
     except Exception as e:
-        return HTTPHeadersResult(
-            target=target,
-            url=url,
-            final_url=None,
-            status_code=None,
-            protocol=None,
-            response_time_ms=None,
-            response_time_rating=None,
-            headers={},
-            security_headers={"present": [], "missing": []},
-            security_analysis=[],
-            technologies=[],
-            cdn=None,
-            waf=None,
-            cookies=[],
-            risk_score=None,
-            risk_level=None,
-            security_score=None,
-            server=None,
-            powered_by=None,
-            compression={},
-            caching={},
-            cors={},
-            csp={},
-            clickjacking={},
-            information_disclosure=[],
-            redirect_chain=[],
-            allowed_methods=[],
-            dangerous_methods=[],
-            api_detection=[],
-            cloud_provider=None,
-            compliance={},
-            timeline=[],
-            recommendations=[],
-            ai_summary=None,
-            error=str(e),
-        )
+        return _empty_result(target, url, str(e))

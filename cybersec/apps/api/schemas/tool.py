@@ -32,11 +32,22 @@ class TracerouteRequest(BaseModel):
     
 class SslRequest(BaseModel):
     host: str
-    port: int = 443
+    port: int = Field(default=443, ge=1, le=65535)
     
 class HttpHeadersRequest(BaseModel):
     target: str
     path: str = "/"
+    
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: str) -> str:
+        if not v:
+            v = "/"
+        if len(v) > 2048:
+            raise ValueError("path is too long (max 2048 characters)")
+        if '\r' in v or '\n' in v:
+            raise ValueError("path must not contain CR/LF characters")
+        return v
     
 class SubdomainRequest(BaseModel):
     domain: str

@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     SCAN_TIMEOUT: float = 10.0
     OS_FINGERPRINT_TIMEOUT: float = 5.0
     SERVICE_DETECTION_TIMEOUT: float = 8.0
+    SSL_AUDIT_TIMEOUT_SECONDS: int = 20
 
     # GeoIP provider configuration
     GEOIP_PROVIDER: str = "ipwhois"
@@ -89,6 +90,10 @@ class Settings(BaseSettings):
 
     # Port screenshot capture (requires `playwright install chromium` after pip install)
     ENABLE_PORT_SCREENSHOTS: bool = True
+
+    # Web app scanner limits
+    WEBAPP_SCAN_MAX_DURATION_SECONDS: int = 300   # 5-minute wall-clock budget per scan
+    WEBAPP_SCAN_STATE_TTL_SECONDS: int = 3600     # evict in-memory scan state after 1 hour
 
     # Caching TTLs for expensive per-scan operations
     THREAT_INTEL_CACHE_TTL_SECONDS: int = 3600   # 1 hour

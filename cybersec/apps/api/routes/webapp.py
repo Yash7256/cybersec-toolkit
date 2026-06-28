@@ -5,17 +5,19 @@ DB-OPTIONAL: Web app scans work even when PostgreSQL is unavailable.
 Results are returned directly in the response or streamed via SSE.
 Azure-compatible: sends heartbeat events every 10s to prevent LB timeout.
 """
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 import dataclasses
 import asyncio
 import json
+import time
 from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from cybersec.apps.api.deps import get_db, get_optional_user
+from cybersec.config.settings import settings
 from cybersec.database.models import Scan, ScanResult, User
 from cybersec.database.session import async_session_maker
 from cybersec.core.tools.webapp_scanner import WebAppScanner
@@ -23,24 +25,59 @@ from cybersec.core.tools.webapp_scanner import WebAppScanner
 router = APIRouter()
 
 # ─── In-memory web scan stores ───────────────────────────────────────────────
+# Values include a `_ts` key (monotonic seconds) for TTL eviction.
 _wapp_scan_meta: dict[str, dict] = {}
 _wapp_scan_events: dict[str, asyncio.Queue] = {}
+_cleanup_task: asyncio.Task | None = None
 
+
+def _register_cleanup(loop: asyncio.AbstractEventLoop | None = None) -> None:
+    """Start the background TTL cleanup task once per process."""
+    global _cleanup_task
+    if _cleanup_task is not None and not _cleanup_task.done():
+        return
+    try:
+        _cleanup_task = asyncio.get_event_loop().create_task(_ttl_cleanup_loop())
+    except RuntimeError:
+        pass  # no running loop yet; will be started lazily on first request
+
+
+async def _ttl_cleanup_loop() -> None:
+    """Periodically evict scan state older than WEBAPP_SCAN_STATE_TTL_SECONDS."""
+    while True:
+        await asyncio.sleep(min(300, settings.WEBAPP_SCAN_STATE_TTL_SECONDS // 2))
+        cutoff = time.monotonic() - settings.WEBAPP_SCAN_STATE_TTL_SECONDS
+        expired = [sid for sid, meta in list(_wapp_scan_meta.items()) if meta.get("_ts", 0) < cutoff]
+        for sid in expired:
+            _wapp_scan_meta.pop(sid, None)
+            _wapp_scan_events.pop(sid, None)
+
+
+# ─── Request models ───────────────────────────────────────────────────────────
 
 class WebAppScanRequest(BaseModel):
     target: str = Field(min_length=1, max_length=255)
     max_pages: int = Field(default=20, ge=1, le=100)
+    confirm_authorized: bool  # required — no default
 
 
 class WebAppScanStartRequest(BaseModel):
     target: str = Field(min_length=1, max_length=255)
     max_pages: int = Field(default=20, ge=1, le=100)
+    confirm_authorized: bool  # required — no default
+
+
+_AUTH_GATE_MSG = (
+    "You must confirm you are authorized to actively test this target "
+    "before running injection payloads against it."
+)
 
 
 async def generate_webscan_events(
     target: str,
     max_pages: int,
     scan_id: str,
+    allow_private: bool = False,
     user_id: str | None = None,
     db_scan_id: str | None = None,
 ):
@@ -61,6 +98,7 @@ async def generate_webscan_events(
         "completed_at": None,
         "error": None,
         "vulnerabilities": [],
+        "_ts": time.monotonic(),
     }
     _wapp_scan_events[scan_id] = asyncio.Queue(maxsize=1000)
 
@@ -81,6 +119,7 @@ async def generate_webscan_events(
                 break
 
     heartbeat_task = asyncio.create_task(_heartbeat_loop())
+    _register_cleanup()
 
     def send_event(stage: str, message: str, **extra):
         return f"data: {json.dumps({'stage': stage, 'message': message, 'timestamp': asyncio.get_event_loop().time(), **extra})}\n\n"
@@ -101,15 +140,15 @@ async def generate_webscan_events(
     try:
         async with httpx.AsyncClient(
             timeout=scanner.timeout, verify=False,
-            headers={"User-Agent": "CyberSec-Scanner/1.0"}, follow_redirects=True
+            headers={"User-Agent": "CyberSec-Scanner/1.0"}, follow_redirects=False
         ) as client:
-            pages = await scanner.crawl(target, client)
+            pages = await scanner.crawl(target, client, allow_private=allow_private)
             yield send_event('CRAWL', f'Found {len(pages)} pages', pages_found=len(pages))
             await asyncio.sleep(0)
 
             for check_name, check_fn in [
-                ('Headers', lambda: scanner.check_missing_headers(target, client)),
-                ('CORS', lambda: scanner.check_cors(target, client)),
+                ('Headers', lambda: scanner.check_headers(target, client, allow_private=allow_private)),
+                ('CORS', lambda: scanner.check_cors(target, client, allow_private=allow_private)),
                 ('Files', lambda: scanner.check_exposed_files(target, client)),
             ]:
                 yield send_event('CHECK', f'Checking {check_name.lower()}...')
@@ -129,9 +168,9 @@ async def generate_webscan_events(
                                      form_count=len(page.forms))
                     await asyncio.sleep(0)
 
-                    sqli_vulns = await scanner.check_sqli(page.url, page.forms, client)
-                    xss_vulns = await scanner.check_xss(page.url, page.forms, client)
-                    csrf_vulns = scanner.check_csrf(page.url, page.forms)
+                    sqli_vulns = await scanner.check_sqli(page.url, page.forms, client, allow_private=allow_private)
+                    xss_vulns = await scanner.check_xss(page.url, page.forms, client, allow_private=allow_private)
+                    csrf_vulns = await scanner.check_csrf(page.url, page.forms)
 
                     all_vulns.extend(sqli_vulns)
                     all_vulns.extend(xss_vulns)
@@ -216,6 +255,11 @@ async def webapp_scan_start(
 
     DB-OPTIONAL: If DB is unavailable, creates an in-memory scan entry.
     """
+    if not body.confirm_authorized:
+        raise HTTPException(status_code=400, detail=_AUTH_GATE_MSG)
+
+    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+
     db_scan_id: str | None = None
     storage = "memory"
 
@@ -241,13 +285,17 @@ async def webapp_scan_start(
     _wapp_scan_meta[scan_id] = {
         "target": body.target,
         "status": "pending",
+        "allow_private": allow_private,
+        "max_pages": body.max_pages,
         "user_id": current_user.id if current_user else None,
         "db_scan_id": db_scan_id,
         "started_at": datetime.now(timezone.utc).isoformat(),
         "completed_at": None,
         "error": None,
         "vulnerabilities": [],
+        "_ts": time.monotonic(),
     }
+    _register_cleanup()
 
     return {
         "scan_id": scan_id,
@@ -267,17 +315,19 @@ async def webapp_scan_stream(scan_id: str):
     """
     meta = _wapp_scan_meta.get(scan_id)
 
-    if meta:
-        target = meta["target"]
-        user_id = meta.get("user_id")
-        db_scan_id = meta.get("db_scan_id")
-    else:
+    if not meta:
         raise HTTPException(status_code=404, detail="Scan not found. Start a scan first via /api/webapp/start-scan or /api/webapp/scan.")
+
+    target = meta["target"]
+    user_id = meta.get("user_id")
+    db_scan_id = meta.get("db_scan_id")
+    allow_private = meta.get("allow_private", False)
+    max_pages = meta.get("max_pages", 20)
 
     async def stream_response():
         try:
             async for event in generate_webscan_events(
-                target, 20, scan_id, user_id, db_scan_id
+                target, max_pages, scan_id, allow_private, user_id, db_scan_id
             ):
                 yield event
         except Exception as e:
@@ -307,8 +357,14 @@ async def webapp_scan(
     DB-OPTIONAL: If DB is unavailable, still returns full results
     but scan_id will be a generated UUID and storage will be 'memory'.
     """
+    if not body.confirm_authorized:
+        raise HTTPException(status_code=400, detail=_AUTH_GATE_MSG)
+
+    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+
     db_scan_id: str | None = None
     storage = "memory"
+    scan = None
 
     try:
         scan = Scan(
@@ -330,10 +386,10 @@ async def webapp_scan(
     scan_id = db_scan_id if db_scan_id else str(uuid4())
     scanner = WebAppScanner(max_pages=body.max_pages)
 
-    result = await scanner.scan(body.target)
+    result = await scanner.scan(body.target, allow_private=allow_private)
     result_dict = dataclasses.asdict(result)
 
-    if db_scan_id:
+    if db_scan_id and scan is not None:
         try:
             for vuln in result.vulnerabilities:
                 db.add(ScanResult(

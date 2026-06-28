@@ -228,7 +228,8 @@ async def run_ssl(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user)
 ):
-    result = await ssl_audit(body.host, body.port)
+    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    result = await ssl_audit(body.host, body.port, allow_private=allow_private)
     result_dict = dataclasses.asdict(result)
     
     cert_data = result_dict.get("cert")
@@ -262,7 +263,8 @@ async def run_http_headers(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user)
 ):
-    result = await check_http_headers(body.target, body.path)
+    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    result = await check_http_headers(body.target, body.path, allow_private=allow_private)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "http_headers", body.target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
