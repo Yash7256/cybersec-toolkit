@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
@@ -6,6 +5,8 @@ import PortScanner from './views/PortScanner';
 import WebAppScanner from './views/WebAppScanner';
 import DNSLookup from './views/DNSLookup';
 import Whois from './views/Whois';
+import Traceroute from './views/Traceroute';
+import SSL from './views/SSL';
 import GenericTool from './views/GenericTool';
 import AIExecutiveReport from './views/AIExecutiveReport';
 
@@ -14,6 +15,8 @@ function DynamicTool() {
   if (toolId === 'dns') return <DNSLookup />;
   if (toolId === 'whois') return <Whois />;
   if (toolId === 'webscan') return <WebAppScanner />;
+  if (toolId === 'traceroute') return <Traceroute />;
+  if (toolId === 'ssl') return <SSL />;
   return <GenericTool toolId={toolId} />;
 }
 

@@ -49,6 +49,14 @@ class RedisKeys:
     def scan_user_active(user_id: str) -> str:
         return f"scans:user:{user_id}:active"
 
+    @staticmethod
+    def threat_intel(ip: str) -> str:
+        return f"threat_intel:{ip}"
+
+    @staticmethod
+    def ai_recommendations(fingerprint_hash: str) -> str:
+        return f"ai_recs:{fingerprint_hash}"
+
 _shared_client: Optional["aioredis.Redis"] = None
 
 

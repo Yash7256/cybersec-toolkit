@@ -82,6 +82,18 @@ class Settings(BaseSettings):
     ABUSEIPDB_API_KEY: str = ""
     THREAT_INTEL_MAX_AGE_DAYS: int = 90
 
+    # Port scan safety limits
+    MAX_PORT_RANGE_SIZE: int = 5000    # max end_port - start_port inclusive
+    MAX_PORTS_LIST_SIZE: int = 1000    # max entries in the explicit ports list
+    ALLOW_PRIVATE_TARGET_SCANS: bool = False  # bypass private-IP block for auth'd callers
+
+    # Port screenshot capture (requires `playwright install chromium` after pip install)
+    ENABLE_PORT_SCREENSHOTS: bool = True
+
+    # Caching TTLs for expensive per-scan operations
+    THREAT_INTEL_CACHE_TTL_SECONDS: int = 3600   # 1 hour
+    AI_RECOMMENDATIONS_CACHE_TTL_SECONDS: int = 86400  # 24 hours
+
     @property
     def whois_privacy_patterns_list(self) -> list[str]:
         return [p.strip().lower() for p in self.WHOIS_PRIVACY_PATTERNS.split(",") if p.strip()]

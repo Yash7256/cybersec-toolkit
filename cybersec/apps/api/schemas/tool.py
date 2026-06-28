@@ -3,10 +3,12 @@ Tool pydantic schemas.
 """
 import ipaddress
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from uuid import UUID
 from typing import Any, Literal
 from datetime import datetime
+
+from cybersec.config.settings import settings
 
 class DnsRequest(BaseModel):
     target: str
@@ -73,10 +75,59 @@ class OsFingerprintRequest(BaseModel):
 class PortScanRequest(BaseModel):
     target: str
     ports: list[int] | None = None
-    start_port: int | None = None
-    end_port: int | None = None
+    start_port: int | None = Field(default=None, ge=1, le=65535)
+    end_port: int | None = Field(default=None, ge=1, le=65535)
     timeout: float = Field(default=2.0, ge=0.1, le=10.0)
     max_concurrent: int = Field(default=100, ge=1, le=2000)
+
+    @field_validator("ports")
+    @classmethod
+    def validate_ports(cls, v: list[int] | None) -> list[int] | None:
+        if v is None:
+            return v
+        limit = settings.MAX_PORTS_LIST_SIZE
+        if len(v) > limit:
+            raise ValueError(
+                f"Too many ports: {len(v)} provided, maximum allowed is {limit}. "
+                "Reduce your ports list or use start_port/end_port for a range scan."
+            )
+        seen: set[int] = set()
+        for port in v:
+            if not (1 <= port <= 65535):
+                raise ValueError(
+                    f"Invalid port number {port}: ports must be between 1 and 65535."
+                )
+            if port in seen:
+                raise ValueError(
+                    f"Duplicate port {port} in ports list. Each port must appear at most once."
+                )
+            seen.add(port)
+        return v
+
+    @model_validator(mode="after")
+    def validate_port_range(self) -> "PortScanRequest":
+        start = self.start_port
+        end = self.end_port
+        if start is None and end is None:
+            return self
+        if (start is None) != (end is None):
+            raise ValueError(
+                "Both start_port and end_port must be provided together, or neither."
+            )
+        # Both are set and already validated 1–65535 by Field constraints.
+        if end < start:  # type: ignore[operator]
+            raise ValueError(
+                f"end_port ({end}) must be greater than or equal to start_port ({start})."
+            )
+        span = end - start  # type: ignore[operator]
+        limit = settings.MAX_PORT_RANGE_SIZE
+        if span > limit:
+            raise ValueError(
+                f"Port range too large: {span} ports requested "
+                f"(end_port - start_port = {span}), maximum allowed range is {limit}. "
+                "Use a smaller range or provide an explicit ports list."
+            )
+        return self
 
 
 class OpenPortOut(BaseModel):

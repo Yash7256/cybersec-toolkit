@@ -203,6 +203,9 @@ sysctls:
 ```bash
 # Backend
 poetry install
+# Install Playwright's Chromium browser (needed for port screenshot capture).
+# Run once after poetry install / pip install:
+playwright install chromium
 docker compose up -d postgres redis
 alembic upgrade head
 uvicorn cybersec.apps.api.main:app --reload --port 8000

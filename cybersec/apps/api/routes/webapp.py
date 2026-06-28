@@ -165,7 +165,7 @@ async def generate_webscan_events(
             seen.add(key)
             unique_vulns.append(v)
 
-    result = scanner._build_result(target, pages, unique_vulns)
+    result = scanner._build_result(target=target, pages=pages, vulns=unique_vulns)
     result_dict = dataclasses.asdict(result)
 
     _wapp_scan_meta[scan_id]["status"] = "completed"

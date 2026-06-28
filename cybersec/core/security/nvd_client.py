@@ -347,7 +347,7 @@ class EnhancedCVELookup:
     def __init__(self, db_session: Optional[AsyncSession] = None):
         self.nvd_client = NVDClient()
         self.db_session = db_session
-        self.cache_manager = NVDCveManager(db_session) if db_session else None
+        self.cache_manager = NVDCacheManager(db_session) if db_session else None
     
     async def lookup(
         self,

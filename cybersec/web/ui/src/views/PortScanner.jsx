@@ -685,11 +685,16 @@ function VersionCell({ version, technologies, fingerprint }) {
   );
 }
 
+function formatScanDuration(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n)) return '0.0s';
+  return `${n.toFixed(1)}s`;
+}
+
 function ScreenshotPreview({ row }) {
   if (!row.screenshot_url) {
     return <span className="text-[10px] font-mono" style={{ color: '#5b4d82' }}>—</span>;
   }
-
   return (
     <a
       href={row.screenshot_url}
@@ -698,15 +703,15 @@ function ScreenshotPreview({ row }) {
       className="web-port-preview"
       title={`Open screenshot preview for port ${row.port}`}
     >
-      <img src={row.screenshot_url} alt={`Preview of port ${row.port}`} loading="lazy" />
+      <img
+        src={row.screenshot_url}
+        alt={`Preview of port ${row.port}`}
+        loading="lazy"
+        className="rounded border border-[#4f3b63] max-w-[80px] max-h-[50px] object-cover"
+        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+      />
     </a>
   );
-}
-
-function formatScanDuration(seconds) {
-  const n = Number(seconds);
-  if (!Number.isFinite(n)) return '0.0s';
-  return `${n.toFixed(1)}s`;
 }
 
 export default function PortScanner() {

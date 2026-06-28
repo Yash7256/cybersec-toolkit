@@ -134,3 +134,4 @@ matplotlib>=3.7.0
 docker>=6.1.0
 python-nmap>=0.7.1
 respx>=0.21.0
+playwright==1.52.0

@@ -1,17 +1,20 @@
 import asyncio
 import json
+import hashlib
 import os
 import re
 import socket
 import ssl
 from dataclasses import asdict, dataclass, field
 from ipaddress import ip_address
-from typing import List
+from typing import List, Optional
 import time
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from cybersec.config.settings import settings
+from cybersec.core.redis_client import RedisKeys, get_shared_redis_client
 from cybersec.core.tools.banner_grab import (
     BannerInfo,
     from_bytes,
@@ -21,11 +24,25 @@ from cybersec.core.tools.banner_grab import (
 from cybersec.core.tools.port_descriptions import get_port_description
 from cybersec.core.tools.port_risk import classify_port_risk
 from cybersec.core.tools.service_version import parse_http_response, parse_ssh_banner
-from cybersec.core.tools.ssl import ssl_audit
+from cybersec.core.tools.ssl import SSLResult, ssl_audit
 from cybersec.core.tools.subdomain import SCREENSHOT_DIR
 from cybersec.core.tools.tech_detect import detect_technologies, merge_technologies
-from cybersec.core.tools.cve_detect import detect_cves_for_version, CVEResult, parse_version_string
 
+# Playwright is an optional dependency for port screenshots.
+# Import at module level so tests can patch cybersec.core.tools.port_scanner.async_playwright.
+# A lazy ImportError is caught in capture_web_port_screenshots() itself.
+try:
+    from playwright.async_api import async_playwright
+except ImportError:  # pragma: no cover
+    async_playwright = None  # type: ignore[assignment,misc]
+from cybersec.core.tools.cve_detect import detect_cves_batch, detect_cves_for_version, CVEResult, parse_version_string
+from cybersec.core.tools.port_registry import (
+    PORT_REGISTRY,
+    COMMON_PORTS,
+    EXPOSED_SERVICE_PORTS,
+    MITRE_PORT_MAPPINGS,
+    POTENTIAL_THREATS,
+)
 
 @dataclass
 class OpenPortDetail:
@@ -85,34 +102,10 @@ class PortScanResult:
     error: str | None = None
 
 
-# Common port services mapping
-COMMON_PORTS = {
-    21: "FTP",
-    22: "SSH",
-    23: "Telnet",
-    25: "SMTP",
-    53: "DNS",
-    80: "HTTP",
-    110: "POP3",
-    143: "IMAP",
-    443: "HTTPS",
-    445: "SMB",
-    993: "IMAPS",
-    995: "POP3S",
-    3306: "MySQL",
-    3389: "RDP",
-    5432: "PostgreSQL",
-    5900: "VNC",
-    6379: "Redis",
-    8080: "HTTP-Proxy",
-    8443: "HTTPS-Alt",
-    27017: "MongoDB",
-}
-
-
 def get_service_for_port(port: int) -> str:
     """Get service name for a port number."""
-    return COMMON_PORTS.get(port, "Unknown")
+    info = PORT_REGISTRY.get(port)
+    return info.service if info else "Unknown"
 
 
 SSH_PORTS = {22}
@@ -403,7 +396,7 @@ def _apply_banner(detail: OpenPortDetail, banner: BannerInfo) -> None:
 
 
 def _screenshot_url(hostname: str, port: int) -> str:
-    scheme = "https" if port == 443 else "http"
+    scheme = "https" if port in HTTPS_PORTS else "http"
     host_part = hostname if port in {80, 443} else f"{hostname}:{port}"
     return f"{scheme}://{host_part}"
 
@@ -413,66 +406,112 @@ def _safe_screenshot_filename(hostname: str, port: int) -> str:
     return f"portscan_{safe_host}_{port}.png"
 
 
+# Total wall-clock cap for the entire screenshot pass (seconds).
+_SCREENSHOT_TOTAL_TIMEOUT = 30.0
+# Per-page navigation + render timeout (seconds).
+_SCREENSHOT_NAV_TIMEOUT = 8_000  # Playwright uses milliseconds
+
+
 async def capture_web_port_screenshots(
     target: str,
     open_ports: list[OpenPortDetail],
     screenshot_dir: str | None = None,
 ) -> None:
-    """Capture best-effort page previews for open web ports."""
-    web_ports = [p for p in open_ports if p.port_number in SCREENSHOT_PORTS]
-    if not web_ports:
+    """
+    Capture best-effort page previews for open web ports using Playwright/Chromium.
+
+    SECURITY NOTE — the target host is untrusted:
+      * JavaScript dialogs (alert/confirm/prompt) are auto-dismissed.
+      * File downloads are rejected before they start.
+      * A strict navigation timeout prevents indefinitely-hung page loads.
+      * The overall function is capped at _SCREENSHOT_TOTAL_TIMEOUT seconds so a
+        single unresponsive target cannot stall the entire scan.
+      * The sandbox is kept enabled wherever possible; --no-sandbox is only
+        added when the process is running as root (unavoidable in many container
+        environments), because the sandbox requires a non-root uid to function.
+    """
+    if not settings.ENABLE_PORT_SCREENSHOTS:
         return
 
-    try:
-        from pyppeteer import launch
-    except ImportError:
+    web_ports = [p for p in open_ports if p.port_number in SCREENSHOT_PORTS]
+    if not web_ports:
         return
 
     dir_path = screenshot_dir or SCREENSHOT_DIR
     os.makedirs(dir_path, exist_ok=True)
 
-    try:
-        browser = await launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-            ],
-        )
-    except Exception:
+    if async_playwright is None:
+        # playwright not installed (ImportError at module load, common in CI without browsers)
         return
-    try:
-        for port_detail in web_ports:
-            url = _screenshot_url(target, port_detail.port_number)
-            filename = _safe_screenshot_filename(target, port_detail.port_number)
-            filepath = os.path.join(dir_path, filename)
-            page = None
+    # The sandbox is a meaningful security boundary; keep it when we can.
+    running_as_root = os.getuid() == 0 if hasattr(os, "getuid") else False
+    launch_args = ["--no-sandbox", "--disable-setuid-sandbox"] if running_as_root else []
+    # Additional hardening regardless of user:
+    launch_args += [
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-default-apps",
+        "--no-first-run",
+        "--disable-sync",
+    ]
 
+    async def _take_screenshots() -> None:
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True, args=launch_args)
             try:
-                page = await browser.newPage()
-                await page.setViewport({"width": 640, "height": 360})
-                await asyncio.wait_for(
-                    page.goto(url, waitUntil="networkidle2"),
-                    timeout=8.0,
-                )
-                await page.screenshot({"path": filepath, "fullPage": False})
-                port_detail.screenshot = filename
-                port_detail.screenshot_url = f"/screenshots/{filename}"
-            except Exception:
-                pass
-            finally:
-                if page:
+                for port_detail in web_ports:
+                    url = _screenshot_url(target, port_detail.port_number)
+                    filename = _safe_screenshot_filename(target, port_detail.port_number)
+                    filepath = os.path.join(dir_path, filename)
+
+                    page = None
                     try:
-                        await page.close()
+                        # new_context with accept_downloads=False blocks drive-by downloads.
+                        ctx = await browser.new_context(
+                            viewport={"width": 640, "height": 360},
+                            accept_downloads=False,
+                            ignore_https_errors=True,
+                            java_script_enabled=True,  # needed to render most pages
+                        )
+                        page = await ctx.new_page()
+
+                        # Auto-dismiss JS dialogs — never let an untrusted page
+                        # pause execution with alert()/confirm()/prompt().
+                        page.on("dialog", lambda d: asyncio.ensure_future(d.dismiss()))
+
+                        await page.goto(
+                            url,
+                            wait_until="networkidle",
+                            timeout=_SCREENSHOT_NAV_TIMEOUT,
+                        )
+                        await page.screenshot(path=filepath, full_page=False)
+                        port_detail.screenshot = filename
+                        port_detail.screenshot_url = f"/screenshots/{filename}"
                     except Exception:
+                        # One port failing must not abort screenshots for the others.
                         pass
-    finally:
-        try:
-            await asyncio.wait_for(browser.close(), timeout=5.0)
-        except Exception:
-            pass
+                    finally:
+                        if page:
+                            try:
+                                await page.close()
+                            except Exception:
+                                pass
+                        try:
+                            await ctx.close()  # type: ignore[possibly-undefined]
+                        except Exception:
+                            pass
+            finally:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
+
+    try:
+        await asyncio.wait_for(_take_screenshots(), timeout=_SCREENSHOT_TOTAL_TIMEOUT)
+    except asyncio.TimeoutError:
+        pass  # Ran out of time — return whatever was captured so far.
 
 
 def _recommendation_payload(target: str, open_ports: list[OpenPortDetail]) -> dict:
@@ -523,6 +562,33 @@ async def add_ai_recommendations(
     """Ask Groq for concise remediation guidance and attach it to each port."""
     if not open_ports:
         return None
+
+    # Build a stable fingerprint key from (port, service, version) tuples.
+    _fp = hashlib.sha256(
+        str(sorted((p.port_number, p.service or "", p.version or "") for p in open_ports)).encode()
+    ).hexdigest()[:16]
+    cache_key = RedisKeys.ai_recommendations(_fp)
+    redis = get_shared_redis_client()
+
+    if redis is not None:
+        try:
+            cached = await redis.get(cache_key)
+            if cached is not None:
+                recommendations: dict[int, dict] = {int(k): v for k, v in json.loads(cached).items()}
+                for port in open_ports:
+                    rec = recommendations.get(port.port_number)
+                    if not rec:
+                        continue
+                    if rec.get("recommendation"):
+                        port.recommendation = str(rec["recommendation"]).strip()
+                    if rec.get("reason"):
+                        port.recommendation_reason = str(rec["reason"]).strip()
+                    priority = str(rec.get("priority") or "").strip().lower()
+                    if priority in {"critical", "high", "medium", "low"}:
+                        port.recommendation_priority = priority
+                return None
+        except Exception:
+            logger.warning("Redis unavailable for ai_recs cache read (fp=%s)", _fp)
 
     try:
         from cybersec.integrations.ai.groq_client import groq_client
@@ -819,11 +885,15 @@ async def _probe_open_proxy(target: str, port: int, timeout: float) -> dict | No
     return None
 
 
-async def _detect_tls_misconfiguration(target: str, port: OpenPortDetail) -> list[dict]:
+async def _detect_tls_misconfiguration(
+    target: str,
+    port: OpenPortDetail,
+    ssl_cache: dict[int, SSLResult] | None = None,
+) -> list[dict]:
     if port.port_number not in HTTPS_PORTS:
         return []
     try:
-        result = await ssl_audit(target, port.port_number)
+        result = ssl_cache[port.port_number] if (ssl_cache and port.port_number in ssl_cache) else await ssl_audit(target, port.port_number)
     except Exception:
         return [_misconfiguration(
             "weak_ssl",
@@ -918,6 +988,46 @@ def _is_public_ip(ip: str | None) -> bool:
         or parsed.is_multicast
         or parsed.is_unspecified
     )
+
+
+# Cloud / hypervisor metadata addresses that must never be scanned externally.
+_METADATA_BLOCKLIST: frozenset[str] = frozenset({
+    "169.254.169.254",   # AWS / Azure / GCP instance metadata (IPv4 link-local)
+    "fd00:ec2::254",     # AWS instance metadata (IPv6)
+    "metadata.google.internal",  # GCP – resolved string form; handled by hostname too
+    "100.100.100.200",   # Alibaba Cloud metadata
+})
+
+
+def _is_scan_target_allowed(ip: str) -> bool:
+    """
+    Return True when *ip* is safe to scan.
+
+    Blocks any address that is private, loopback, link-local, reserved,
+    multicast, unspecified, or in the hardcoded cloud-metadata blocklist.
+    This is intentionally strict – the only way to bypass it is the
+    ``allow_private`` flag on the scan functions (gated by authentication
+    in the API layer).
+    """
+    if ip in _METADATA_BLOCKLIST:
+        return False
+    try:
+        parsed = ip_address(ip)
+    except ValueError:
+        return False
+    return not (
+        parsed.is_private
+        or parsed.is_loopback
+        or parsed.is_link_local
+        or parsed.is_reserved
+        or parsed.is_multicast
+        or parsed.is_unspecified
+    )
+
+
+_BLOCKED_SCAN_ERROR = (
+    "Scanning private, loopback, or cloud-metadata addresses is not permitted"
+)
 
 
 def _exposure_level(score: int) -> str:
@@ -1091,6 +1201,7 @@ async def detect_misconfigurations(
     target: str,
     open_ports: list[OpenPortDetail],
     timeout: float,
+    ssl_cache: dict[int, SSLResult] | None = None,
 ) -> dict:
     """Attach best-effort misconfiguration findings to each open port."""
     if not open_ports:
@@ -1101,7 +1212,7 @@ async def detect_misconfigurations(
         if port.port_number in HTTP_PORTS:
             findings.extend(_detect_http_misconfigurations(port))
         if port.port_number in HTTPS_PORTS:
-            findings.extend(await _detect_tls_misconfiguration(target, port))
+            findings.extend(await _detect_tls_misconfiguration(target, port, ssl_cache))
         if port.port_number in FTP_PORTS:
             ftp_finding = await _probe_anonymous_ftp(target, port.port_number, min(max(timeout, 2.0), 5.0))
             if ftp_finding:
@@ -1235,6 +1346,17 @@ async def check_threat_intelligence(ip: str | None) -> dict:
             "Private, loopback, or reserved IPs are not checked against public abuse databases.",
         )
 
+    # --- Redis cache check ---
+    redis = get_shared_redis_client()
+    cache_key = RedisKeys.threat_intel(ip)
+    if redis is not None:
+        try:
+            cached = await redis.get(cache_key)
+            if cached is not None:
+                return json.loads(cached)
+        except Exception:
+            logger.warning("Redis unavailable for threat_intel cache read (ip=%s)", ip)
+
     abuseipdb, spamhaus = await asyncio.gather(
         _abuseipdb_check(ip),
         _spamhaus_check(ip),
@@ -1268,7 +1390,7 @@ async def check_threat_intelligence(ip: str | None) -> dict:
     else:
         summary = "IP Reputation: Unknown. No threat intelligence source returned a usable result."
 
-    return {
+    result = {
         "ip": ip,
         "reputation": reputation,
         "summary": summary,
@@ -1280,6 +1402,12 @@ async def check_threat_intelligence(ip: str | None) -> dict:
         "sources": sources,
         "error": abuseipdb.get("error") or spamhaus.get("error"),
     }
+    if redis is not None:
+        try:
+            await redis.setex(cache_key, settings.THREAT_INTEL_CACHE_TTL_SECONDS, json.dumps(result))
+        except Exception:
+            logger.warning("Redis unavailable for threat_intel cache write (ip=%s)", ip)
+    return result
 
 
 def _attack_surface_level(score: int) -> str:
@@ -1813,6 +1941,7 @@ def add_mitre_attack_mapping(open_ports: list[OpenPortDetail]) -> None:
 async def calculate_security_score(
     target: str,
     open_ports: list[OpenPortDetail],
+    ssl_cache: dict[int, SSLResult] | None = None,
 ) -> tuple[int, list[dict]]:
     """Calculate a simple defensive exposure score from scan findings."""
     factors: list[dict] = []
@@ -1857,10 +1986,15 @@ async def calculate_security_score(
 
     ssl_ports = [p for p in open_ports if p.port_number in HTTPS_PORTS]
     if ssl_ports:
-        ssl_results = await asyncio.gather(
-            *(ssl_audit(target, p.port_number) for p in ssl_ports),
-            return_exceptions=True,
-        )
+        if ssl_cache:
+            ssl_results: list[SSLResult | Exception] = [
+                ssl_cache.get(p.port_number, Exception("not in cache")) for p in ssl_ports
+            ]
+        else:
+            ssl_results = await asyncio.gather(
+                *(ssl_audit(target, p.port_number) for p in ssl_ports),
+                return_exceptions=True,
+            )
         for port, result in zip(ssl_ports, ssl_results):
             if isinstance(result, Exception):
                 factors.append(_score_factor("weak_ssl", f"TLS audit failed on port {port.port_number}.", 5, "medium"))
@@ -1955,7 +2089,9 @@ async def scan_ports(
     target: str,
     ports: List[int] | None = None,
     timeout: float = 2.0,
-    max_concurrent: int = 100
+    max_concurrent: int = 100,
+    allow_private: bool = False,
+    db_session: Optional[AsyncSession] = None,
 ) -> PortScanResult:
     """
     Scan multiple ports on a target host concurrently.
@@ -2024,11 +2160,59 @@ async def scan_ports(
             recommendations_error=None,
             error=f"DNS resolution failed: {e}"
         )
-    
+
+    # Block scans against private / loopback / cloud-metadata targets unless
+    # the caller has explicitly opted in (authenticated internal use only).
+    if not allow_private and not _is_scan_target_allowed(ip):
+        return PortScanResult(
+            target=target,
+            total_scanned=0,
+            open_ports_count=0,
+            open_ports=[],
+            detected_technologies=[],
+            scan_duration_seconds=0.0,
+            packets_sent=0,
+            avg_latency_ms=None,
+            security_score=0,
+            security_score_factors=[
+                _score_factor("scan_error", _BLOCKED_SCAN_ERROR, 100, "critical")
+            ],
+            attack_surface={
+                "level": "UNKNOWN",
+                "score": 0,
+                "publicly_exposed_services": [],
+                "factors": [],
+                "summary": _BLOCKED_SCAN_ERROR,
+            },
+            threat_intelligence=_empty_threat_intel(ip, "Unknown", _BLOCKED_SCAN_ERROR),
+            misconfiguration_summary=_misconfiguration_summary([]),
+            exposure_summary={
+                "public_exposure": False,
+                "highest_severity": "unknown",
+                "highest_score": 0,
+                "highest_finding": _BLOCKED_SCAN_ERROR,
+                "highest_port": None,
+                "critical": 0,
+                "high": 0,
+                "medium": 0,
+                "low": 0,
+            },
+            attack_paths={
+                "nodes": [],
+                "edges": [],
+                "paths": [],
+                "summary": _BLOCKED_SCAN_ERROR,
+                "highest_severity": "unknown",
+            },
+            attack_simulations=[],
+            recommendations_error=None,
+            error=_BLOCKED_SCAN_ERROR,
+        )
+
     # Create semaphore to limit concurrent connections
     semaphore = asyncio.Semaphore(max_concurrent)
     attempt_latencies_ms: list[float] = []
-    
+
     async def scan_with_semaphore(port: int) -> OpenPortDetail | None:
         async with semaphore:
             attempt_start = time.perf_counter()
@@ -2055,41 +2239,65 @@ async def scan_ports(
     )
     all_technologies = merge_technologies(*(p.technologies for p in open_ports))
     add_service_fingerprints(open_ports)
-    
-    # Perform CVE detection for ports with version information
+
+    # Run ssl_audit once per HTTPS port upfront so both detect_misconfigurations
+    # and calculate_security_score share the same results without duplicate calls.
+    https_ports_list = [p for p in open_ports if p.port_number in HTTPS_PORTS]
+    if https_ports_list:
+        _ssl_results = await asyncio.gather(
+            *(ssl_audit(target, p.port_number) for p in https_ports_list),
+            return_exceptions=True,
+        )
+        ssl_cache: dict[int, SSLResult] = {
+            p.port_number: r
+            for p, r in zip(https_ports_list, _ssl_results)
+            if not isinstance(r, Exception)
+        }
+    else:
+        ssl_cache = {}
+
+    # Run the four independent analysis steps concurrently.
+    # and check_threat_intelligence do not depend on each other's output.
     version_strings = [p.version for p in open_ports if p.version]
-    if version_strings:
-        from cybersec.core.tools.cve_detect import detect_cves_batch
-        cve_results = await detect_cves_batch(version_strings)
-        
-        # Attach CVE results to ports
-        for port in open_ports:
-            if port.version and port.version in cve_results:
-                port.cve_result = cve_results[port.version]
-                port.cve_count = port.cve_result.total_count
-                port.cve_critical_count = port.cve_result.critical_count
-                port.cve_high_count = port.cve_result.high_count
-                port.cve_medium_count = port.cve_result.medium_count
-                port.cve_low_count = port.cve_result.low_count
-                scored_cves = [
-                    cve for cve in port.cve_result.cves
-                    if cve.cvss_score is not None
-                ]
-                if scored_cves:
-                    top_cve = max(scored_cves, key=lambda cve: float(cve.cvss_score or 0))
-                    port.max_cvss_score = float(top_cve.cvss_score)
-                    port.max_cvss_severity = top_cve.severity
-                    port.max_cvss_cve = top_cve.cve_id
+
+    async def _run_cves() -> dict:
+        if not version_strings:
+            return {}
+        return await detect_cves_batch(version_strings, db_session)
+
+    cve_results, misconfiguration_summary, _, threat_intelligence = await asyncio.gather(
+        _run_cves(),
+        detect_misconfigurations(target, open_ports, timeout, ssl_cache),
+        capture_web_port_screenshots(target, open_ports),
+        check_threat_intelligence(ip),
+    )
+
+    # Attach CVE results to ports (must happen before add_exploit_availability).
+    for port in open_ports:
+        if port.version and port.version in cve_results:
+            port.cve_result = cve_results[port.version]
+            port.cve_count = port.cve_result.total_count
+            port.cve_critical_count = port.cve_result.critical_count
+            port.cve_high_count = port.cve_result.high_count
+            port.cve_medium_count = port.cve_result.medium_count
+            port.cve_low_count = port.cve_result.low_count
+            scored_cves = [
+                cve for cve in port.cve_result.cves
+                if cve.cvss_score is not None
+            ]
+            if scored_cves:
+                top_cve = max(scored_cves, key=lambda cve: float(cve.cvss_score or 0))
+                port.max_cvss_score = float(top_cve.cvss_score)
+                port.max_cvss_severity = top_cve.severity
+                port.max_cvss_cve = top_cve.cve_id
 
     add_exploit_availability(open_ports)
-    misconfiguration_summary = await detect_misconfigurations(target, open_ports, timeout)
-    await capture_web_port_screenshots(target, open_ports)
-    threat_intelligence = await check_threat_intelligence(ip)
+
     exposure_summary = calculate_exposure_severity(ip, open_ports, threat_intelligence)
     attack_paths = build_attack_path_visualization(open_ports, exposure_summary)
     attack_simulations = build_attack_simulation_recommendations(open_ports, exposure_summary)
     add_mitre_attack_mapping(open_ports)
-    security_score, security_score_factors = await calculate_security_score(target, open_ports)
+    security_score, security_score_factors = await calculate_security_score(target, open_ports, ssl_cache)
     attack_surface = calculate_attack_surface(open_ports)
     recommendations_error = await add_ai_recommendations(target, open_ports)
     
@@ -2120,6 +2328,8 @@ async def stream_port_scan_events(
     ports: List[int] | None = None,
     timeout: float = 2.0,
     max_concurrent: int = 100,
+    allow_private: bool = False,
+    db_session: Optional[AsyncSession] = None,
 ):
     """Yield port scan events as individual port checks complete."""
     start_time = time.time()
@@ -2146,6 +2356,12 @@ async def stream_port_scan_events(
         ip = (await loop.getaddrinfo(target, None, family=socket.AF_INET))[0][4][0]
     except Exception as e:
         yield {"type": "error", "error": f"DNS resolution failed: {e}"}
+        return
+
+    # Block scans against private / loopback / cloud-metadata targets unless
+    # the caller has explicitly opted in (authenticated internal use only).
+    if not allow_private and not _is_scan_target_allowed(ip):
+        yield {"type": "error", "error": _BLOCKED_SCAN_ERROR}
         return
 
     semaphore = asyncio.Semaphore(max_concurrent)
@@ -2197,37 +2413,64 @@ async def stream_port_scan_events(
     )
     add_service_fingerprints(open_ports)
 
+    # Run ssl_audit once per HTTPS port upfront so both detect_misconfigurations
+    # and calculate_security_score share the same results without duplicate calls.
+    https_ports_list = [p for p in open_ports if p.port_number in HTTPS_PORTS]
+    if https_ports_list:
+        _ssl_results = await asyncio.gather(
+            *(ssl_audit(target, p.port_number) for p in https_ports_list),
+            return_exceptions=True,
+        )
+        ssl_cache: dict[int, SSLResult] = {
+            p.port_number: r
+            for p, r in zip(https_ports_list, _ssl_results)
+            if not isinstance(r, Exception)
+        }
+    else:
+        ssl_cache = {}
+
+    # Run the four independent analysis steps concurrently.
+    # and check_threat_intelligence do not depend on each other's output.
     version_strings = [p.version for p in open_ports if p.version]
-    if version_strings:
-        from cybersec.core.tools.cve_detect import detect_cves_batch
-        cve_results = await detect_cves_batch(version_strings)
-        for port in open_ports:
-            if port.version and port.version in cve_results:
-                port.cve_result = cve_results[port.version]
-                port.cve_count = port.cve_result.total_count
-                port.cve_critical_count = port.cve_result.critical_count
-                port.cve_high_count = port.cve_result.high_count
-                port.cve_medium_count = port.cve_result.medium_count
-                port.cve_low_count = port.cve_result.low_count
-                scored_cves = [
-                    cve for cve in port.cve_result.cves
-                    if cve.cvss_score is not None
-                ]
-                if scored_cves:
-                    top_cve = max(scored_cves, key=lambda cve: float(cve.cvss_score or 0))
-                    port.max_cvss_score = float(top_cve.cvss_score)
-                    port.max_cvss_severity = top_cve.severity
-                    port.max_cvss_cve = top_cve.cve_id
+
+    async def _run_cves() -> dict:
+        if not version_strings:
+            return {}
+        return await detect_cves_batch(version_strings, db_session)
+
+    cve_results, misconfiguration_summary, _, threat_intelligence = await asyncio.gather(
+        _run_cves(),
+        detect_misconfigurations(target, open_ports, timeout, ssl_cache),
+        capture_web_port_screenshots(target, open_ports),
+        check_threat_intelligence(ip),
+    )
+
+    # Attach CVE results to ports (must happen before add_exploit_availability).
+    for port in open_ports:
+        if port.version and port.version in cve_results:
+            port.cve_result = cve_results[port.version]
+            port.cve_count = port.cve_result.total_count
+            port.cve_critical_count = port.cve_result.critical_count
+            port.cve_high_count = port.cve_result.high_count
+            port.cve_medium_count = port.cve_result.medium_count
+            port.cve_low_count = port.cve_result.low_count
+            scored_cves = [
+                cve for cve in port.cve_result.cves
+                if cve.cvss_score is not None
+            ]
+            if scored_cves:
+                top_cve = max(scored_cves, key=lambda cve: float(cve.cvss_score or 0))
+                port.max_cvss_score = float(top_cve.cvss_score)
+                port.max_cvss_severity = top_cve.severity
+                port.max_cvss_cve = top_cve.cve_id
 
     add_exploit_availability(open_ports)
-    misconfiguration_summary = await detect_misconfigurations(target, open_ports, timeout)
-    await capture_web_port_screenshots(target, open_ports)
-    threat_intelligence = await check_threat_intelligence(ip)
+
     exposure_summary = calculate_exposure_severity(ip, open_ports, threat_intelligence)
     attack_paths = build_attack_path_visualization(open_ports, exposure_summary)
     attack_simulations = build_attack_simulation_recommendations(open_ports, exposure_summary)
     add_mitre_attack_mapping(open_ports)
-    security_score, security_score_factors = await calculate_security_score(target, open_ports)
+    security_score, security_score_factors = await calculate_security_score(target, open_ports, ssl_cache)
     attack_surface = calculate_attack_surface(open_ports)
     recommendations_error = await add_ai_recommendations(target, open_ports)
     all_technologies = merge_technologies(*(p.technologies for p in open_ports))
@@ -2260,7 +2503,9 @@ async def scan_port_range(
     start_port: int = 1,
     end_port: int = 1024,
     timeout: float = 2.0,
-    max_concurrent: int = 100
+    max_concurrent: int = 100,
+    allow_private: bool = False,
+    db_session: Optional[AsyncSession] = None,
 ) -> PortScanResult:
     """
     Scan a range of ports on a target host.
@@ -2271,9 +2516,14 @@ async def scan_port_range(
         end_port: Ending port number
         timeout: Connection timeout per port in seconds
         max_concurrent: Maximum concurrent connections
+        allow_private: Bypass private-IP check (authenticated callers only)
+        db_session: Optional AsyncSession for NVD CVE cache (pass from route layer)
     
     Returns:
         PortScanResult with scan details
     """
     ports = list(range(start_port, end_port + 1))
-    return await scan_ports(target, ports, timeout, max_concurrent)
+    return await scan_ports(
+        target, ports, timeout, max_concurrent,
+        allow_private=allow_private, db_session=db_session,
+    )

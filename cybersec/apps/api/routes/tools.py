@@ -16,6 +16,7 @@ from cybersec.apps.api.schemas.tool import (
     SslRequest, HttpHeadersRequest, SubdomainRequest, GeoipRequest,
     OsFingerprintRequest, PortScanRequest, PortScanOut, OpenPortOut, ToolResultOut
 )
+from cybersec.config.settings import settings
 from cybersec.core.tools.port_scanner import PortScanResult
 
 from cybersec.core.tools.dns import dns_lookup
@@ -405,14 +406,19 @@ async def run_port_scan(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user)
 ):
+    # Authenticated users may bypass the private-IP block when the setting permits.
+    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+
     # Determine scan type based on parameters
     if body.ports:
         # Scan specific ports
         result = await scan_ports(
-            body.target, 
+            body.target,
             ports=body.ports,
             timeout=body.timeout,
-            max_concurrent=body.max_concurrent
+            max_concurrent=body.max_concurrent,
+            allow_private=allow_private,
+            db_session=db,
         )
     elif body.start_port is not None and body.end_port is not None:
         # Scan port range
@@ -421,16 +427,20 @@ async def run_port_scan(
             start_port=body.start_port,
             end_port=body.end_port,
             timeout=body.timeout,
-            max_concurrent=body.max_concurrent
+            max_concurrent=body.max_concurrent,
+            allow_private=allow_private,
+            db_session=db,
         )
     else:
         # Scan common ports by default
         result = await scan_ports(
             body.target,
             timeout=body.timeout,
-            max_concurrent=body.max_concurrent
+            max_concurrent=body.max_concurrent,
+            allow_private=allow_private,
+            db_session=db,
         )
-    
+
     result_dict = _port_scan_to_dict(result)
     tool_result_id = await _save_tool_result(db, current_user, "port_scan", body.target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
@@ -449,6 +459,8 @@ async def stream_port_scan(
     else:
         ports = None
 
+    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+
     async def stream_response():
         try:
             async for event in stream_port_scan_events(
@@ -456,6 +468,8 @@ async def stream_port_scan(
                 ports=ports,
                 timeout=body.timeout,
                 max_concurrent=body.max_concurrent,
+                allow_private=allow_private,
+                db_session=db,
             ):
                 if event.get("type") == "done":
                     result_dict = _port_scan_to_dict(event["result"])

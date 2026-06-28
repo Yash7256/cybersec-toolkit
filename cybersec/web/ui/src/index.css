@@ -2380,3 +2380,1063 @@
     }
   }
 }
+
+/* ─── Traceroute view ─────────────────────────────────────────────── */
+@layer components {
+  /* results wrapper */
+  .tr-results {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  /* hero panel */
+  .tr-hero-panel {
+    position: relative;
+    border-radius: 12px;
+    border: 1px solid rgba(167, 139, 250, 0.22);
+    background: rgba(19, 9, 33, 0.7);
+    overflow: hidden;
+  }
+  .tr-hero-glow-bar {
+    position: absolute;
+    inset-x: 0;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.7), transparent);
+  }
+  .tr-hero-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px 22px;
+  }
+  .tr-hero-left {
+    min-width: 0;
+    flex: 1;
+  }
+  .tr-hero-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 26px;
+    font-weight: 600;
+    color: #e9d5ff;
+    line-height: 1.2;
+    word-break: break-all;
+    margin-bottom: 10px;
+  }
+  .tr-hero-summary {
+    font-size: 13px;
+    line-height: 1.65;
+    color: #b8afc5;
+    max-width: 640px;
+  }
+  .tr-hero-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    min-width: 280px;
+    flex-shrink: 0;
+  }
+
+  /* metric card */
+  .tr-metric-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    background: rgba(13, 7, 24, 0.65);
+  }
+  .tr-metric-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7a6d8a;
+  }
+  .tr-metric-value {
+    font-family: 'Fira Code', ui-monospace, monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: #e9d5ff;
+    line-height: 1.2;
+  }
+  .tr-metric-sub {
+    font-size: 10px;
+    color: #7a6d8a;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* stat grid */
+  .tr-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+  }
+
+  /* card shared header */
+  .tr-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #7a6d8a;
+    margin-bottom: 16px;
+  }
+  .tr-card-header-sub {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: #9d8ebf;
+    font-family: 'Fira Code', ui-monospace, monospace;
+  }
+
+  /* timeline + map section */
+  .tr-timeline-section {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+    gap: 14px;
+  }
+  @media (max-width: 900px) {
+    .tr-timeline-section {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .tr-timeline-card,
+  .tr-map-card,
+  .tr-chart-card,
+  .tr-intel-card {
+    border-radius: 10px;
+    border: 1px solid rgba(124, 58, 237, 0.18);
+    background: rgba(15, 8, 27, 0.55);
+    padding: 18px;
+    overflow: hidden;
+  }
+
+  /* hop timeline */
+  .tr-hops-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .tr-hop-row {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 14px;
+    min-height: 72px;
+  }
+  .tr-hop-stem {
+    position: relative;
+    display: flex;
+    justify-content: center;
+  }
+  .tr-hop-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1.5px solid;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-family: 'Fira Code', ui-monospace, monospace;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 4px;
+    position: relative;
+    z-index: 1;
+    background: rgba(13, 7, 24, 0.8);
+  }
+  .tr-hop-line {
+    position: absolute;
+    top: 44px;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(180deg, rgba(167,139,250,0.55), rgba(34,211,238,0.18));
+  }
+  .tr-hop-pulse {
+    position: absolute;
+    top: 46px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    animation: tr-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes tr-pulse {
+    0%, 100% { opacity: 0.9; transform: scale(1); }
+    50%       { opacity: 0.35; transform: scale(0.7); }
+  }
+
+  /* hop content */
+  .tr-hop-content {
+    padding-bottom: 14px;
+    min-width: 0;
+  }
+  .tr-hop-header {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    padding-right: 28px;
+  }
+  .tr-hop-header:hover .tr-hop-ip {
+    color: #e9d5ff;
+  }
+  .tr-hop-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .tr-hop-ip {
+    font-size: 13px;
+    font-family: 'Fira Code', ui-monospace, monospace;
+    color: #c4b5fd;
+    transition: color 150ms ease;
+  }
+  .tr-hop-meta {
+    font-size: 11px;
+    color: #7a6d8a;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .tr-hop-spike {
+    font-size: 11px;
+    color: #fbbf24;
+    margin-top: 4px;
+  }
+  .tr-hop-chevron {
+    position: absolute;
+    right: 0;
+    top: 2px;
+    width: 14px;
+    height: 14px;
+    color: #7a6d8a;
+    transition: transform 200ms ease, color 150ms ease;
+  }
+  .tr-hop-header:hover .tr-hop-chevron {
+    color: #a78bfa;
+  }
+
+  /* expanded hop details */
+  .tr-hop-details {
+    margin-top: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(124, 58, 237, 0.18);
+    background: rgba(8, 4, 16, 0.55);
+    overflow: hidden;
+  }
+  .tr-detail-row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 12px;
+    padding: 7px 12px;
+    border-bottom: 1px solid rgba(124, 58, 237, 0.1);
+    font-size: 11px;
+  }
+  .tr-detail-row:last-child {
+    border-bottom: none;
+  }
+  .tr-detail-row span {
+    color: #7a6d8a;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding-top: 1px;
+  }
+  .tr-detail-row strong {
+    color: #ddd6fe;
+    font-family: 'Fira Code', ui-monospace, monospace;
+    font-weight: 500;
+    word-break: break-all;
+  }
+
+  /* map card */
+  .tr-map-card {
+    display: flex;
+    flex-direction: column;
+  }
+  .tr-ownership-chain {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .tr-ownership-tag {
+    padding: 4px 9px;
+    border-radius: 7px;
+    border: 1px solid rgba(124, 58, 237, 0.22);
+    background: rgba(13, 7, 24, 0.7);
+    font-size: 11px;
+    font-family: 'Fira Code', ui-monospace, monospace;
+    color: #c4b5fd;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+  }
+
+  /* analysis section */
+  .tr-analysis-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 700px) {
+    .tr-analysis-section {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* intel list */
+  .tr-intel-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .tr-intel-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(124, 58, 237, 0.16);
+    background: rgba(8, 4, 16, 0.5);
+    font-size: 12px;
+    line-height: 1.55;
+    color: #c4b5fd;
+  }
+
+  /* live toggle button */
+  .tr-live-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #a78bfa;
+    background: rgba(124, 58, 237, 0.1);
+    border: 1px solid rgba(167, 139, 250, 0.32);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+  .tr-live-btn:hover:not(:disabled) {
+    background: rgba(124, 58, 237, 0.2);
+    border-color: rgba(167, 139, 250, 0.55);
+    color: #c4b5fd;
+  }
+  .tr-live-btn.active {
+    color: #22d3ee;
+    background: rgba(34, 211, 238, 0.1);
+    border-color: rgba(34, 211, 238, 0.42);
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.18);
+  }
+  .tr-live-btn.active svg {
+    animation: tr-pulse 1.4s ease-in-out infinite;
+  }
+  .tr-live-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+/* ─── Traceroute — Network Analysis tab additions ──────────────── */
+@layer components {
+
+  /* tab bar */
+  .tr-tab-bar {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(13, 7, 24, 0.7);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    width: fit-content;
+  }
+  .tr-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 18px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #7a6d8a;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease;
+    position: relative;
+    white-space: nowrap;
+  }
+  .tr-tab:hover {
+    color: #c4b5fd;
+    background: rgba(124, 58, 237, 0.1);
+  }
+  .tr-tab.active {
+    color: #e9d5ff;
+    background: rgba(124, 58, 237, 0.22);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .tr-tab-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22d3ee;
+    box-shadow: 0 0 8px #22d3ee;
+    animation: tr-pulse 1.4s ease-in-out infinite;
+  }
+
+  /* tab body */
+  .tr-tab-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* three-column analysis grid */
+  .tr-analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 960px) {
+    .tr-analysis-grid { grid-template-columns: 1fr; }
+  }
+
+  /* shared panel card */
+  .tr-panel {
+    border-radius: 10px;
+    border: 1px solid rgba(124, 58, 237, 0.18);
+    background: rgba(15, 8, 27, 0.6);
+    padding: 16px 18px;
+  }
+
+  /* card header */
+  .tr-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #7a6d8a;
+    margin-bottom: 14px;
+  }
+  .tr-card-header-sub {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: #9d8ebf;
+    font-family: 'Fira Code', ui-monospace, monospace;
+  }
+  .tr-card-header-badge {
+    margin-left: auto;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.28);
+  }
+
+  /* ── Segment Breakdown ─────────────────────────────────────── */
+  .tr-segment-list { display: flex; flex-direction: column; gap: 10px; }
+  .tr-segment-row  { display: flex; gap: 10px; align-items: flex-start; }
+  .tr-segment-bar-wrap {
+    width: 4px;
+    flex-shrink: 0;
+    align-self: stretch;
+    border-radius: 2px;
+    overflow: hidden;
+    background: rgba(124,58,237,0.12);
+    min-height: 38px;
+  }
+  .tr-segment-bar {
+    width: 100%;
+    height: 100%;
+    border-radius: 2px;
+  }
+  .tr-segment-info  { flex: 1; min-width: 0; }
+  .tr-segment-top   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .tr-segment-name  {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 5px;
+    border: 1px solid;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .tr-segment-hops  {
+    font-size: 10px;
+    font-family: 'Fira Code', ui-monospace, monospace;
+    color: #7a6d8a;
+  }
+  .tr-segment-meta  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 10px;
+    color: #7a6d8a;
+  }
+  .tr-segment-meta strong { color: #c4b5fd; }
+
+  /* ── ASN / Provider Flow — vertical blocks ─────────────────── */
+  .tr-asn-flow-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: stretch;
+  }
+  .tr-asn-flow-entry {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .tr-asn-block {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    transition: filter 150ms ease;
+  }
+  .tr-asn-block:hover { filter: brightness(1.12); }
+  .tr-asn-block-provider {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.3;
+    word-break: break-word;
+  }
+  .tr-asn-block-asn {
+    font-size: 10px;
+    font-family: 'Fira Code', ui-monospace, monospace;
+    color: #7a6d8a;
+  }
+  .tr-asn-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3px 0;
+  }
+  .tr-asn-connector-line {
+    width: 1px;
+    height: 12px;
+    background: linear-gradient(180deg, rgba(124,58,237,0.5), rgba(124,58,237,0.15));
+  }
+
+  /* ── MITRE list ─────────────────────────────────────────────── */
+  .tr-mitre-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .tr-mitre-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 11px;
+    line-height: 1.55;
+  }
+  .tr-mitre-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+  .tr-mitre-summary {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(124,58,237,0.14);
+  }
+
+  /* ── AI Summary panel ───────────────────────────────────────── */
+  .tr-ai-panel {
+    border-radius: 10px;
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    background: linear-gradient(135deg, rgba(52, 20, 80, 0.72) 0%, rgba(28, 12, 50, 0.8) 100%);
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .tr-ai-panel::before {
+    content: '';
+    position: absolute;
+    inset-x: 0;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(167,139,250,0.55), transparent);
+  }
+  .tr-ai-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .tr-ai-icon-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(124, 58, 237, 0.25);
+    border: 1px solid rgba(167, 139, 250, 0.35);
+    display: grid;
+    place-items: center;
+    color: #c4b5fd;
+    flex-shrink: 0;
+  }
+  .tr-ai-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #c4b5fd;
+  }
+  .tr-ai-lines {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .tr-ai-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.65;
+    color: #c4b5fd;
+  }
+  .tr-ai-line-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(167, 139, 250, 0.6);
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+
+  /* ── Export & Share panel ───────────────────────────────────── */
+  .tr-export-panel {
+    border-radius: 10px;
+    border: 1px solid rgba(124, 58, 237, 0.18);
+    background: rgba(13, 7, 24, 0.55);
+    padding: 18px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .tr-export-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #c4b5fd;
+    margin: 0 0 3px;
+  }
+  .tr-export-sub {
+    font-size: 11px;
+    color: #7a6d8a;
+    margin: 0;
+  }
+  .tr-export-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .tr-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #c4b5fd;
+    background: rgba(124, 58, 237, 0.12);
+    border: 1px solid rgba(167, 139, 250, 0.28);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+  }
+  .tr-export-btn:hover {
+    background: rgba(124, 58, 237, 0.22);
+    border-color: rgba(167, 139, 250, 0.5);
+    transform: translateY(-1px);
+    color: #e9d5ff;
+  }
+  .tr-export-share {
+    background: rgba(124, 58, 237, 0.2);
+    border-color: rgba(167, 139, 250, 0.4);
+    color: #e9d5ff;
+  }
+  .tr-export-share:hover {
+    background: rgba(124, 58, 237, 0.32);
+  }
+
+  /* ── intelligence list (monitoring tab) ─────────────────────── */
+  .tr-intel-list  { display: flex; flex-direction: column; gap: 8px; }
+  .tr-intel-item  {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(124,58,237,0.16);
+    background: rgba(8,4,16,0.5);
+    font-size: 12px;
+    line-height: 1.55;
+    color: #c4b5fd;
+  }
+
+  /* empty state note */
+  .tr-empty-note {
+    font-size: 11px;
+    color: #5a4d72;
+    font-style: italic;
+    margin: 0;
+  }
+}
+
+/* ─── SSL Check view ──────────────────────────────────────────────── */
+@layer components {
+
+  .ssl-results {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+  }
+
+  /* hero */
+  .ssl-hero-panel {
+    position: relative;
+    border-radius: 12px;
+    border: 1px solid rgba(167, 139, 250, 0.22);
+    background: rgba(19, 9, 33, 0.72);
+    overflow: hidden;
+  }
+  .ssl-hero-glow {
+    position: absolute;
+    inset-x: 0;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.7), transparent);
+  }
+  .ssl-hero-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px 22px;
+  }
+  .ssl-hero-left { flex: 1; min-width: 0; }
+  .ssl-hero-domain {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #e9d5ff;
+    word-break: break-all;
+    margin-bottom: 6px;
+  }
+  .ssl-hero-sub {
+    font-size: 12px;
+    color: #7a6d8a;
+    font-family: 'Fira Code', monospace;
+  }
+
+  /* metric tiles */
+  .ssl-hero-tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(90px, 130px));
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  @media (max-width: 860px) {
+    .ssl-hero-tiles { grid-template-columns: repeat(2, 1fr); }
+  }
+  .ssl-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    background: rgba(13, 7, 24, 0.65);
+  }
+  .ssl-tile-icon {
+    color: #a78bfa;
+    margin-bottom: 2px;
+  }
+  .ssl-tile-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7a6d8a;
+  }
+  .ssl-tile-value {
+    font-family: 'Fira Code', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: #e9d5ff;
+    line-height: 1.2;
+  }
+  .ssl-tile-value--sm {
+    font-size: 13px;
+    word-break: break-all;
+  }
+  .ssl-tile-sub {
+    font-size: 10px;
+    color: #7a6d8a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* three detail panels */
+  .ssl-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 900px) {
+    .ssl-detail-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 580px) {
+    .ssl-detail-grid { grid-template-columns: 1fr; }
+  }
+
+  /* shared panel */
+  .ssl-panel {
+    border-radius: 10px;
+    border: 1px solid rgba(124, 58, 237, 0.18);
+    background: rgba(15, 8, 27, 0.55);
+    padding: 16px 18px;
+  }
+  .ssl-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #7a6d8a;
+    margin-bottom: 14px;
+  }
+  .ssl-panel-count {
+    margin-left: auto;
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #a78bfa;
+    background: rgba(124, 58, 237, 0.12);
+    border: 1px solid rgba(167, 139, 250, 0.25);
+    border-radius: 999px;
+    padding: 1px 8px;
+  }
+
+  /* info rows inside panels */
+  .ssl-info-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(124, 58, 237, 0.1);
+    font-size: 11px;
+  }
+  .ssl-info-row:last-child { border-bottom: none; }
+  .ssl-info-row span {
+    color: #7a6d8a;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding-top: 1px;
+  }
+  .ssl-info-row strong {
+    color: #ddd6fe;
+    font-weight: 500;
+    word-break: break-all;
+  }
+
+  /* validity bar */
+  .ssl-days-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+  }
+  .ssl-days-bar-track {
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(124, 58, 237, 0.14);
+    overflow: hidden;
+  }
+  .ssl-days-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 600ms ease;
+  }
+
+  /* TLS protocol grid */
+  .ssl-tls-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 620px) {
+    .ssl-tls-grid { grid-template-columns: 1fr; }
+  }
+  .ssl-tls-card {
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid;
+  }
+  .ssl-tls-supported {
+    border-color: rgba(52, 211, 153, 0.28);
+    background: rgba(52, 211, 153, 0.07);
+  }
+  .ssl-tls-unsupported {
+    border-color: rgba(248, 113, 113, 0.28);
+    background: rgba(248, 113, 113, 0.07);
+  }
+  .ssl-tls-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .ssl-tls-version {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e9d5ff;
+    font-family: 'Fira Code', monospace;
+  }
+  .ssl-tls-status {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .ssl-tls-note {
+    font-size: 10px;
+    color: #7a6d8a;
+    line-height: 1.4;
+  }
+
+  /* SAN chips */
+  .ssl-san-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .ssl-san-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(167, 139, 250, 0.28);
+    background: rgba(124, 58, 237, 0.1);
+    font-size: 11px;
+    font-family: 'Fira Code', monospace;
+    color: #c4b5fd;
+    transition: border-color 150ms ease, background 150ms ease;
+  }
+  .ssl-san-tag:hover {
+    border-color: rgba(167, 139, 250, 0.55);
+    background: rgba(124, 58, 237, 0.18);
+  }
+
+  /* export */
+  .ssl-export-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .ssl-export-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #c4b5fd;
+    margin-bottom: 4px;
+  }
+  .ssl-export-sub {
+    font-size: 11px;
+    color: #7a6d8a;
+  }
+  .ssl-export-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ssl-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(167, 139, 250, 0.28);
+    background: rgba(13, 7, 24, 0.65);
+    font-size: 12px;
+    font-weight: 500;
+    color: #ddd6fe;
+    cursor: pointer;
+    transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+    white-space: nowrap;
+  }
+  .ssl-export-btn:hover {
+    border-color: rgba(167, 139, 250, 0.55);
+    background: rgba(124, 58, 237, 0.14);
+    transform: translateY(-1px);
+  }
+  .ssl-export-share {
+    border-color: rgba(34, 211, 238, 0.3);
+    color: #22d3ee;
+  }
+  .ssl-export-share:hover {
+    border-color: rgba(34, 211, 238, 0.6);
+    background: rgba(34, 211, 238, 0.1);
+  }
+}

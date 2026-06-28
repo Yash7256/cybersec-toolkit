@@ -28,7 +28,14 @@ RUN poetry install --only=main --no-root --no-interaction --no-ansi || \
     pip install fastapi uvicorn sqlalchemy asyncpg alembic python-jose[cryptography] \
                 passlib[bcrypt] click rich httpx dnspython python-whois cryptography \
                 reportlab pydantic-settings email-validator slowapi scapy groq \
-                mitreattack-python arq python-multipart
+                mitreattack-python arq python-multipart playwright==1.52.0
+
+# Install Playwright's Chromium browser (required for port screenshot capture).
+# The PLAYWRIGHT_BROWSERS_PATH env var is set so the browser lives inside /app
+# rather than ~/.cache, which is more predictable in a container.
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers
+RUN python -m playwright install chromium --with-deps 2>/dev/null || \
+    playwright install chromium --with-deps
 
 # Install frontend dependencies in a cacheable layer. Copying only package files
 # here keeps npm from reinstalling on every backend/source-code change.
