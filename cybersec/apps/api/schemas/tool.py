@@ -81,6 +81,8 @@ class PortScanRequest(BaseModel):
     max_concurrent: int = Field(default=100, ge=1, le=2000)
     include_ai_recommendations: bool = True
     include_threat_intel: bool = True
+    include_misconfigurations: bool = True
+    include_screenshots: bool = True
 
     @field_validator("ports")
     @classmethod

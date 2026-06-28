@@ -365,7 +365,8 @@ async def run_os_fingerprint(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user)
 ):
-    result = await os_fingerprint(body.target, timeout=body.timeout)
+    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    result = await os_fingerprint(body.target, timeout=body.timeout, allow_private=allow_private, db_session=db)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "os_fingerprint", body.target, result_dict)
     return {"tool_result_id": tool_result_id, "data": result_dict}
@@ -378,9 +379,14 @@ async def stream_os_fingerprint(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user)
 ):
+    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+
     async def stream_response():
         try:
-            async for event in stream_os_fingerprint_events(body.target, timeout=body.timeout):
+            async for event in stream_os_fingerprint_events(
+                body.target, timeout=body.timeout,
+                allow_private=allow_private, db_session=db,
+            ):
                 if event.get("type") == "done":
                     result_dict = dataclasses.asdict(event["result"])
                     tool_result_id = await _save_tool_result(db, current_user, "os_fingerprint", body.target, result_dict)
@@ -421,6 +427,8 @@ async def run_port_scan(
             db_session=db,
             include_ai_recommendations=body.include_ai_recommendations,
             include_threat_intel=body.include_threat_intel,
+            include_misconfigurations=body.include_misconfigurations,
+            include_screenshots=body.include_screenshots,
         )
     elif body.start_port is not None and body.end_port is not None:
         # Scan port range
@@ -434,6 +442,8 @@ async def run_port_scan(
             db_session=db,
             include_ai_recommendations=body.include_ai_recommendations,
             include_threat_intel=body.include_threat_intel,
+            include_misconfigurations=body.include_misconfigurations,
+            include_screenshots=body.include_screenshots,
         )
     else:
         # Scan common ports by default
@@ -445,6 +455,8 @@ async def run_port_scan(
             db_session=db,
             include_ai_recommendations=body.include_ai_recommendations,
             include_threat_intel=body.include_threat_intel,
+            include_misconfigurations=body.include_misconfigurations,
+            include_screenshots=body.include_screenshots,
         )
 
     result_dict = _port_scan_to_dict(result)
@@ -478,6 +490,8 @@ async def stream_port_scan(
                 db_session=db,
                 include_ai_recommendations=body.include_ai_recommendations,
                 include_threat_intel=body.include_threat_intel,
+                include_misconfigurations=body.include_misconfigurations,
+                include_screenshots=body.include_screenshots,
             ):
                 if event.get("type") == "done":
                     result_dict = _port_scan_to_dict(event["result"])

@@ -2094,6 +2094,8 @@ async def scan_ports(
     db_session: Optional[AsyncSession] = None,
     include_ai_recommendations: bool = True,
     include_threat_intel: bool = True,
+    include_misconfigurations: bool = True,
+    include_screenshots: bool = True,
 ) -> PortScanResult:
     """
     Scan multiple ports on a target host concurrently.
@@ -2270,15 +2272,28 @@ async def scan_ports(
     async def _empty_threat_intel_coro():
         return _empty_threat_intel(ip, "Not checked", "Threat intelligence check was skipped for this scan.")
 
+    async def _empty_misconfig_coro():
+        return _misconfiguration_summary([])
+
     _threat_intel_coro = (
         check_threat_intelligence(ip)
         if include_threat_intel
         else _empty_threat_intel_coro()
     )
+    _misconfig_coro = (
+        detect_misconfigurations(target, open_ports, timeout, ssl_cache)
+        if include_misconfigurations
+        else _empty_misconfig_coro()
+    )
+    _screenshot_coro = (
+        capture_web_port_screenshots(target, open_ports)
+        if include_screenshots
+        else asyncio.sleep(0)
+    )
     cve_results, misconfiguration_summary, _, threat_intelligence = await asyncio.gather(
         _run_cves(),
-        detect_misconfigurations(target, open_ports, timeout, ssl_cache),
-        capture_web_port_screenshots(target, open_ports),
+        _misconfig_coro,
+        _screenshot_coro,
         _threat_intel_coro,
     )
 
@@ -2342,6 +2357,8 @@ async def stream_port_scan_events(
     db_session: Optional[AsyncSession] = None,
     include_ai_recommendations: bool = True,
     include_threat_intel: bool = True,
+    include_misconfigurations: bool = True,
+    include_screenshots: bool = True,
 ):
     """Yield port scan events as individual port checks complete."""
     start_time = time.time()
@@ -2453,15 +2470,28 @@ async def stream_port_scan_events(
     async def _empty_threat_intel_coro():
         return _empty_threat_intel(ip, "Not checked", "Threat intelligence check was skipped for this scan.")
 
+    async def _empty_misconfig_coro():
+        return _misconfiguration_summary([])
+
     _threat_intel_coro = (
         check_threat_intelligence(ip)
         if include_threat_intel
         else _empty_threat_intel_coro()
     )
+    _misconfig_coro = (
+        detect_misconfigurations(target, open_ports, timeout, ssl_cache)
+        if include_misconfigurations
+        else _empty_misconfig_coro()
+    )
+    _screenshot_coro = (
+        capture_web_port_screenshots(target, open_ports)
+        if include_screenshots
+        else asyncio.sleep(0)
+    )
     cve_results, misconfiguration_summary, _, threat_intelligence = await asyncio.gather(
         _run_cves(),
-        detect_misconfigurations(target, open_ports, timeout, ssl_cache),
-        capture_web_port_screenshots(target, open_ports),
+        _misconfig_coro,
+        _screenshot_coro,
         _threat_intel_coro,
     )
 
@@ -2528,23 +2558,11 @@ async def scan_port_range(
     db_session: Optional[AsyncSession] = None,
     include_ai_recommendations: bool = True,
     include_threat_intel: bool = True,
+    include_misconfigurations: bool = True,
+    include_screenshots: bool = True,
 ) -> PortScanResult:
     """
     Scan a range of ports on a target host.
-    
-    Args:
-        target: Target hostname or IP address
-        start_port: Starting port number
-        end_port: Ending port number
-        timeout: Connection timeout per port in seconds
-        max_concurrent: Maximum concurrent connections
-        allow_private: Bypass private-IP check (authenticated callers only)
-        db_session: Optional AsyncSession for NVD CVE cache (pass from route layer)
-        include_ai_recommendations: When False, skip Groq AI recommendations entirely.
-        include_threat_intel: When False, skip AbuseIPDB/Spamhaus checks entirely.
-    
-    Returns:
-        PortScanResult with scan details
     """
     ports = list(range(start_port, end_port + 1))
     return await scan_ports(
@@ -2552,4 +2570,6 @@ async def scan_port_range(
         allow_private=allow_private, db_session=db_session,
         include_ai_recommendations=include_ai_recommendations,
         include_threat_intel=include_threat_intel,
+        include_misconfigurations=include_misconfigurations,
+        include_screenshots=include_screenshots,
     )

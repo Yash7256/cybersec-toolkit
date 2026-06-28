@@ -57,6 +57,10 @@ class RedisKeys:
     def ai_recommendations(fingerprint_hash: str) -> str:
         return f"ai_recs:{fingerprint_hash}"
 
+    @staticmethod
+    def os_fingerprint(ip: str) -> str:
+        return f"os_fingerprint:{ip}"
+
 _shared_client: Optional["aioredis.Redis"] = None
 
 

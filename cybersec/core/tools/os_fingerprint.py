@@ -1,6 +1,7 @@
 import asyncio
 import dataclasses
 import ipaddress
+import json
 import re
 import socket
 import struct
@@ -9,8 +10,17 @@ import time
 from asyncio import subprocess as asy_sub
 from dataclasses import dataclass, field
 
+from cybersec.config.settings import settings
+from cybersec.core.redis_client import RedisKeys, get_shared_redis_client
 from cybersec.core.tools.geoip import geoip_lookup
-from cybersec.core.tools.port_scanner import OpenPortDetail, scan_ports
+from cybersec.core.tools.port_scanner import (
+    OpenPortDetail,
+    scan_ports,
+    _is_scan_target_allowed,
+    _BLOCKED_SCAN_ERROR,
+)
+from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 OS_FINGERPRINT_PORTS = [
@@ -61,6 +71,7 @@ class OsFingerprintResult:
     ttl: int | None = None
     open_ports: list[dict] = field(default_factory=list)
     scan_duration_seconds: float = 0.0
+    cached: bool = False
     error: str | None = None
 
 
@@ -260,7 +271,13 @@ async def _tcp_probe(target: str, ports: list[OpenPortDetail], timeout: float) -
         "window_scaling": None,
         "tcp_options": [],
         "raw_packet_capture": False,
-        "note": "Uses local TCP_INFO when available; raw remote SYN option capture requires privileged packet probing.",
+        # NOTE: Values here are read from the local kernel's TCP_INFO socket option after
+        # establishing a connection. They reflect the local kernel's *negotiated* view of
+        # the connection (what the two sides agreed on during the handshake) rather than
+        # the remote TCP/IP stack's raw advertised options. A genuine remote-stack
+        # fingerprint (à la nmap -O or p0f) requires capturing the raw SYN-ACK packet
+        # with its unmodified TCP option fields, which needs a privileged raw socket.
+        "note": "Values reflect local kernel negotiated TCP parameters (MSS, window scaling, SACK, timestamps) for this connection, not raw remote SYN-ACK option capture. Privileged raw-socket probing is required for a true remote stack fingerprint.",
     }
     if target_port is None or not hasattr(socket, "TCP_INFO"):
         base["note"] = "TCP stack details unavailable on this platform or no open TCP port was found."
@@ -322,8 +339,40 @@ def _eol_and_vuln_findings(open_ports: list[OpenPortDetail]) -> tuple[list[dict]
     eol = []
     vulns = []
     for port in open_ports:
+        version = (port.version or (port.fingerprint.get("detected") if port.fingerprint else None))
+        component = version or port.service or f"TCP/{port.port_number}"
+
+        # --- CVE-based path (preferred when CVE data is available) ---
+        if port.cve_result is not None:
+            if port.cve_critical_count or port.cve_high_count:
+                severity = "critical" if port.cve_critical_count else "high"
+                count = port.cve_critical_count or port.cve_high_count
+                vulns.append({
+                    "component": component,
+                    "finding": (
+                        f"{port.cve_critical_count} critical CVE(s) and "
+                        f"{port.cve_high_count} high CVE(s) detected."
+                        if port.cve_critical_count and port.cve_high_count
+                        else f"{count} {severity}-severity CVE(s) detected."
+                    ),
+                    "severity": severity,
+                })
+            elif port.cve_count:
+                vulns.append({
+                    "component": component,
+                    "finding": f"{port.cve_count} known CVE(s) detected for this version.",
+                    "severity": "medium",
+                })
+            if port.cve_count and version:
+                eol.append({
+                    "component": component,
+                    "status": "Aged",
+                    "reason": f"CVE data exists for this version; ensure it is actively maintained and patched.",
+                })
+            continue  # CVE path handled — skip banner fallback for this port
+
+        # --- Banner fallback (when no cve_result, i.e. version wasn't parsed) ---
         text = _service_text(port)
-        version = port.version or port.fingerprint.get("detected") if port.fingerprint else port.version
         if "apache/2.4.7" in text:
             eol.append({"component": "Apache HTTP Server 2.4.7", "status": "Outdated", "reason": "Apache 2.4.7 is associated with old Ubuntu-era packages."})
             vulns.append({"component": "Apache HTTP Server 2.4.7", "finding": "Potential historical CVEs; validate with authenticated/package-aware scanning.", "severity": "medium"})
@@ -332,6 +381,7 @@ def _eol_and_vuln_findings(open_ports: list[OpenPortDetail]) -> tuple[list[dict]
             vulns.append({"component": version or "OpenSSH 6.x", "finding": "Potential OpenSSH CVEs may apply depending on vendor backports.", "severity": "medium"})
         if "ubuntu 14" in text or "ubuntu 16" in text:
             eol.append({"component": version or "Ubuntu release marker", "status": "End-of-life likely", "reason": "Observed Ubuntu marker suggests an old LTS generation."})
+
     return eol, vulns
 
 
@@ -494,7 +544,12 @@ def _choose_os(scores: dict[str, int]) -> tuple[str, str, int]:
     return labels.get(family, "Unknown"), family, min(95, max(20, score))
 
 
-async def os_fingerprint(target: str, timeout: float = 2.0) -> OsFingerprintResult:
+async def os_fingerprint(
+    target: str,
+    timeout: float = 2.0,
+    allow_private: bool = False,
+    db_session: Optional[AsyncSession] = None,
+) -> OsFingerprintResult:
     start = time.time()
     ip, error = await _resolve_ipv4(target)
     if error:
@@ -519,9 +574,59 @@ async def os_fingerprint(target: str, timeout: float = 2.0) -> OsFingerprintResu
             error=error,
         )
 
+    # SSRF guard — block private/loopback/cloud-metadata targets unless
+    # the caller has explicitly opted in (authenticated internal use only).
+    if not allow_private and not _is_scan_target_allowed(ip):
+        return OsFingerprintResult(
+            target=target,
+            ip=ip,
+            detected_os="Unknown",
+            family="unknown",
+            os_version_estimate=None,
+            distribution_family=None,
+            kernel_estimate=None,
+            device_type="Unknown",
+            environment="Unknown",
+            hosting_provider=None,
+            confidence=0,
+            confidence_label="Insufficient",
+            os_probabilities=[],
+            virtualization_signals=[],
+            method="passive TCP/ICMP fingerprint",
+            detection_mode="Passive Fingerprinting",
+            scan_duration_seconds=time.time() - start,
+            error=_BLOCKED_SCAN_ERROR,
+        )
+
+    # --- Cache read ---
+    # Key is the resolved IP so hostname aliases of the same host share an entry.
+    _redis = get_shared_redis_client()
+    _cache_key = RedisKeys.os_fingerprint(ip)
+    if _redis is not None:
+        try:
+            cached_raw = await _redis.get(_cache_key)
+            if cached_raw is not None:
+                cached_dict = json.loads(cached_raw)
+                cached_dict["cached"] = True
+                cached_dict["scan_duration_seconds"] = round(time.time() - start, 4)
+                return OsFingerprintResult(**cached_dict)
+        except Exception:
+            pass  # Redis unavailable or malformed — fall through to live scan
+
     ttl_task = asyncio.create_task(_read_ttl(target, timeout))
     geo_task = asyncio.create_task(geoip_lookup(target))
-    ports_result = await scan_ports(target, ports=OS_FINGERPRINT_PORTS, timeout=timeout, max_concurrent=40)
+    ports_result = await scan_ports(
+        target,
+        ports=OS_FINGERPRINT_PORTS,
+        timeout=timeout,
+        max_concurrent=40,
+        allow_private=allow_private,
+        db_session=db_session,
+        include_ai_recommendations=False,
+        include_threat_intel=False,
+        include_misconfigurations=False,
+        include_screenshots=False,
+    )
     ttl = await ttl_task
     geo_result = await geo_task
     geo = dataclasses.asdict(geo_result)
@@ -646,7 +751,7 @@ async def os_fingerprint(target: str, timeout: float = 2.0) -> OsFingerprintResu
         for port in ports_result.open_ports
     ]
 
-    return OsFingerprintResult(
+    result = OsFingerprintResult(
         target=target,
         ip=ip,
         detected_os=detected_os,
@@ -701,11 +806,27 @@ async def os_fingerprint(target: str, timeout: float = 2.0) -> OsFingerprintResu
         ttl=ttl,
         open_ports=open_ports,
         scan_duration_seconds=time.time() - start,
+        cached=False,
         error=ports_result.error,
     )
 
+    # --- Cache write ---
+    if _redis is not None:
+        try:
+            payload = json.dumps(dataclasses.asdict(result))
+            await _redis.set(_cache_key, payload, ex=settings.OS_FINGERPRINT_CACHE_TTL_SECONDS)
+        except Exception:
+            pass  # Redis unavailable — continue without caching
 
-async def stream_os_fingerprint_events(target: str, timeout: float = 2.0):
+    return result
+
+
+async def stream_os_fingerprint_events(
+    target: str,
+    timeout: float = 2.0,
+    allow_private: bool = False,
+    db_session: Optional[AsyncSession] = None,
+):
     """Yield OS fingerprinting progress events and the final result."""
     started_at = time.time()
     yield {
@@ -736,7 +857,7 @@ async def stream_os_fingerprint_events(target: str, timeout: float = 2.0):
         }
         await asyncio.sleep(0)
 
-    result = await os_fingerprint(target, timeout=timeout)
+    result = await os_fingerprint(target, timeout=timeout, allow_private=allow_private, db_session=db_session)
     yield {"type": "done", "result": result}
 
 
