@@ -7,6 +7,8 @@ import time
 from asyncio import subprocess as asy_sub
 from dataclasses import dataclass, field
 
+from cybersec.config.settings import settings
+from cybersec.core.redis_client import RedisKeys, get_shared_redis_client
 from cybersec.core.tools.geoip import geoip_lookup
 
 
@@ -49,7 +51,7 @@ class PingResult:
     last_checked: str | None = None
 
 
-_PING_HISTORY: dict[str, float] = {}
+
 
 
 def _round(value: float | None, digits: int = 2) -> float | None:
@@ -226,6 +228,7 @@ def _build_result(
     dns_lookup_ms: float | None,
     replies: list[dict],
     geo_data: dict,
+    previous_avg: float | None = None,
 ) -> PingResult:
     if replies and not packets_received:
         packets_received = len(replies)
@@ -269,10 +272,7 @@ def _build_result(
         badges.append("HIGH LATENCY")
 
     history_key = ip or target
-    previous_avg = _PING_HISTORY.get(history_key)
     history_delta = (avg_ms - previous_avg) if avg_ms is not None and previous_avg is not None else None
-    if avg_ms is not None:
-        _PING_HISTORY[history_key] = avg_ms
 
     return PingResult(
         target=target,
@@ -340,7 +340,7 @@ async def _geo_for_ip(ip: str) -> dict:
     }
 
 
-async def ping_host(target: str, count: int = 4) -> PingResult:
+async def ping_host(target: str, count: int = 4, *, allow_private: bool = False) -> PingResult:
     count = max(1, min(100, count))
     dns_start = time.perf_counter()
     try:
@@ -362,7 +362,36 @@ async def ping_host(target: str, count: int = 4) -> PingResult:
         )
     dns_lookup_ms = _round((time.perf_counter() - dns_start) * 1000)
 
-    cmd = ["ping", "-n", str(count), target] if sys.platform == "win32" else ["ping", "-c", str(count), target]
+    # Private/loopback/metadata guard — import lazily to avoid circular deps
+    from cybersec.core.tools.port_scanner import _is_scan_target_allowed
+    if not allow_private and not _is_scan_target_allowed(ip):
+        return PingResult(
+            target=target,
+            ip=ip,
+            packets_sent=0,
+            packets_received=0,
+            packet_loss_pct=100.0,
+            min_ms=None,
+            avg_ms=None,
+            max_ms=None,
+            error="Pinging private, loopback, or cloud-metadata addresses is not permitted",
+            dns_lookup_ms=dns_lookup_ms,
+            last_checked="just now",
+        )
+
+    # Redis history — read previous avg before the ping so delta is meaningful
+    history_key = RedisKeys.ping_history(ip)
+    previous_avg: float | None = None
+    redis = get_shared_redis_client()
+    if redis is not None:
+        try:
+            raw = await redis.get(history_key)
+            if raw is not None:
+                previous_avg = float(raw)
+        except Exception:
+            pass
+
+    cmd = ["ping", "-n", str(count), ip] if sys.platform == "win32" else ["ping", "-c", str(count), "--", ip]
 
     try:
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asy_sub.PIPE, stderr=asy_sub.PIPE)
@@ -404,7 +433,7 @@ async def ping_host(target: str, count: int = 4) -> PingResult:
                     min_ms, max_ms = max_ms, min_ms
 
         geo_data = await _geo_for_ip(ip)
-        return _build_result(
+        result = _build_result(
             target=target,
             ip=ip,
             packets_sent=packets_sent or count,
@@ -416,7 +445,17 @@ async def ping_host(target: str, count: int = 4) -> PingResult:
             dns_lookup_ms=dns_lookup_ms,
             replies=replies,
             geo_data=geo_data,
+            previous_avg=previous_avg,
         )
+
+        # Persist new avg to Redis
+        if result.avg_ms is not None and redis is not None:
+            try:
+                await redis.set(history_key, str(result.avg_ms), ex=settings.PING_HISTORY_TTL_SECONDS)
+            except Exception:
+                pass
+
+        return result
     except asyncio.TimeoutError:
         return PingResult(
             target,

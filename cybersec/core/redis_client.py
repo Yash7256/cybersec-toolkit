@@ -61,6 +61,10 @@ class RedisKeys:
     def os_fingerprint(ip: str) -> str:
         return f"os_fingerprint:{ip}"
 
+    @staticmethod
+    def ping_history(ip_or_target: str) -> str:
+        return f"ping_history:{ip_or_target}"
+
 _shared_client: Optional["aioredis.Redis"] = None
 
 
