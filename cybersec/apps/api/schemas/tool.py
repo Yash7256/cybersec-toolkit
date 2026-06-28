@@ -79,6 +79,8 @@ class PortScanRequest(BaseModel):
     end_port: int | None = Field(default=None, ge=1, le=65535)
     timeout: float = Field(default=2.0, ge=0.1, le=10.0)
     max_concurrent: int = Field(default=100, ge=1, le=2000)
+    include_ai_recommendations: bool = True
+    include_threat_intel: bool = True
 
     @field_validator("ports")
     @classmethod

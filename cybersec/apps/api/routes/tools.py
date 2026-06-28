@@ -419,6 +419,8 @@ async def run_port_scan(
             max_concurrent=body.max_concurrent,
             allow_private=allow_private,
             db_session=db,
+            include_ai_recommendations=body.include_ai_recommendations,
+            include_threat_intel=body.include_threat_intel,
         )
     elif body.start_port is not None and body.end_port is not None:
         # Scan port range
@@ -430,6 +432,8 @@ async def run_port_scan(
             max_concurrent=body.max_concurrent,
             allow_private=allow_private,
             db_session=db,
+            include_ai_recommendations=body.include_ai_recommendations,
+            include_threat_intel=body.include_threat_intel,
         )
     else:
         # Scan common ports by default
@@ -439,6 +443,8 @@ async def run_port_scan(
             max_concurrent=body.max_concurrent,
             allow_private=allow_private,
             db_session=db,
+            include_ai_recommendations=body.include_ai_recommendations,
+            include_threat_intel=body.include_threat_intel,
         )
 
     result_dict = _port_scan_to_dict(result)
@@ -470,6 +476,8 @@ async def stream_port_scan(
                 max_concurrent=body.max_concurrent,
                 allow_private=allow_private,
                 db_session=db,
+                include_ai_recommendations=body.include_ai_recommendations,
+                include_threat_intel=body.include_threat_intel,
             ):
                 if event.get("type") == "done":
                     result_dict = _port_scan_to_dict(event["result"])

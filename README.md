@@ -165,6 +165,19 @@ Every open port comes back with a full threat picture — not just "port 80: ope
 | | `/api/tools/subdomains` | POST | Subdomain enumeration |
 | | `/api/tools/geoip` | POST | IP geolocation |
 | | `/api/tools/os-fingerprint` | POST | Passive + active OS detection |
+
+**`POST /api/tools/port_scan` — request body (`PortScanRequest`)**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `target` | string | — | Hostname or IP to scan |
+| `ports` | int[] \| null | null | Explicit port list (mutually exclusive with range) |
+| `start_port` | int \| null | null | Range start (requires `end_port`) |
+| `end_port` | int \| null | null | Range end (requires `start_port`) |
+| `timeout` | float | 2.0 | Per-port connection timeout (seconds) |
+| `max_concurrent` | int | 100 | Maximum concurrent connections |
+| `include_ai_recommendations` | bool | **true** | When `false`, skips the Groq AI remediation call entirely (no cache lookup, no network request). Ports will have no `recommendation` fields set and `recommendations_error` will be `null`. |
+| `include_threat_intel` | bool | **true** | When `false`, skips AbuseIPDB and Spamhaus checks entirely. `threat_intelligence.reputation` will be `"Not checked"`. Exposure scoring still runs using a placeholder value. |
 | **AI** | `/api/ai/chat` | POST | Chat with scan/tool context |
 | | `/api/ai/analyze` | POST | Auto-generate security report |
 | **Reports** | `/api/reports/{id}` | GET | Export as JSON / CSV / PDF |

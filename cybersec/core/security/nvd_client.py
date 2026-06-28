@@ -2,6 +2,7 @@
 NVD API 2.0 Client with rate limiting and caching.
 """
 import asyncio
+import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
 from cybersec.config.settings import settings
-from cybersec.database.models import NVDCveCache
+from cybersec.database.models import NVDCveCache, NVDServiceLookupCache
 
 logger = logging.getLogger(__name__)
 
@@ -231,49 +232,62 @@ class NVDClient:
     ) -> List[CVEResult]:
         """
         Look up CVEs for a detected service.
-        
-        This method combines keyword search with filtering and caching.
+
+        Checks NVDServiceLookupCache first when db_session is provided; on a
+        miss it queries NVD and stores the result. Falls back to a live lookup
+        on any cache error so a DB outage never breaks the port scan.
         """
         # Skip unknown and overly generic services
         if not service_name or service_name.lower() in ["unknown", "", "http", "http-alt", "https"]:
-            # For generic HTTP services, only do CVE lookup if we have a version
             if service_name.lower() in ["http", "http-alt", "https"] and not service_version:
                 return []
             elif service_name.lower() in ["unknown", ""]:
                 return []
-        
-        # Build search keyword
+
+        # --- cache read ---
+        if db_session is not None:
+            try:
+                cache_manager = NVDCacheManager(db_session)
+                cached = await cache_manager.get_cached_service_lookup(service_name, service_version)
+                if cached is not None:
+                    return cached
+            except Exception as e:
+                logger.warning("NVD service-lookup cache read failed, proceeding with live lookup: %s", e)
+
+        # --- live NVD query ---
         keyword = f"{service_name} {service_version}".strip()
-        
-        # Search NVD
         cves = await self.search_cves_by_keyword(keyword, max_results=50)
-        
+
         # Filter by CVSS score and recency
         min_score = settings.NVD_MIN_CVSS_SCORE
-        min_date = datetime.now() - timedelta(days=365 * 10)  # 10 years ago
+        min_date = datetime.now() - timedelta(days=365 * 10)
         filtered_cves = []
         for cve in cves:
             score = cve.cvss_v3_score or cve.cvss_v2_score or 0.0
             if score >= min_score:
-                # Filter out very old CVEs (unless they have very high CVSS)
                 try:
                     published_date = datetime.fromisoformat(cve.published.replace('Z', '+00:00'))
-                    if published_date >= min_date or score >= 9.0:  # Keep critical CVEs regardless of age
+                    if published_date >= min_date or score >= 9.0:
                         filtered_cves.append(cve)
                 except (ValueError, AttributeError):
-                    # If date parsing fails, include if high score
                     if score >= 7.0:
                         filtered_cves.append(cve)
-        
-        # Sort by CVSS v3 score (highest first), fallback to v2
+
         filtered_cves.sort(
             key=lambda x: (x.cvss_v3_score or x.cvss_v2_score or 0.0),
             reverse=True
         )
-        
-        # Cap results
-        max_results = settings.NVD_MAX_RESULTS_PER_SERVICE
-        return filtered_cves[:max_results]
+        result = filtered_cves[:settings.NVD_MAX_RESULTS_PER_SERVICE]
+
+        # --- cache write ---
+        if db_session is not None:
+            try:
+                cache_manager = NVDCacheManager(db_session)
+                await cache_manager.cache_service_lookup(service_name, service_version, result)
+            except Exception as e:
+                logger.warning("NVD service-lookup cache write failed: %s", e)
+
+        return result
 
 
 class NVDCacheManager:
@@ -339,6 +353,69 @@ class NVDCacheManager:
         except Exception as e:
             logger.error(f"Cache set failed for {cve_result.cve_id}: {e}")
             await self.db_session.rollback()
+
+    @staticmethod
+    def _service_cache_key(service_name: str, service_version: str) -> str:
+        return hashlib.sha256(f"{service_name}:{service_version}".encode()).hexdigest()
+
+    async def get_cached_service_lookup(
+        self, service_name: str, service_version: str
+    ) -> Optional[List[CVEResult]]:
+        """Return cached service-lookup results, or None if missing/expired."""
+        key = self._service_cache_key(service_name, service_version)
+        result = await self.db_session.execute(
+            select(NVDServiceLookupCache).where(
+                NVDServiceLookupCache.cache_key == key,
+                NVDServiceLookupCache.expires_at > datetime.utcnow(),
+            )
+        )
+        entry = result.scalar_one_or_none()
+        if entry is None:
+            return None
+        return [CVEResult(**row) for row in entry.results]
+
+    async def cache_service_lookup(
+        self, service_name: str, service_version: str, results: List[CVEResult]
+    ) -> None:
+        """Upsert a service-lookup result list into the cache."""
+        key = self._service_cache_key(service_name, service_version)
+        expires_at = datetime.utcnow() + timedelta(hours=settings.NVD_CACHE_TTL_HOURS)
+        rows = [
+            {
+                "cve_id": r.cve_id,
+                "description": r.description,
+                "published": r.published,
+                "last_modified": r.last_modified,
+                "vuln_status": r.vuln_status,
+                "cvss_v3_score": r.cvss_v3_score,
+                "cvss_v3_severity": r.cvss_v3_severity,
+                "cvss_v2_score": r.cvss_v2_score,
+                "cvss_v3_vector": r.cvss_v3_vector,
+                "references": r.references,
+                "source": r.source,
+            }
+            for r in results
+        ]
+        # Fetch existing row to decide insert vs update
+        existing = await self.db_session.execute(
+            select(NVDServiceLookupCache).where(NVDServiceLookupCache.cache_key == key)
+        )
+        entry = existing.scalar_one_or_none()
+        if entry is None:
+            entry = NVDServiceLookupCache(
+                cache_key=key,
+                service_name=service_name,
+                service_version=service_version,
+                results=rows,
+                fetched_at=datetime.utcnow(),
+                expires_at=expires_at,
+            )
+            self.db_session.add(entry)
+        else:
+            entry.results = rows
+            entry.fetched_at = datetime.utcnow()
+            entry.expires_at = expires_at
+        await self.db_session.commit()
 
 
 class EnhancedCVELookup:

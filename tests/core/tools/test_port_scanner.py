@@ -452,3 +452,236 @@ async def test_ssl_audit_called_once_per_https_port_multiple_ports():
     assert ssl_mock.call_count == 2, (
         f"Expected 2 ssl_audit calls (one per HTTPS port), got {ssl_mock.call_count}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Shared helper for flag tests
+# ---------------------------------------------------------------------------
+
+def _base_patches_for_flags(open_port):
+    """Minimal patches to make scan_ports() complete without real network I/O."""
+    async def _fake_check_port(ip, port, timeout, hostname=None):
+        return open_port if port == open_port.port_number else None
+
+    return {
+        "check_port": AsyncMock(side_effect=_fake_check_port),
+        "detect_cves_batch": AsyncMock(return_value={}),
+        "detect_misconfigurations": AsyncMock(return_value=_dummy_misconfiguration_summary()),
+        "capture_web_port_screenshots": AsyncMock(return_value=None),
+        "calculate_security_score": AsyncMock(return_value=(80, [])),
+        "calculate_exposure_severity": MagicMock(return_value=_dummy_exposure_summary()),
+        "build_attack_path_visualization": MagicMock(return_value=_dummy_attack_paths()),
+        "build_attack_simulation_recommendations": MagicMock(return_value=[]),
+        "calculate_attack_surface": MagicMock(return_value=_dummy_attack_surface()),
+        "add_mitre_attack_mapping": MagicMock(),
+        "add_exploit_availability": MagicMock(),
+        "add_service_fingerprints": MagicMock(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Test 6: include_ai_recommendations=False — groq never called
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_include_ai_recommendations_false():
+    """
+    When include_ai_recommendations=False the Groq client must never be called,
+    recommendations_error must be None, and no port should have a recommendation.
+    """
+    open_port = _make_open_port(80, service="http", version="Apache/2.4.51")
+    patches = _base_patches_for_flags(open_port)
+
+    groq_chat_mock = AsyncMock(return_value='{"recommendations": []}')
+    threat_intel_mock = AsyncMock(return_value=_dummy_threat_intel())
+
+    with (
+        patch("cybersec.core.tools.port_scanner.check_port", patches["check_port"]),
+        patch("asyncio.get_running_loop") as mock_loop,
+        patch("cybersec.core.tools.port_scanner.detect_cves_batch", patches["detect_cves_batch"]),
+        patch("cybersec.core.tools.port_scanner.detect_misconfigurations", patches["detect_misconfigurations"]),
+        patch("cybersec.core.tools.port_scanner.capture_web_port_screenshots", patches["capture_web_port_screenshots"]),
+        patch("cybersec.core.tools.port_scanner.check_threat_intelligence", threat_intel_mock),
+        patch("cybersec.core.tools.port_scanner.ssl_audit", AsyncMock(side_effect=lambda h, p: _dummy_ssl_result(p))),
+        patch("cybersec.core.tools.port_scanner.calculate_security_score", patches["calculate_security_score"]),
+        patch("cybersec.core.tools.port_scanner.calculate_exposure_severity", patches["calculate_exposure_severity"]),
+        patch("cybersec.core.tools.port_scanner.build_attack_path_visualization", patches["build_attack_path_visualization"]),
+        patch("cybersec.core.tools.port_scanner.build_attack_simulation_recommendations", patches["build_attack_simulation_recommendations"]),
+        patch("cybersec.core.tools.port_scanner.calculate_attack_surface", patches["calculate_attack_surface"]),
+        patch("cybersec.core.tools.port_scanner.add_mitre_attack_mapping", patches["add_mitre_attack_mapping"]),
+        patch("cybersec.core.tools.port_scanner.add_exploit_availability", patches["add_exploit_availability"]),
+        patch("cybersec.core.tools.port_scanner.add_service_fingerprints", patches["add_service_fingerprints"]),
+    ):
+        # Patch groq_client inside the module namespace
+        groq_mock = MagicMock()
+        groq_mock.chat = groq_chat_mock
+        with patch.dict("sys.modules", {"cybersec.integrations.ai.groq_client": MagicMock(groq_client=groq_mock)}):
+            loop_mock = MagicMock()
+            loop_mock.getaddrinfo = AsyncMock(return_value=[(None, None, None, None, ("1.2.3.4", 0))])
+            mock_loop.return_value = loop_mock
+
+            result = await scan_ports(
+                "example.com",
+                ports=[80],
+                timeout=2.0,
+                include_ai_recommendations=False,
+            )
+
+    groq_chat_mock.assert_not_called()
+    assert result.recommendations_error is None
+    for port in result.open_ports:
+        assert port.recommendation is None
+
+
+# ---------------------------------------------------------------------------
+# Test 7: include_threat_intel=False — AbuseIPDB/Spamhaus never called
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_include_threat_intel_false():
+    """
+    When include_threat_intel=False neither AbuseIPDB nor Spamhaus must be
+    contacted and threat_intelligence.reputation must be 'Not checked'.
+    """
+    open_port = _make_open_port(80, service="http")
+    patches = _base_patches_for_flags(open_port)
+
+    abuseipdb_mock = AsyncMock()
+    spamhaus_mock = AsyncMock()
+
+    with (
+        patch("cybersec.core.tools.port_scanner.check_port", patches["check_port"]),
+        patch("asyncio.get_running_loop") as mock_loop,
+        patch("cybersec.core.tools.port_scanner.detect_cves_batch", patches["detect_cves_batch"]),
+        patch("cybersec.core.tools.port_scanner.detect_misconfigurations", patches["detect_misconfigurations"]),
+        patch("cybersec.core.tools.port_scanner.capture_web_port_screenshots", patches["capture_web_port_screenshots"]),
+        patch("cybersec.core.tools.port_scanner._abuseipdb_check", abuseipdb_mock),
+        patch("cybersec.core.tools.port_scanner._spamhaus_check", spamhaus_mock),
+        patch("cybersec.core.tools.port_scanner.ssl_audit", AsyncMock(side_effect=lambda h, p: _dummy_ssl_result(p))),
+        patch("cybersec.core.tools.port_scanner.add_ai_recommendations", AsyncMock(return_value=None)),
+        patch("cybersec.core.tools.port_scanner.calculate_security_score", patches["calculate_security_score"]),
+        patch("cybersec.core.tools.port_scanner.calculate_exposure_severity", patches["calculate_exposure_severity"]),
+        patch("cybersec.core.tools.port_scanner.build_attack_path_visualization", patches["build_attack_path_visualization"]),
+        patch("cybersec.core.tools.port_scanner.build_attack_simulation_recommendations", patches["build_attack_simulation_recommendations"]),
+        patch("cybersec.core.tools.port_scanner.calculate_attack_surface", patches["calculate_attack_surface"]),
+        patch("cybersec.core.tools.port_scanner.add_mitre_attack_mapping", patches["add_mitre_attack_mapping"]),
+        patch("cybersec.core.tools.port_scanner.add_exploit_availability", patches["add_exploit_availability"]),
+        patch("cybersec.core.tools.port_scanner.add_service_fingerprints", patches["add_service_fingerprints"]),
+    ):
+        loop_mock = MagicMock()
+        loop_mock.getaddrinfo = AsyncMock(return_value=[(None, None, None, None, ("1.2.3.4", 0))])
+        mock_loop.return_value = loop_mock
+
+        result = await scan_ports(
+            "example.com",
+            ports=[80],
+            timeout=2.0,
+            include_threat_intel=False,
+        )
+
+    abuseipdb_mock.assert_not_called()
+    spamhaus_mock.assert_not_called()
+    assert result.threat_intelligence.get("reputation") == "Not checked"
+
+
+# ---------------------------------------------------------------------------
+# Test 8: both flags True (default) — existing behavior unchanged
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_both_flags_true_default_behavior():
+    """
+    With both flags True (the default), add_ai_recommendations and
+    check_threat_intelligence are still called as normal.
+    """
+    open_port = _make_open_port(80, service="http", version="nginx/1.21.0")
+    patches = _base_patches_for_flags(open_port)
+
+    ai_mock = AsyncMock(return_value=None)
+    threat_intel_mock = AsyncMock(return_value=_dummy_threat_intel())
+
+    with (
+        patch("cybersec.core.tools.port_scanner.check_port", patches["check_port"]),
+        patch("asyncio.get_running_loop") as mock_loop,
+        patch("cybersec.core.tools.port_scanner.detect_cves_batch", patches["detect_cves_batch"]),
+        patch("cybersec.core.tools.port_scanner.detect_misconfigurations", patches["detect_misconfigurations"]),
+        patch("cybersec.core.tools.port_scanner.capture_web_port_screenshots", patches["capture_web_port_screenshots"]),
+        patch("cybersec.core.tools.port_scanner.check_threat_intelligence", threat_intel_mock),
+        patch("cybersec.core.tools.port_scanner.add_ai_recommendations", ai_mock),
+        patch("cybersec.core.tools.port_scanner.ssl_audit", AsyncMock(side_effect=lambda h, p: _dummy_ssl_result(p))),
+        patch("cybersec.core.tools.port_scanner.calculate_security_score", patches["calculate_security_score"]),
+        patch("cybersec.core.tools.port_scanner.calculate_exposure_severity", patches["calculate_exposure_severity"]),
+        patch("cybersec.core.tools.port_scanner.build_attack_path_visualization", patches["build_attack_path_visualization"]),
+        patch("cybersec.core.tools.port_scanner.build_attack_simulation_recommendations", patches["build_attack_simulation_recommendations"]),
+        patch("cybersec.core.tools.port_scanner.calculate_attack_surface", patches["calculate_attack_surface"]),
+        patch("cybersec.core.tools.port_scanner.add_mitre_attack_mapping", patches["add_mitre_attack_mapping"]),
+        patch("cybersec.core.tools.port_scanner.add_exploit_availability", patches["add_exploit_availability"]),
+        patch("cybersec.core.tools.port_scanner.add_service_fingerprints", patches["add_service_fingerprints"]),
+    ):
+        loop_mock = MagicMock()
+        loop_mock.getaddrinfo = AsyncMock(return_value=[(None, None, None, None, ("1.2.3.4", 0))])
+        mock_loop.return_value = loop_mock
+
+        result = await scan_ports(
+            "example.com",
+            ports=[80],
+            timeout=2.0,
+            # defaults: include_ai_recommendations=True, include_threat_intel=True
+        )
+
+    ai_mock.assert_called_once()
+    threat_intel_mock.assert_called_once()
+    assert result.error is None
+
+
+# ---------------------------------------------------------------------------
+# Test 9: both flags False — completes successfully, neither service called
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_both_flags_false_neither_service_called():
+    """
+    With both flags False, scan_ports() returns successfully without calling
+    add_ai_recommendations or check_threat_intelligence at all.
+    """
+    open_port = _make_open_port(80, service="http")
+    patches = _base_patches_for_flags(open_port)
+
+    ai_mock = AsyncMock(return_value=None)
+    threat_intel_mock = AsyncMock(return_value=_dummy_threat_intel())
+
+    with (
+        patch("cybersec.core.tools.port_scanner.check_port", patches["check_port"]),
+        patch("asyncio.get_running_loop") as mock_loop,
+        patch("cybersec.core.tools.port_scanner.detect_cves_batch", patches["detect_cves_batch"]),
+        patch("cybersec.core.tools.port_scanner.detect_misconfigurations", patches["detect_misconfigurations"]),
+        patch("cybersec.core.tools.port_scanner.capture_web_port_screenshots", patches["capture_web_port_screenshots"]),
+        patch("cybersec.core.tools.port_scanner.check_threat_intelligence", threat_intel_mock),
+        patch("cybersec.core.tools.port_scanner.add_ai_recommendations", ai_mock),
+        patch("cybersec.core.tools.port_scanner.ssl_audit", AsyncMock(side_effect=lambda h, p: _dummy_ssl_result(p))),
+        patch("cybersec.core.tools.port_scanner.calculate_security_score", patches["calculate_security_score"]),
+        patch("cybersec.core.tools.port_scanner.calculate_exposure_severity", patches["calculate_exposure_severity"]),
+        patch("cybersec.core.tools.port_scanner.build_attack_path_visualization", patches["build_attack_path_visualization"]),
+        patch("cybersec.core.tools.port_scanner.build_attack_simulation_recommendations", patches["build_attack_simulation_recommendations"]),
+        patch("cybersec.core.tools.port_scanner.calculate_attack_surface", patches["calculate_attack_surface"]),
+        patch("cybersec.core.tools.port_scanner.add_mitre_attack_mapping", patches["add_mitre_attack_mapping"]),
+        patch("cybersec.core.tools.port_scanner.add_exploit_availability", patches["add_exploit_availability"]),
+        patch("cybersec.core.tools.port_scanner.add_service_fingerprints", patches["add_service_fingerprints"]),
+    ):
+        loop_mock = MagicMock()
+        loop_mock.getaddrinfo = AsyncMock(return_value=[(None, None, None, None, ("1.2.3.4", 0))])
+        mock_loop.return_value = loop_mock
+
+        result = await scan_ports(
+            "example.com",
+            ports=[80],
+            timeout=2.0,
+            include_ai_recommendations=False,
+            include_threat_intel=False,
+        )
+
+    ai_mock.assert_not_called()
+    threat_intel_mock.assert_not_called()
+    assert result.error is None
+    assert result.recommendations_error is None
+    assert result.threat_intelligence.get("reputation") == "Not checked"

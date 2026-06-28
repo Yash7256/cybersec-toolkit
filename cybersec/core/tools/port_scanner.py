@@ -2092,6 +2092,8 @@ async def scan_ports(
     max_concurrent: int = 100,
     allow_private: bool = False,
     db_session: Optional[AsyncSession] = None,
+    include_ai_recommendations: bool = True,
+    include_threat_intel: bool = True,
 ) -> PortScanResult:
     """
     Scan multiple ports on a target host concurrently.
@@ -2265,11 +2267,19 @@ async def scan_ports(
             return {}
         return await detect_cves_batch(version_strings, db_session)
 
+    async def _empty_threat_intel_coro():
+        return _empty_threat_intel(ip, "Not checked", "Threat intelligence check was skipped for this scan.")
+
+    _threat_intel_coro = (
+        check_threat_intelligence(ip)
+        if include_threat_intel
+        else _empty_threat_intel_coro()
+    )
     cve_results, misconfiguration_summary, _, threat_intelligence = await asyncio.gather(
         _run_cves(),
         detect_misconfigurations(target, open_ports, timeout, ssl_cache),
         capture_web_port_screenshots(target, open_ports),
-        check_threat_intelligence(ip),
+        _threat_intel_coro,
     )
 
     # Attach CVE results to ports (must happen before add_exploit_availability).
@@ -2299,8 +2309,8 @@ async def scan_ports(
     add_mitre_attack_mapping(open_ports)
     security_score, security_score_factors = await calculate_security_score(target, open_ports, ssl_cache)
     attack_surface = calculate_attack_surface(open_ports)
-    recommendations_error = await add_ai_recommendations(target, open_ports)
-    
+    recommendations_error = await add_ai_recommendations(target, open_ports) if include_ai_recommendations else None
+
     return PortScanResult(
         target=target,
         total_scanned=len(ports),
@@ -2330,6 +2340,8 @@ async def stream_port_scan_events(
     max_concurrent: int = 100,
     allow_private: bool = False,
     db_session: Optional[AsyncSession] = None,
+    include_ai_recommendations: bool = True,
+    include_threat_intel: bool = True,
 ):
     """Yield port scan events as individual port checks complete."""
     start_time = time.time()
@@ -2438,11 +2450,19 @@ async def stream_port_scan_events(
             return {}
         return await detect_cves_batch(version_strings, db_session)
 
+    async def _empty_threat_intel_coro():
+        return _empty_threat_intel(ip, "Not checked", "Threat intelligence check was skipped for this scan.")
+
+    _threat_intel_coro = (
+        check_threat_intelligence(ip)
+        if include_threat_intel
+        else _empty_threat_intel_coro()
+    )
     cve_results, misconfiguration_summary, _, threat_intelligence = await asyncio.gather(
         _run_cves(),
         detect_misconfigurations(target, open_ports, timeout, ssl_cache),
         capture_web_port_screenshots(target, open_ports),
-        check_threat_intelligence(ip),
+        _threat_intel_coro,
     )
 
     # Attach CVE results to ports (must happen before add_exploit_availability).
@@ -2472,7 +2492,7 @@ async def stream_port_scan_events(
     add_mitre_attack_mapping(open_ports)
     security_score, security_score_factors = await calculate_security_score(target, open_ports, ssl_cache)
     attack_surface = calculate_attack_surface(open_ports)
-    recommendations_error = await add_ai_recommendations(target, open_ports)
+    recommendations_error = await add_ai_recommendations(target, open_ports) if include_ai_recommendations else None
     all_technologies = merge_technologies(*(p.technologies for p in open_ports))
 
     result = PortScanResult(
@@ -2506,6 +2526,8 @@ async def scan_port_range(
     max_concurrent: int = 100,
     allow_private: bool = False,
     db_session: Optional[AsyncSession] = None,
+    include_ai_recommendations: bool = True,
+    include_threat_intel: bool = True,
 ) -> PortScanResult:
     """
     Scan a range of ports on a target host.
@@ -2518,6 +2540,8 @@ async def scan_port_range(
         max_concurrent: Maximum concurrent connections
         allow_private: Bypass private-IP check (authenticated callers only)
         db_session: Optional AsyncSession for NVD CVE cache (pass from route layer)
+        include_ai_recommendations: When False, skip Groq AI recommendations entirely.
+        include_threat_intel: When False, skip AbuseIPDB/Spamhaus checks entirely.
     
     Returns:
         PortScanResult with scan details
@@ -2526,4 +2550,6 @@ async def scan_port_range(
     return await scan_ports(
         target, ports, timeout, max_concurrent,
         allow_private=allow_private, db_session=db_session,
+        include_ai_recommendations=include_ai_recommendations,
+        include_threat_intel=include_threat_intel,
     )

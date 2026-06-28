@@ -84,4 +84,17 @@ class NVDCveCache(Base):
     fetched_at = Column(TIMESTAMP(timezone=True), nullable=False)
     expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
 
+
+class NVDServiceLookupCache(Base):
+    """Cache for NVDClient.lookup_cves_for_service() results keyed by service/version pair."""
+    __tablename__ = "nvd_service_lookup_cache"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cache_key = Column(String(64), unique=True, nullable=False, index=True)  # sha256 hex
+    service_name = Column(String(255), nullable=False)
+    service_version = Column(String(255), nullable=False)
+    results = Column(JSONB, nullable=False)  # list of CVEResult dicts
+    fetched_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
+
 # TODO: implement relationships and other columns if needed
