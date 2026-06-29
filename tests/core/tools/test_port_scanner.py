@@ -123,7 +123,7 @@ def _common_patches(
         await asyncio.sleep(cve_delay)
         return {}
 
-    async def _slow_misconfig(target, ports, timeout, ssl_cache=None):
+    async def _slow_misconfig(target, ports, timeout, ssl_cache=None, allow_private=False):
         await asyncio.sleep(misconfig_delay)
         return _dummy_misconfiguration_summary()
 
@@ -299,7 +299,7 @@ async def test_ssl_audit_called_once_per_https_port_scan_ports():
 
     # detect_misconfigurations and calculate_security_score must receive the
     # cache and NOT call ssl_audit themselves — we verify via ssl_mock.call_count.
-    async def _real_detect_misconfigs(target, ports, timeout, ssl_cache=None):
+    async def _real_detect_misconfigs(target, ports, timeout, ssl_cache=None, allow_private=False):
         # Simulate what the real function does: use the cache if provided.
         # We should NOT call ssl_audit here because ssl_cache is provided.
         assert ssl_cache is not None, "ssl_cache should be passed to detect_misconfigurations"
@@ -338,7 +338,7 @@ async def test_ssl_audit_called_once_per_https_port_scan_ports():
     assert ssl_mock.call_count == 1, (
         f"ssl_audit should be called exactly once for port 443, got {ssl_mock.call_count} call(s)"
     )
-    assert ssl_mock.call_args == call("example.com", 443)
+    assert ssl_mock.call_args == call("example.com", 443, allow_private=False)
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +359,7 @@ async def test_ssl_audit_called_once_per_https_port_stream():
             return https_port
         return None
 
-    async def _real_detect_misconfigs(target, ports, timeout, ssl_cache=None):
+    async def _real_detect_misconfigs(target, ports, timeout, ssl_cache=None, allow_private=False):
         assert ssl_cache is not None, "ssl_cache should be passed to detect_misconfigurations"
         return _dummy_misconfiguration_summary()
 
@@ -397,7 +397,7 @@ async def test_ssl_audit_called_once_per_https_port_stream():
     assert ssl_mock.call_count == 1, (
         f"ssl_audit should be called exactly once for port 443, got {ssl_mock.call_count} call(s)"
     )
-    assert ssl_mock.call_args == call("example.com", 443)
+    assert ssl_mock.call_args == call("example.com", 443, allow_private=False)
 
 
 # ---------------------------------------------------------------------------
@@ -685,3 +685,104 @@ async def test_both_flags_false_neither_service_called():
     assert result.error is None
     assert result.recommendations_error is None
     assert result.threat_intelligence.get("reputation") == "Not checked"
+
+
+# ---------------------------------------------------------------------------
+# Regression Test: allow_private threaded through ssl_audit in scan_ports
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_scan_ports_allow_private_passed_to_ssl_audit():
+    """
+    When scan_ports() is called with allow_private=True against a private-IP
+    target, ssl_audit must be called with allow_private=True so that the TLS
+    audit step doesn't falsely reject the private target.
+
+    Regression for: ssl_audit(host, port) always defaulting to allow_private=False
+    inside scan_ports/stream_port_scan_events, causing the TLS-audit step to
+    error for legitimate internal scans even after the SSRF guard was bypassed.
+    """
+    https_port = _make_open_port(443, service="https")
+    ssl_mock = AsyncMock(return_value=_dummy_ssl_result(443))
+
+    async def _fake_check_port(ip, port, timeout, hostname=None):
+        return https_port if port == 443 else None
+
+    with (
+        patch("cybersec.core.tools.port_scanner.check_port", side_effect=_fake_check_port),
+        patch("asyncio.get_running_loop") as mock_loop,
+        patch("cybersec.core.tools.port_scanner.ssl_audit", ssl_mock),
+        patch("cybersec.core.tools.port_scanner.detect_cves_batch", AsyncMock(return_value={})),
+        patch("cybersec.core.tools.port_scanner.detect_misconfigurations", AsyncMock(return_value=_dummy_misconfiguration_summary())),
+        patch("cybersec.core.tools.port_scanner.capture_web_port_screenshots", AsyncMock(return_value=None)),
+        patch("cybersec.core.tools.port_scanner.check_threat_intelligence", AsyncMock(return_value=_dummy_threat_intel())),
+        patch("cybersec.core.tools.port_scanner.add_ai_recommendations", AsyncMock(return_value=None)),
+        patch("cybersec.core.tools.port_scanner.calculate_security_score", AsyncMock(return_value=(80, []))),
+        patch("cybersec.core.tools.port_scanner.calculate_exposure_severity", MagicMock(return_value=_dummy_exposure_summary())),
+        patch("cybersec.core.tools.port_scanner.build_attack_path_visualization", MagicMock(return_value=_dummy_attack_paths())),
+        patch("cybersec.core.tools.port_scanner.build_attack_simulation_recommendations", MagicMock(return_value=[])),
+        patch("cybersec.core.tools.port_scanner.calculate_attack_surface", MagicMock(return_value=_dummy_attack_surface())),
+        patch("cybersec.core.tools.port_scanner.add_mitre_attack_mapping", MagicMock()),
+        patch("cybersec.core.tools.port_scanner.add_exploit_availability", MagicMock()),
+        patch("cybersec.core.tools.port_scanner.add_service_fingerprints", MagicMock()),
+    ):
+        # Simulate a private target IP that is allowed via allow_private=True
+        loop_mock = MagicMock()
+        loop_mock.getaddrinfo = AsyncMock(return_value=[(None, None, None, None, ("192.168.1.10", 0))])
+        mock_loop.return_value = loop_mock
+
+        result = await scan_ports("internal.corp", ports=[443], timeout=2.0, allow_private=True)
+
+    assert result.error is None
+    assert ssl_mock.call_count == 1
+    # The critical assertion: allow_private=True must be threaded through
+    _, kwargs = ssl_mock.call_args
+    assert kwargs.get("allow_private") is True, (
+        f"ssl_audit was called without allow_private=True: {ssl_mock.call_args}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_stream_port_scan_allow_private_passed_to_ssl_audit():
+    """
+    Same regression test for stream_port_scan_events: ssl_audit must receive
+    allow_private=True when the stream scan is called with allow_private=True.
+    """
+    https_port = _make_open_port(443, service="https")
+    ssl_mock = AsyncMock(return_value=_dummy_ssl_result(443))
+
+    async def _fake_check_port(ip, port, timeout, hostname=None):
+        return https_port if port == 443 else None
+
+    with (
+        patch("cybersec.core.tools.port_scanner.check_port", side_effect=_fake_check_port),
+        patch("asyncio.get_running_loop") as mock_loop,
+        patch("cybersec.core.tools.port_scanner.ssl_audit", ssl_mock),
+        patch("cybersec.core.tools.port_scanner.detect_cves_batch", AsyncMock(return_value={})),
+        patch("cybersec.core.tools.port_scanner.detect_misconfigurations", AsyncMock(return_value=_dummy_misconfiguration_summary())),
+        patch("cybersec.core.tools.port_scanner.capture_web_port_screenshots", AsyncMock(return_value=None)),
+        patch("cybersec.core.tools.port_scanner.check_threat_intelligence", AsyncMock(return_value=_dummy_threat_intel())),
+        patch("cybersec.core.tools.port_scanner.add_ai_recommendations", AsyncMock(return_value=None)),
+        patch("cybersec.core.tools.port_scanner.calculate_security_score", AsyncMock(return_value=(80, []))),
+        patch("cybersec.core.tools.port_scanner.calculate_exposure_severity", MagicMock(return_value=_dummy_exposure_summary())),
+        patch("cybersec.core.tools.port_scanner.build_attack_path_visualization", MagicMock(return_value=_dummy_attack_paths())),
+        patch("cybersec.core.tools.port_scanner.build_attack_simulation_recommendations", MagicMock(return_value=[])),
+        patch("cybersec.core.tools.port_scanner.calculate_attack_surface", MagicMock(return_value=_dummy_attack_surface())),
+        patch("cybersec.core.tools.port_scanner.add_mitre_attack_mapping", MagicMock()),
+        patch("cybersec.core.tools.port_scanner.add_exploit_availability", MagicMock()),
+        patch("cybersec.core.tools.port_scanner.add_service_fingerprints", MagicMock()),
+    ):
+        loop_mock = MagicMock()
+        loop_mock.getaddrinfo = AsyncMock(return_value=[(None, None, None, None, ("192.168.1.10", 0))])
+        mock_loop.return_value = loop_mock
+
+        events = []
+        async for event in stream_port_scan_events("internal.corp", ports=[443], timeout=2.0, allow_private=True):
+            events.append(event)
+
+    assert any(e["type"] == "done" for e in events)
+    assert ssl_mock.call_count == 1
+    _, kwargs = ssl_mock.call_args
+    assert kwargs.get("allow_private") is True, (
+        f"ssl_audit was called without allow_private=True in stream: {ssl_mock.call_args}"
+    )

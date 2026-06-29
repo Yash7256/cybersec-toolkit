@@ -1,3 +1,4 @@
+import asyncio
 import time
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
@@ -556,14 +557,14 @@ def _empty_result(target: str, url: str, error: str) -> "HTTPHeadersResult":
     )
 
 
-def _resolve_host(url: str) -> str | None:
+async def _resolve_host(url: str) -> str | None:
     """Return the resolved IP string for the host in *url*, or None on failure."""
-    import socket
     host = urlparse(url).hostname
     if not host:
         return None
     try:
-        return socket.getaddrinfo(host, None)[0][4][0]
+        addrinfo = await asyncio.get_event_loop().getaddrinfo(host, None)
+        return addrinfo[0][4][0]
     except OSError:
         return None
 
@@ -575,7 +576,7 @@ async def check_http_headers(target: str, path: str = "/", allow_private: bool =
     # --- SSRF guard: resolve the initial target and block private/loopback/metadata ---
     if not allow_private:
         from cybersec.core.tools.port_scanner import _is_scan_target_allowed  # lazy import
-        ip = _resolve_host(url)
+        ip = await _resolve_host(url)
         if ip is None or not _is_scan_target_allowed(ip):
             return _empty_result(
                 target, url,
@@ -617,7 +618,7 @@ async def check_http_headers(target: str, path: str = "/", allow_private: bool =
                 next_url = location if location.startswith(("http://", "https://")) else str(httpx.URL(current_url).copy_with(path=location))
                 # SSRF re-validation on each hop
                 if not allow_private:
-                    hop_ip = _resolve_host(next_url)
+                    hop_ip = await _resolve_host(next_url)
                     if hop_ip is None or not _is_scan_target_allowed(hop_ip):
                         return _empty_result(
                             target, url,

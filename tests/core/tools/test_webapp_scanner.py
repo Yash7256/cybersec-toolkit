@@ -252,3 +252,121 @@ class TestCrawlRedirectSsrfGuard:
         assert private_fetches == [], (
             f"Private URL was fetched: {private_fetches} — redirect SSRF guard failed"
         )
+
+
+# ---------------------------------------------------------------------------
+# Regression Tests: allow_private threading and async resolver
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+class TestCheckTlsAllowPrivate:
+
+    async def test_check_tls_passes_allow_private_to_ssl_audit(self):
+        """
+        check_tls(base_url, allow_private=True) must pass allow_private=True to
+        ssl_audit so private HTTPS targets aren't blocked during internal scans.
+
+        Regression: check_tls() previously called ssl_audit(host, port) with no
+        allow_private argument, causing it to always default to False.
+        """
+        from unittest.mock import AsyncMock, patch
+        from cybersec.core.tools.ssl import SSLResult
+
+        dummy_result = SSLResult(
+            host="192.168.1.10", port=443,
+            tls_version="TLSv1.3", cipher_suite="TLS_AES_256_GCM_SHA384",
+            cert=None, is_self_signed=False,
+            supports_tls12=True, supports_tls13=True, error=None,
+        )
+        ssl_mock = AsyncMock(return_value=dummy_result)
+
+        scanner = WebAppScanner()
+        # ssl_audit is imported locally inside check_tls — patch at source
+        with patch("cybersec.core.tools.ssl.ssl_audit", ssl_mock):
+            vulns = await scanner.check_tls("https://192.168.1.10/", allow_private=True)
+
+        assert ssl_mock.call_count == 1
+        _, kwargs = ssl_mock.call_args
+        assert kwargs.get("allow_private") is True, (
+            f"ssl_audit was not called with allow_private=True: {ssl_mock.call_args}"
+        )
+        assert not any(v.vuln_type == "TLS_ERROR" for v in vulns)
+
+    async def test_check_tls_default_allow_private_false(self):
+        """check_tls with default allow_private (False) passes False to ssl_audit."""
+        from unittest.mock import AsyncMock, patch
+        from cybersec.core.tools.ssl import SSLResult
+
+        dummy_result = SSLResult(
+            host="1.2.3.4", port=443,
+            tls_version="TLSv1.3", cipher_suite="TLS_AES_256_GCM_SHA384",
+            cert=None, is_self_signed=False,
+            supports_tls12=True, supports_tls13=True, error=None,
+        )
+        ssl_mock = AsyncMock(return_value=dummy_result)
+
+        scanner = WebAppScanner()
+        with patch("cybersec.core.tools.ssl.ssl_audit", ssl_mock):
+            await scanner.check_tls("https://1.2.3.4/")
+
+        _, kwargs = ssl_mock.call_args
+        assert kwargs.get("allow_private") is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+class TestResolveIpAsync:
+
+    async def test_resolve_ip_uses_async_getaddrinfo(self):
+        """
+        _resolve_ip must use the async loop.getaddrinfo, not blocking
+        socket.getaddrinfo, so it doesn't block the event loop.
+
+        Regression: _resolve_ip was a @staticmethod using the synchronous
+        socket.getaddrinfo() call.
+        """
+        import inspect
+        from unittest.mock import AsyncMock, patch, MagicMock
+
+        scanner = WebAppScanner()
+
+        # _resolve_ip must be a coroutine function (async method)
+        assert inspect.iscoroutinefunction(scanner._resolve_ip), (
+            "_resolve_ip must be async (coroutinefunction)"
+        )
+
+        loop_mock = MagicMock()
+        loop_mock.getaddrinfo = AsyncMock(
+            return_value=[(None, None, None, None, ("93.184.216.34", 0))]
+        )
+
+        with patch("asyncio.get_event_loop", return_value=loop_mock):
+            result = await scanner._resolve_ip("https://example.com/")
+
+        # The async getaddrinfo was called, not the sync version
+        loop_mock.getaddrinfo.assert_called_once()
+        assert result == "93.184.216.34"
+
+    async def test_resolve_ip_does_not_call_sync_socket_getaddrinfo(self):
+        """socket.getaddrinfo (the blocking version) must NOT be called by _resolve_ip."""
+        import socket as socket_mod
+        from unittest.mock import AsyncMock, patch, MagicMock
+
+        scanner = WebAppScanner()
+
+        loop_mock = MagicMock()
+        loop_mock.getaddrinfo = AsyncMock(
+            return_value=[(None, None, None, None, ("93.184.216.34", 0))]
+        )
+
+        with (
+            patch("asyncio.get_event_loop", return_value=loop_mock),
+            patch.object(socket_mod, "getaddrinfo", side_effect=AssertionError(
+                "Blocking socket.getaddrinfo() was called — must use async version"
+            )),
+        ):
+            # Should not raise even though socket.getaddrinfo is poisoned
+            result = await scanner._resolve_ip("https://example.com/")
+
+        assert result == "93.184.216.34"

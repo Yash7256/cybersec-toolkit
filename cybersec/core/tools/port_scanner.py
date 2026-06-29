@@ -889,11 +889,12 @@ async def _detect_tls_misconfiguration(
     target: str,
     port: OpenPortDetail,
     ssl_cache: dict[int, SSLResult] | None = None,
+    allow_private: bool = False,
 ) -> list[dict]:
     if port.port_number not in HTTPS_PORTS:
         return []
     try:
-        result = ssl_cache[port.port_number] if (ssl_cache and port.port_number in ssl_cache) else await ssl_audit(target, port.port_number)
+        result = ssl_cache[port.port_number] if (ssl_cache and port.port_number in ssl_cache) else await ssl_audit(target, port.port_number, allow_private=allow_private)
     except Exception:
         return [_misconfiguration(
             "weak_ssl",
@@ -1202,6 +1203,7 @@ async def detect_misconfigurations(
     open_ports: list[OpenPortDetail],
     timeout: float,
     ssl_cache: dict[int, SSLResult] | None = None,
+    allow_private: bool = False,
 ) -> dict:
     """Attach best-effort misconfiguration findings to each open port."""
     if not open_ports:
@@ -1212,7 +1214,7 @@ async def detect_misconfigurations(
         if port.port_number in HTTP_PORTS:
             findings.extend(_detect_http_misconfigurations(port))
         if port.port_number in HTTPS_PORTS:
-            findings.extend(await _detect_tls_misconfiguration(target, port, ssl_cache))
+            findings.extend(await _detect_tls_misconfiguration(target, port, ssl_cache, allow_private=allow_private))
         if port.port_number in FTP_PORTS:
             ftp_finding = await _probe_anonymous_ftp(target, port.port_number, min(max(timeout, 2.0), 5.0))
             if ftp_finding:
@@ -2249,7 +2251,7 @@ async def scan_ports(
     https_ports_list = [p for p in open_ports if p.port_number in HTTPS_PORTS]
     if https_ports_list:
         _ssl_results = await asyncio.gather(
-            *(ssl_audit(target, p.port_number) for p in https_ports_list),
+            *(ssl_audit(target, p.port_number, allow_private=allow_private) for p in https_ports_list),
             return_exceptions=True,
         )
         ssl_cache: dict[int, SSLResult] = {
@@ -2281,7 +2283,7 @@ async def scan_ports(
         else _empty_threat_intel_coro()
     )
     _misconfig_coro = (
-        detect_misconfigurations(target, open_ports, timeout, ssl_cache)
+        detect_misconfigurations(target, open_ports, timeout, ssl_cache, allow_private=allow_private)
         if include_misconfigurations
         else _empty_misconfig_coro()
     )
@@ -2447,7 +2449,7 @@ async def stream_port_scan_events(
     https_ports_list = [p for p in open_ports if p.port_number in HTTPS_PORTS]
     if https_ports_list:
         _ssl_results = await asyncio.gather(
-            *(ssl_audit(target, p.port_number) for p in https_ports_list),
+            *(ssl_audit(target, p.port_number, allow_private=allow_private) for p in https_ports_list),
             return_exceptions=True,
         )
         ssl_cache: dict[int, SSLResult] = {
@@ -2479,7 +2481,7 @@ async def stream_port_scan_events(
         else _empty_threat_intel_coro()
     )
     _misconfig_coro = (
-        detect_misconfigurations(target, open_ports, timeout, ssl_cache)
+        detect_misconfigurations(target, open_ports, timeout, ssl_cache, allow_private=allow_private)
         if include_misconfigurations
         else _empty_misconfig_coro()
     )

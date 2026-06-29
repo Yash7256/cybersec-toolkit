@@ -190,3 +190,81 @@ class TestNormalRedirectChain:
 
         assert result.error is None
         assert len(result.redirect_chain) == 1
+
+
+# ---------------------------------------------------------------------------
+# Regression Tests: async resolver
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+class TestResolveHostAsync:
+
+    async def test_resolve_host_uses_async_getaddrinfo(self):
+        """
+        _resolve_host must be an async function that calls
+        loop.getaddrinfo() (the async version) rather than the blocking
+        socket.getaddrinfo().
+
+        Regression: _resolve_host was a synchronous function using
+        socket.getaddrinfo(), which would block the event loop on every
+        request — potentially dozens of times per scan via check_http_headers.
+        """
+        import inspect
+        from cybersec.core.tools.http_headers import _resolve_host
+
+        assert inspect.iscoroutinefunction(_resolve_host), (
+            "_resolve_host must be an async coroutine function"
+        )
+
+    async def test_resolve_host_calls_async_not_sync(self):
+        """
+        Verify that _resolve_host calls the async event-loop getaddrinfo and
+        does NOT call the blocking socket.getaddrinfo.
+        """
+        import socket as socket_mod
+        from unittest.mock import AsyncMock, patch, MagicMock
+        from cybersec.core.tools.http_headers import _resolve_host
+
+        loop_mock = MagicMock()
+        loop_mock.getaddrinfo = AsyncMock(
+            return_value=[(None, None, None, None, ("93.184.216.34", 0))]
+        )
+
+        with (
+            patch("asyncio.get_event_loop", return_value=loop_mock),
+            patch.object(socket_mod, "getaddrinfo", side_effect=AssertionError(
+                "Blocking socket.getaddrinfo() was called — must use async version"
+            )),
+        ):
+            result = await _resolve_host("https://example.com/")
+
+        # Async variant was called; blocking variant would have raised
+        loop_mock.getaddrinfo.assert_called_once()
+        assert result == "93.184.216.34"
+
+    async def test_check_http_headers_resolve_host_is_awaited(self):
+        """
+        check_http_headers uses _resolve_host internally for the SSRF guard.
+        Verify the async loop.getaddrinfo path is taken, not blocking socket.
+        """
+        import socket as socket_mod
+        from unittest.mock import AsyncMock, patch, MagicMock
+
+        loop_mock = MagicMock()
+        loop_mock.getaddrinfo = AsyncMock(
+            return_value=[(None, None, None, None, ("169.254.169.254", 0))]
+        )
+
+        with (
+            patch("asyncio.get_event_loop", return_value=loop_mock),
+            patch.object(socket_mod, "getaddrinfo", side_effect=AssertionError(
+                "Blocking socket.getaddrinfo() was called inside check_http_headers"
+            )),
+        ):
+            # 169.254.169.254 = cloud metadata → should be blocked by SSRF guard
+            result = await check_http_headers("http://169.254.169.254/", allow_private=False)
+
+        # SSRF guard triggered via async path — no blocking socket call
+        assert result.error is not None
+        assert "not permitted" in result.error or "private" in result.error.lower()

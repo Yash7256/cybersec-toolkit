@@ -191,12 +191,13 @@ class WebAppScanner:
     _MAX_REDIRECT_HOPS = 5
 
     @staticmethod
-    def _resolve_ip(url: str) -> str | None:
+    async def _resolve_ip(url: str) -> str | None:
         host = urlparse(url).hostname
         if not host:
             return None
         try:
-            return socket.getaddrinfo(host, None)[0][4][0]
+            addrinfo = await asyncio.get_event_loop().getaddrinfo(host, None)
+            return addrinfo[0][4][0]
         except OSError:
             return None
 
@@ -212,7 +213,7 @@ class WebAppScanner:
         current = url
         for _ in range(self._MAX_REDIRECT_HOPS + 1):
             if not allow_private:
-                ip = self._resolve_ip(current)
+                ip = await self._resolve_ip(current)
                 if ip is None or not _is_scan_target_allowed(ip):
                     return None
             resp = await client.get(current, follow_redirects=False, **kwargs)
@@ -290,7 +291,7 @@ class WebAppScanner:
     # TLS / SSL check (reuses existing ssl_audit)
     # ------------------------------------------------------------------
 
-    async def check_tls(self, base_url: str) -> List[WebAppVulnerability]:
+    async def check_tls(self, base_url: str, allow_private: bool = False) -> List[WebAppVulnerability]:
         vulns: List[WebAppVulnerability] = []
         parsed = urlparse(base_url)
         if parsed.scheme != "https":
@@ -300,7 +301,7 @@ class WebAppScanner:
 
         try:
             from cybersec.core.tools.ssl import ssl_audit
-            r = await ssl_audit(host, port)
+            r = await ssl_audit(host, port, allow_private=allow_private)
         except Exception as exc:
             vulns.append(self._v("TLS_AUDIT_FAILED", INFO, base_url, None,
                 str(exc)[:200], "Verify TLS is properly configured.", "tls"))
@@ -960,7 +961,7 @@ class WebAppScanner:
 
         # SSRF guard: resolve host IP before opening any connection
         if not allow_private:
-            ip = self._resolve_ip(base_url)
+            ip = await self._resolve_ip(base_url)
             if ip is None or not _is_scan_target_allowed(ip):
                 return WebAppScanResult(
                     target=target, base_url=base_url, pages_crawled=0,
@@ -1010,7 +1011,7 @@ class WebAppScanner:
 
                 # Run all passive/non-injection checks concurrently
                 passive = await asyncio.gather(
-                    self.check_tls(_base),
+                    self.check_tls(_base, allow_private=allow_private),
                     self.check_headers(_base, client, allow_private=allow_private),
                     self.check_cors(_base, client, allow_private=allow_private),
                     self.check_exposed_files(_base, client),
