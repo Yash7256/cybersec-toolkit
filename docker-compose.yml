@@ -1,48 +1,6 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: cybersec
-    ports:
-      - "${POSTGRES_HOST_PORT:-5433}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  # Redis is not exposed to the host. Only reachable by other containers
-  # on this network. Auth required via REDIS_PASSWORD.
-  # maxmemory: caps Redis at 256MB so it can never consume unbounded host
-  # memory. maxmemory-policy allkeys-lru: when full, evict the least-
-  # recently-used keys first (safe here since everything we store in
-  # Redis — CVE cache, WHOIS cache, SSE streams — is either reconstructable
-  # from source data or short-lived; nothing in Redis is the system of
-  # record). Adjust 256mb upward if cache hit-rate monitoring shows
-  # frequent evictions under real load.
-  redis:
-    image: redis:7-alpine
-    command: [
-      "redis-server",
-      "--requirepass", "${REDIS_PASSWORD}",
-      "--maxmemory", "256mb",
-      "--maxmemory-policy", "allkeys-lru"
-    ]
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
+  # Redis sidecar removed — using Upstash hosted Redis (TLS).
+  # REDIS_URL is set in .env and passed through via env_file.
 
   backend:
     build: .
@@ -51,8 +9,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/cybersec
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      # DATABASE_URL and REDIS_URL come from .env (Supabase + Upstash).
       APP_HOST: 0.0.0.0
       APP_PORT: 8000
       SCAN_TIMEOUT: 15.0
@@ -68,14 +25,4 @@ services:
 #      nofile:
 #        soft: 1048576
 #        hard: 1048576
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     restart: unless-stopped
-
-
-volumes:
-  postgres_data:
-  redis_data:

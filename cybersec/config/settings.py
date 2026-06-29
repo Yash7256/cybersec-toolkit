@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     )
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/cybersec"
+    DATABASE_SYNC_URL: str = ""  # psycopg2 URL used only by Alembic migrations
     DATABASE_POOL_SIZE: int = 5
     DATABASE_MAX_OVERFLOW: int = 10
     APP_NAME: str = "cybersec"

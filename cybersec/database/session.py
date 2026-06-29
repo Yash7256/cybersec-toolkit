@@ -9,6 +9,7 @@ from cybersec.database.base import Base
 # Create engine with connection pool settings for Supabase
 engine = create_async_engine(
     settings.DATABASE_URL,
+    connect_args={"ssl": "require"},
     pool_size=1,  # Smaller pool for Supabase
     max_overflow=2,
     pool_pre_ping=True,  # Verify connections before use

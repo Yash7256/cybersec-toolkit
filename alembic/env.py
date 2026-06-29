@@ -18,7 +18,9 @@ import cybersec.database.models  # Requires this import for metadata registratio
 # access to the values within the .ini file in use.
 config = context.config
 
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+_alembic_url = settings.DATABASE_SYNC_URL or settings.DATABASE_URL
+# configparser uses % for interpolation — escape any literal % signs in the URL
+config.set_main_option("sqlalchemy.url", _alembic_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -70,11 +72,12 @@ async def run_async_migrations() -> None:
     and associate a connection with the context.
 
     """
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    # Use the async URL directly — sqlalchemy.url in the config is set to the
+    # sync (psycopg2) URL for Alembic offline mode; we must not pass it here.
+    async_url = settings.DATABASE_URL
+    connectable = create_async_engine(async_url, poolclass=pool.NullPool)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
