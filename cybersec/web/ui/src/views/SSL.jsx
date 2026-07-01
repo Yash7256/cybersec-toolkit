@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
+import { apiPost } from '../utils/apiClient';
 import {
   ArrowRight,
   Building2,
@@ -310,17 +312,14 @@ export default function SSL() {
   const [host,    setHost]    = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const { getToken } = useAuth();
 
   const run = async () => {
     if (!host.trim()) return;
     setLoading(true);
     setResults(null);
     try {
-      const r = await fetch('/api/tools/ssl', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ host: host.trim() }),
-      });
+      const r = await apiPost('/api/tools/ssl', { host: host.trim() }, getToken);
       const payload = await r.json();
       if (!r.ok) throw new Error(payload.detail || payload.error || `HTTP ${r.status}`);
       setResults(payload.data || payload);

@@ -33,6 +33,8 @@ dist/
 node_modules/
 cybersec/web/ui/node_modules/
 cybersec/web/ui/dist/
+cybersec/web/ui/.env
+cybersec/web/ui/.env.*
 .vite/
 
 # Runtime/output artifacts

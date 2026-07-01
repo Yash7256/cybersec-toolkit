@@ -1,6 +1,7 @@
 """
 SQLAlchemy database models for CyberSec.
 """
+import datetime
 from sqlalchemy import Column, String, Boolean, Enum, Integer, Text, ForeignKey, TIMESTAMP
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -10,10 +11,26 @@ from cybersec.database.base import Base, UUIDPrimaryKeyMixin, TimestampMixin
 class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "users"
 
-    email = Column(String(255), unique=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
+    # email: nullable so Clerk users who don't expose their email can still be stored
+    email = Column(String(255), unique=True, nullable=True)
+    # hashed_password: NULL for Clerk-authed users; only populated for legacy rows
+    hashed_password = Column(String(255), nullable=True)
+    # clerk_user_id: the Clerk identity token (format: user_XXXX); NULL for legacy users
+    clerk_user_id = Column(String(255), unique=True, nullable=True, index=True)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
+
+    # Tier system — free users get 5 tool executions per tool per day
+    tier = Column(
+        Enum('free', 'paid', name='user_tier_enum'),
+        nullable=False,
+        default='free',
+        server_default='free',
+    )
+    # Per-tool usage tracking.
+    # Schema: { "<tool_name>": { "count": int, "date": "YYYY-MM-DD" }, ... }
+    # e.g.  { "dns": { "count": 3, "date": "2026-06-30" }, "whois": { "count": 1, "date": "2026-06-30" } }
+    tool_usage = Column(JSONB, nullable=False, default=dict, server_default='{}')
 
 class Scan(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "scans"

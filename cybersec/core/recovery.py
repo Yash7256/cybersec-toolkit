@@ -12,7 +12,7 @@ import os
 import socket
 from datetime import datetime, timezone, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from cybersec.database.session import async_session_maker
 from cybersec.database.models import Scan, WorkerHeartbeat
@@ -126,9 +126,11 @@ async def reap_stale_workers() -> list[str]:
                 return []
 
             # 2. Find scans owned by dead workers
+            # Use text() comparison to avoid asyncpg casting 'running' to scan_status_enum
+            # when the DB column is actually VARCHAR
             orphaned = await db.execute(
                 select(Scan).where(
-                    Scan.status == "running",
+                    text("scans.status = 'running'"),
                     Scan.worker_id.in_(dead_ids),
                 )
             )

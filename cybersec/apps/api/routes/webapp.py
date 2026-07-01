@@ -16,7 +16,8 @@ import time
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from cybersec.apps.api.deps import get_db, get_optional_user
+from cybersec.apps.api.deps import get_db, get_current_user
+from cybersec.apps.api.tier import check_and_increment_usage
 from cybersec.config.settings import settings
 from cybersec.database.models import Scan, ScanResult, User
 from cybersec.database.session import async_session_maker
@@ -249,7 +250,7 @@ async def _persist_web_scan(db_scan_id: str | None, vulns: list) -> None:
 async def webapp_scan_start(
     body: WebAppScanStartRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Start a web app scan with streaming results.
 
@@ -258,14 +259,16 @@ async def webapp_scan_start(
     if not body.confirm_authorized:
         raise HTTPException(status_code=400, detail=_AUTH_GATE_MSG)
 
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    await check_and_increment_usage(current_user, db, tool_name="webapp")
+
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
 
     db_scan_id: str | None = None
     storage = "memory"
 
     try:
         scan = Scan(
-            user_id=current_user.id if current_user else None,
+            user_id=current_user.id,
             target=body.target,
             scan_type="web",
             status="running",
@@ -287,7 +290,7 @@ async def webapp_scan_start(
         "status": "pending",
         "allow_private": allow_private,
         "max_pages": body.max_pages,
-        "user_id": current_user.id if current_user else None,
+        "user_id": current_user.id,
         "db_scan_id": db_scan_id,
         "started_at": datetime.now(timezone.utc).isoformat(),
         "completed_at": None,
@@ -308,15 +311,24 @@ async def webapp_scan_start(
 
 
 @router.get("/stream/{scan_id}")
-async def webapp_scan_stream(scan_id: str):
+async def webapp_scan_stream(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Stream web scan progress via SSE.
 
+    Requires authentication. Only the user who started the scan can stream it.
     Azure-compatible: heartbeat every 10s, keepalive every 55s.
     """
     meta = _wapp_scan_meta.get(scan_id)
 
     if not meta:
         raise HTTPException(status_code=404, detail="Scan not found. Start a scan first via /api/webapp/start-scan or /api/webapp/scan.")
+
+    # Ownership check — only the user who created the scan can stream it
+    if meta.get("user_id") and str(meta["user_id"]) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Access denied")
 
     target = meta["target"]
     user_id = meta.get("user_id")
@@ -350,7 +362,7 @@ async def webapp_scan_stream(scan_id: str):
 async def webapp_scan(
     body: WebAppScanRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Run a web app scan and return full results synchronously.
 
@@ -360,7 +372,9 @@ async def webapp_scan(
     if not body.confirm_authorized:
         raise HTTPException(status_code=400, detail=_AUTH_GATE_MSG)
 
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    await check_and_increment_usage(current_user, db, tool_name="webapp")
+
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
 
     db_scan_id: str | None = None
     storage = "memory"
@@ -368,7 +382,7 @@ async def webapp_scan(
 
     try:
         scan = Scan(
-            user_id=current_user.id if current_user else None,
+            user_id=current_user.id,
             target=body.target,
             scan_type="web",
             status="running",
@@ -418,10 +432,17 @@ async def webapp_scan(
 
 
 @router.get("/{scan_id}/status")
-async def webapp_scan_status(scan_id: str):
-    """Get status of a web scan from in-memory or DB stores."""
+async def webapp_scan_status(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get status of a web scan. Requires authentication and ownership."""
     meta = _wapp_scan_meta.get(scan_id)
     if meta:
+        # Ownership check
+        if meta.get("user_id") and str(meta["user_id"]) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Access denied")
         vulns = meta.get("vulnerabilities", [])
         return {
             "scan_id": scan_id,
@@ -432,15 +453,20 @@ async def webapp_scan_status(scan_id: str):
         }
 
     try:
-        async with async_session_maker() as db:
-            scan = await db.get(Scan, scan_id)
+        async with async_session_maker() as session:
+            scan = await session.get(Scan, scan_id)
             if scan:
+                # Ownership check from DB
+                if scan.user_id and str(scan.user_id) != str(current_user.id):
+                    raise HTTPException(status_code=403, detail="Access denied")
                 return {
                     "scan_id": scan_id,
                     "status": scan.status,
                     "target": scan.target,
                     "storage": "database",
                 }
+    except HTTPException:
+        raise
     except Exception:
         pass
 

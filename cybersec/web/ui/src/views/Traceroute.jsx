@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
+import { apiPost } from '../utils/apiClient';
 import {
   Activity,
   ArrowRight,
@@ -572,6 +574,7 @@ export default function Traceroute() {
   const [loading,  setLoading]  = useState(false);
   const [results,  setResults]  = useState(null);
   const liveRef = useRef(false);
+  const { getToken } = useAuth();
 
   const run = useCallback(async ({ silent = false, appendLive = false } = {}) => {
     if (!target) return;
@@ -579,11 +582,7 @@ export default function Traceroute() {
     if (appendLive) liveRef.current = true;
     if (!silent) setLoading(true);
     try {
-      const r = await fetch('/api/tools/traceroute', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ target, max_hops: maxHops }),
-      });
+      const r = await apiPost('/api/tools/traceroute', { target, max_hops: maxHops }, getToken);
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
         throw new Error(err.detail || err.error || `HTTP ${r.status}`);

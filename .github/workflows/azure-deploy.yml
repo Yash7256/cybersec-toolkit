@@ -27,8 +27,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: cybersec/web/ui/package-lock.json
 
+      # Inject Clerk publishable key at build time so Vite embeds it in the
+      # React bundle. VITE_CLERK_PUBLISHABLE_KEY must be added to GitHub
+      # repository secrets (Settings → Secrets → Actions).
+      # Use the LIVE key (pk_live_...) for production builds.
       - name: Build React frontend
         working-directory: cybersec/web/ui
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
         run: |
           npm ci
           npm run build
@@ -38,10 +44,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests (optional)
+      - name: Run tests
         run: |
-          # Add your test commands here
-          echo "Tests would run here"
+          python -m pytest tests/ -q \
+            --ignore=tests/core/tools/test_geoip_production.py \
+            --ignore=tests/core/tools/whois \
+            2>&1 | tail -5
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2

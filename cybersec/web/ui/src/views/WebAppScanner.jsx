@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ShieldHalf, X, AlertTriangle, CheckCircle, ArrowRight, Info,
          Globe, Lock, Server, Code2, Cpu, ChevronDown, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
+import { useAuth } from '@clerk/clerk-react';
+import { apiPost } from '../utils/apiClient';
 
 // ---------------------------------------------------------------------------
 // Style maps
@@ -166,6 +168,7 @@ export default function WebAppScanner() {
   const [results, setResults] = useState(null);
   const [filter, setFilter] = useState('all');
   const [catFilter, setCatFilter] = useState('all');
+  const { getToken } = useAuth();
 
   const run = async () => {
     if (!url || !authorized) return;
@@ -174,11 +177,7 @@ export default function WebAppScanner() {
     setFilter('all');
     setCatFilter('all');
     try {
-      const r = await fetch('/api/webapp/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: url, max_pages: 20, confirm_authorized: true }),
-      });
+      const r = await apiPost('/api/webapp/scan', { target: url, max_pages: 20, confirm_authorized: true }, getToken);
       setResults(await r.json());
     } catch (e) {
       setResults({ error: e.message });

@@ -102,6 +102,267 @@
     box-shadow: inset 0 1px 2px rgba(255,255,255,0.85), 0 2px 10px rgba(0,0,0,0.2);
   }
 
+  /* ── Tier badge (Navbar) ──────────────────────────────────────── */
+  .tier-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Fira Code', ui-monospace, monospace;
+    letter-spacing: 0.04em;
+    cursor: default;
+    transition: opacity 200ms ease;
+    user-select: none;
+  }
+  .tier-badge.free {
+    background: rgba(251,191,36,0.12);
+    border: 1px solid rgba(251,191,36,0.32);
+    color: #fbbf24;
+  }
+  .tier-badge.paid {
+    background: rgba(167,139,250,0.14);
+    border: 1px solid rgba(167,139,250,0.38);
+    color: #c4b5fd;
+  }
+  .tier-badge.limit {
+    background: rgba(248,113,113,0.14);
+    border: 1px solid rgba(248,113,113,0.32);
+    color: #f87171;
+    cursor: pointer;
+  }
+  .tier-badge.limit:hover {
+    background: rgba(248,113,113,0.22);
+  }
+
+  /* ── Upgrade modal overlay ───────────────────────────────────── */
+  .upgrade-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(4, 1, 10, 0.80);
+    backdrop-filter: blur(6px);
+    animation: fadeInOverlay 180ms ease;
+  }
+  @keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .upgrade-modal {
+    position: relative;
+    width: min(760px, 100%);
+    max-height: 92vh;
+    overflow-y: auto;
+    border-radius: 18px;
+    border: 1px solid rgba(167,139,250,0.30);
+    background: linear-gradient(160deg, #1a0e30 0%, #110824 60%, #0e061e 100%);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    animation: slideUpModal 220ms cubic-bezier(0.22,1,0.36,1);
+  }
+  @keyframes slideUpModal {
+    from { opacity: 0; transform: translateY(20px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .upgrade-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(167,139,250,0.22);
+    background: rgba(124,58,237,0.10);
+    color: #a78bfa;
+    transition: background 150ms ease, color 150ms ease;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .upgrade-modal-close:hover {
+    background: rgba(124,58,237,0.22);
+    color: #e9d5ff;
+  }
+
+  .upgrade-modal-header {
+    padding: 36px 32px 24px;
+    text-align: center;
+    border-bottom: 1px solid rgba(124,58,237,0.15);
+  }
+  .upgrade-modal-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: rgba(251,191,36,0.12);
+    border: 1px solid rgba(251,191,36,0.28);
+    margin-bottom: 16px;
+  }
+  .upgrade-modal-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f4eef7;
+    margin: 0 0 8px;
+  }
+  .upgrade-modal-subtitle {
+    font-size: 15px;
+    color: #a78bfa;
+    margin: 0 0 20px;
+    line-height: 1.55;
+  }
+  .upgrade-usage-bar-wrap {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+    margin: 0 auto 8px;
+    max-width: 320px;
+  }
+  .upgrade-usage-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #f87171 0%, #ef4444 100%);
+    transition: width 600ms cubic-bezier(0.4,0,0.2,1);
+  }
+  .upgrade-usage-label {
+    font-size: 12px;
+    color: #8b7ec8;
+    margin: 0;
+  }
+
+  .upgrade-tier-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 24px 32px;
+  }
+  @media (max-width: 560px) {
+    .upgrade-tier-grid { grid-template-columns: 1fr; }
+  }
+
+  .upgrade-tier-card {
+    border-radius: 12px;
+    border: 1px solid rgba(124,58,237,0.20);
+    background: rgba(18,9,33,0.65);
+    overflow: hidden;
+  }
+  .upgrade-tier-card.paid {
+    border-color: rgba(167,139,250,0.40);
+    background: rgba(25,12,44,0.80);
+    box-shadow: 0 0 0 1px rgba(167,139,250,0.10) inset;
+  }
+
+  .upgrade-tier-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(124,58,237,0.15);
+    color: #c4b5fd;
+  }
+  .upgrade-tier-card-header.free { background: rgba(124,58,237,0.08); }
+  .upgrade-tier-card-header.paid-header {
+    background: rgba(167,139,250,0.10);
+    color: #e9d5ff;
+  }
+  .upgrade-tier-popular-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    background: rgba(167,139,250,0.20);
+    border: 1px solid rgba(167,139,250,0.35);
+    color: #c4b5fd;
+  }
+
+  .upgrade-tier-price {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid rgba(124,58,237,0.12);
+  }
+  .upgrade-tier-price-value {
+    font-family: 'Fira Code', ui-monospace, monospace;
+    font-size: 28px;
+    font-weight: 800;
+    color: #c4b5fd;
+  }
+  .upgrade-tier-price-value.paid-price { color: #e9d5ff; }
+  .upgrade-tier-price-period {
+    font-size: 13px;
+    color: #6b5fa0;
+    margin-left: 4px;
+  }
+
+  .upgrade-tier-features { padding: 12px 16px; }
+
+  .upgrade-tier-unlimited {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid rgba(167,139,250,0.15);
+    font-size: 12px;
+    font-weight: 600;
+    color: #a78bfa;
+    background: rgba(124,58,237,0.08);
+  }
+
+  .upgrade-modal-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 32px 28px;
+    border-top: 1px solid rgba(124,58,237,0.15);
+  }
+  .upgrade-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 380px;
+    height: 52px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a0e2e;
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+    border: 1px solid rgba(251,191,36,0.6);
+    box-shadow: 0 8px 24px rgba(251,191,36,0.28), inset 0 1px 0 rgba(255,255,255,0.35);
+    transition: transform 150ms ease, box-shadow 150ms ease;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .upgrade-cta-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(251,191,36,0.38), inset 0 1px 0 rgba(255,255,255,0.40);
+  }
+  .upgrade-dismiss-btn {
+    font-size: 13px;
+    color: #6b5fa0;
+    cursor: pointer;
+    transition: color 150ms ease;
+  }
+  .upgrade-dismiss-btn:hover { color: #a78bfa; }
+
   /* Sidebar nav item */
   .nav-item {
     @apply flex items-center gap-4 cursor-pointer transition-all duration-200 w-full text-left;

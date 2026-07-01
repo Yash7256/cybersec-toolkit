@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -67,6 +68,7 @@ const cleanStatus = (status) => String(status || '')
   .trim();
 
 function Whois() {
+  const { getToken } = useAuth();
   const [target, setTarget] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
@@ -130,12 +132,19 @@ function Whois() {
       cached: false,
     });
     try {
+      const token = typeof getToken === 'function' ? await getToken() : null;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const r = await fetch('/api/tools/whois/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ target }),
         signal: controller.signal,
       });
+      if (r.status === 429) {
+        window.dispatchEvent(new CustomEvent('tier:limit_reached'));
+        throw new Error('Daily scan limit reached. Upgrade to continue scanning.');
+      }
       if (!r.ok) {
         throw new Error(`WHOIS stream failed with HTTP ${r.status}`);
       }

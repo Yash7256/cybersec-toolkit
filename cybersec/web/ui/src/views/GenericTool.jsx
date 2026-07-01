@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
+import { apiPost } from '../utils/apiClient';
 import {
   Activity,
   ArrowRight,
@@ -189,6 +191,7 @@ export default function GenericTool({ toolId }) {
   const [activePingTab, setActivePingTab] = useState('monitoring');
   const liveRequestActive = useRef(false);
   const streamAbortRef = useRef(null);
+  const { getToken } = useAuth();
 
   const Icon = meta?.icon;
 
@@ -277,12 +280,19 @@ export default function GenericTool({ toolId }) {
       scanning: true,
     });
     try {
+      const token = typeof getToken === 'function' ? await getToken() : null;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch('/api/tools/subdomain/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ domain: target }),
         signal: controller.signal,
       });
+      if (response.status === 429) {
+        window.dispatchEvent(new CustomEvent('tier:limit_reached'));
+        throw new Error('Daily scan limit reached. Upgrade to continue scanning.');
+      }
       if (!response.ok) {
         throw new Error(`Subdomain stream failed with HTTP ${response.status}`);
       }
@@ -406,12 +416,19 @@ export default function GenericTool({ toolId }) {
       scanning: true,
     });
     try {
+      const token = typeof getToken === 'function' ? await getToken() : null;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch('/api/tools/os-fingerprint/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ target }),
         signal: controller.signal,
       });
+      if (response.status === 429) {
+        window.dispatchEvent(new CustomEvent('tier:limit_reached'));
+        throw new Error('Daily scan limit reached. Upgrade to continue scanning.');
+      }
       if (!response.ok) {
         throw new Error(`OS fingerprint stream failed with HTTP ${response.status}`);
       }
@@ -467,12 +484,19 @@ export default function GenericTool({ toolId }) {
       scan_message: 'Starting GeoIP lookup',
     });
     try {
+      const token = typeof getToken === 'function' ? await getToken() : null;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch('/api/tools/geoip/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ target }),
         signal: controller.signal,
       });
+      if (response.status === 429) {
+        window.dispatchEvent(new CustomEvent('tier:limit_reached'));
+        throw new Error('Daily scan limit reached. Upgrade to continue scanning.');
+      }
       if (!response.ok) {
         throw new Error(`GeoIP stream failed with HTTP ${response.status}`);
       }
@@ -548,11 +572,7 @@ export default function GenericTool({ toolId }) {
       const body = { [meta.param]: target };
       if (toolId === 'ping') body.count = count;
       if (toolId === 'traceroute') body.max_hops = maxHops;
-      const r = await fetch(meta.endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const r = await apiPost(meta.endpoint, body, getToken);
       const contentType = r.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
         throw new Error(`Expected JSON from ${meta.endpoint}, but received ${contentType || 'an HTML response'}. Check that the API server is running and the Vite proxy is pointing at it.`);

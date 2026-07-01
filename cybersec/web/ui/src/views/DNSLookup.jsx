@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Globe, X, ArrowRight } from 'lucide-react';
+import { useAuth } from '@clerk/clerk-react';
+import { apiGet } from '../utils/apiClient';
 
 const RECORD_TYPES = ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME', 'SOA', 'PTR'];
 
@@ -8,12 +10,13 @@ export default function DNSLookup() {
   const [recordType, setRecordType] = useState('A');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const { getToken } = useAuth();
 
   const run = async () => {
     if (!target) return;
     setLoading(true);
     try {
-      const r = await fetch(`/api/tools/dns?target=${encodeURIComponent(target)}&type=${recordType}`);
+      const r = await apiGet('/api/tools/dns', { target, type: recordType }, getToken);
       const data = await r.json();
       setResults(data);
     } catch (e) {

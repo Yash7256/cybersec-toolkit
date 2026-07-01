@@ -6,7 +6,8 @@ import logging
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from cybersec.apps.api.deps import get_db, get_optional_user
+from cybersec.apps.api.deps import get_db, get_current_user
+from cybersec.apps.api.tier import check_and_increment_usage
 from cybersec.database.models import User, ToolResult
 import dataclasses
 import json
@@ -98,7 +99,7 @@ async def _save_tool_result(db: AsyncSession, current_user: User | None, tool_na
     """Persist tool result if DB is available; return ID or None on failure."""
     try:
         row = ToolResult(
-            user_id=current_user.id if current_user else None,
+            user_id=current_user.id,
             tool_name=tool_name,
             target=target,
             result_data=result_dict
@@ -119,8 +120,9 @@ async def _save_tool_result(db: AsyncSession, current_user: User | None, tool_na
 async def run_dns(
     body: DnsRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="dns")
     result = await dns_lookup(body.target, body.record_type)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "dns", body.target, result_dict)
@@ -130,8 +132,9 @@ async def run_dns(
 async def run_whois(
     body: WhoisRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="whois")
     result = await whois_lookup(body.target)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "whois", body.target, result_dict)
@@ -142,8 +145,9 @@ async def run_whois(
 async def stream_whois(
     body: WhoisRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="whois")
     async def stream_response():
         queue: asyncio.Queue[str | None] = asyncio.Queue()
 
@@ -191,8 +195,9 @@ async def stream_whois(
 async def run_whois_get(
     target: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="whois")
     result = await whois_lookup(target)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "whois", target, result_dict)
@@ -202,9 +207,10 @@ async def run_whois_get(
 async def run_ping(
     body: PingRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    await check_and_increment_usage(current_user, db, tool_name="ping")
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
     result = await ping_host(body.target, body.count, allow_private=allow_private)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "ping", body.target, result_dict)
@@ -214,9 +220,10 @@ async def run_ping(
 async def run_traceroute(
     body: TracerouteRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    await check_and_increment_usage(current_user, db, tool_name="traceroute")
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
     result = await traceroute(body.target, body.max_hops, allow_private=allow_private)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "traceroute", body.target, result_dict)
@@ -226,9 +233,10 @@ async def run_traceroute(
 async def run_ssl(
     body: SslRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    await check_and_increment_usage(current_user, db, tool_name="ssl")
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
     result = await ssl_audit(body.host, body.port, allow_private=allow_private)
     result_dict = dataclasses.asdict(result)
     
@@ -261,9 +269,10 @@ async def run_ssl(
 async def run_http_headers(
     body: HttpHeadersRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    await check_and_increment_usage(current_user, db, tool_name="http_headers")
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
     result = await check_http_headers(body.target, body.path, allow_private=allow_private)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "http_headers", body.target, result_dict)
@@ -273,8 +282,9 @@ async def run_http_headers(
 async def run_subdomain(
     body: SubdomainRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="subdomain")
     result = await find_subdomains(body.domain, body.wordlist, body.strictness)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "subdomain", body.domain, result_dict)
@@ -285,8 +295,9 @@ async def run_subdomain(
 async def stream_subdomain(
     body: SubdomainRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="subdomain")
     async def stream_response():
         try:
             async for event in stream_subdomain_events(body.domain, body.wordlist, body.strictness):
@@ -312,8 +323,9 @@ async def stream_subdomain(
 async def run_geoip(
     body: GeoipRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="geoip")
     result = await geoip_lookup(body.target)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "geoip", body.target, result_dict)
@@ -324,8 +336,9 @@ async def run_geoip(
 async def stream_geoip(
     body: GeoipRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="geoip")
     async def stream_response():
         try:
             yield f"data: {json.dumps({'type': 'init', 'data': {'target': body.target, 'ip': None, 'resolved_ips': [], 'ip_results': [], 'provider': 'ipwhois', 'cached': False, 'scanning': True, 'scan_stage': 'init', 'scan_message': 'Starting GeoIP lookup'}})}\n\n"
@@ -355,8 +368,9 @@ async def stream_geoip(
 async def run_geoip_legacy_get(
     target: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="geoip")
     result = await geoip_lookup(target)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "geoip", target, result_dict)
@@ -367,9 +381,10 @@ async def run_geoip_legacy_get(
 async def run_os_fingerprint(
     body: OsFingerprintRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    await check_and_increment_usage(current_user, db, tool_name="os_fingerprint")
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
     result = await os_fingerprint(body.target, timeout=body.timeout, allow_private=allow_private, db_session=db)
     result_dict = dataclasses.asdict(result)
     tool_result_id = await _save_tool_result(db, current_user, "os_fingerprint", body.target, result_dict)
@@ -381,9 +396,10 @@ async def run_os_fingerprint(
 async def stream_os_fingerprint(
     body: OsFingerprintRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    await check_and_increment_usage(current_user, db, tool_name="os_fingerprint")
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
 
     async def stream_response():
         try:
@@ -414,10 +430,11 @@ async def stream_os_fingerprint(
 async def run_port_scan(
     body: PortScanRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="port_scan")
     # Authenticated users may bypass the private-IP block when the setting permits.
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
 
     # Determine scan type based on parameters
     if body.ports:
@@ -472,8 +489,9 @@ async def run_port_scan(
 async def stream_port_scan(
     body: PortScanRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
+    await check_and_increment_usage(current_user, db, tool_name="port_scan")
     if body.ports:
         ports = body.ports
     elif body.start_port is not None and body.end_port is not None:
@@ -481,7 +499,7 @@ async def stream_port_scan(
     else:
         ports = None
 
-    allow_private = bool(current_user and settings.ALLOW_PRIVATE_TARGET_SCANS)
+    allow_private = bool(settings.ALLOW_PRIVATE_TARGET_SCANS)
 
     async def stream_response():
         try:

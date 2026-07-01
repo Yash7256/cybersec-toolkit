@@ -4,25 +4,17 @@ services:
 
   backend:
     build: .
-    ports:
-      - "8000:8000"
+    # host network mode: container shares the host network stack directly.
+    # Required for rootless Podman (pasta/netavark) to reach external hosts.
+    # sysctls are removed — they can't be set with network_mode: host.
+    network_mode: host
     env_file:
       - .env
     environment:
-      # DATABASE_URL and REDIS_URL come from .env (Supabase + Upstash).
       APP_HOST: 0.0.0.0
       APP_PORT: 8000
       SCAN_TIMEOUT: 15.0
       OS_FINGERPRINT_TIMEOUT: 8.0
       SERVICE_DETECTION_TIMEOUT: 10.0
       WORKERS: 1
-    sysctls:
-      - net.ipv4.ip_local_port_range=10000 65535
-      - net.ipv4.tcp_fin_timeout=15
-      - net.ipv4.tcp_tw_reuse=1
-      - net.core.somaxconn=65535
-#    ulimits:
-#      nofile:
-#        soft: 1048576
-#        hard: 1048576
     restart: unless-stopped

@@ -13,7 +13,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from cybersec.config import settings
 
 # Import routers
-from cybersec.apps.api.routes import auth, tools, ai, reports, webapp
+from cybersec.apps.api.routes import auth, tools, ai, reports, webapp, user
 from cybersec.runtime.scan_workers import start_workers, stop_workers
 
 @asynccontextmanager
@@ -173,7 +173,9 @@ def create_app() -> FastAPI:
         - **Multi-host Scanning**: CIDR range and multiple target support
         
         ## Authentication
-        Most endpoints require authentication via JWT tokens. Use `/api/auth/login` to obtain tokens.
+        Authentication is handled by [Clerk](https://clerk.com). Sign in via the frontend to obtain a
+        session token, then pass it as `Authorization: Bearer <token>` on API requests.
+        Most tool endpoints support anonymous access; the token associates results with your account.
         
         ## Rate Limiting
         API is rate-limited to 100 requests per minute per IP address.
@@ -230,6 +232,7 @@ def create_app() -> FastAPI:
     app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
     app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
     app.include_router(webapp.router, prefix="/api/webapp", tags=["webapp"])
+    app.include_router(user.router, prefix="/api/user", tags=["user"])
 
     @app.get("/api/health", tags=["health"])
     async def health_check():

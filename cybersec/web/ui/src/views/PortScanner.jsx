@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import {
   Activity,
   ArrowRight,
@@ -715,6 +716,7 @@ function ScreenshotPreview({ row }) {
 }
 
 export default function PortScanner() {
+  const { getToken } = useAuth();
   const [target, setTarget] = useState('');
   const [portRange, setPortRange] = useState('common');
   const [customPortRange, setCustomPortRange] = useState('');
@@ -830,13 +832,20 @@ export default function PortScanner() {
     let completed = false;
     let finalPayload = null;
 
+    const token = typeof getToken === 'function' ? await getToken() : null;
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     const response = await fetch('/api/tools/port_scan/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
 
+    if (response.status === 429) {
+      window.dispatchEvent(new CustomEvent('tier:limit_reached'));
+      throw new Error('Daily scan limit reached. Upgrade to continue scanning.');
+    }
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.detail || `Scan failed (${response.status})`);

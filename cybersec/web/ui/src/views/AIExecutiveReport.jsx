@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { Brain, Loader } from 'lucide-react';
+import { useAuth } from '@clerk/clerk-react';
+import { apiPost } from '../utils/apiClient';
 
 export default function AIExecutiveReport() {
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState(null);
+  const { getToken } = useAuth();
 
   const generate = async () => {
     setLoading(true);
     try {
-      const r = await fetch('/api/ai/executive-summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      const r = await apiPost('/api/ai/executive-summary', {}, getToken);
       const data = await r.json();
       setReport(data);
     } catch (e) { setReport({ error: e.message }); } finally { setLoading(false); }

@@ -1,8 +1,11 @@
 """
 Configuration for CyberSec.
 """
+import logging
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -21,10 +24,13 @@ class Settings(BaseSettings):
     APP_PORT: int = 8000
     APP_DEBUG: bool = False
     WORKERS: int = 1
-    APP_SECRET_KEY: str = "change-this-to-a-random-64-char-string-in-production"
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
-    JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRATION_MINUTES: int = 30
+
+    # Clerk Auth
+    CLERK_PUBLISHABLE_KEY: str = ""
+    CLERK_SECRET_KEY: str = ""
+    CLERK_JWKS_URL: str = ""
+    CLERK_ISSUER: str = ""
     REDIS_URL: str = "redis://localhost:6379/0"
     ENABLE_SERVICE_DETECTION: bool = True
     ENABLE_ATTACK_MAPPING: bool = True
@@ -105,6 +111,11 @@ class Settings(BaseSettings):
     HOP_INFO_CACHE_TTL_SECONDS: int = 86400  # 24 hours — router hostnames are stable
 
     @property
+    def clerk_configured(self) -> bool:
+        """Return True if both Clerk JWKS URL and issuer are configured."""
+        return bool(self.CLERK_JWKS_URL and self.CLERK_ISSUER)
+
+    @property
     def whois_privacy_patterns_list(self) -> list[str]:
         return [p.strip().lower() for p in self.WHOIS_PRIVACY_PATTERNS.split(",") if p.strip()]
 
@@ -140,5 +151,13 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Warn at startup if Clerk is not configured — authenticated requests will return 503
+if not settings.clerk_configured:
+    logger.warning(
+        "CLERK_JWKS_URL and/or CLERK_ISSUER are not set. "
+        "All authenticated requests will be rejected with HTTP 503 "
+        "until these values are provided in the environment."
+    )
 
 # TODO: implement additional config logic if needed

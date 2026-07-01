@@ -11,9 +11,14 @@ from datetime import datetime
 from cybersec.config.settings import settings
 
 class DnsRequest(BaseModel):
-    target: str
+    target: str = Field(
+        min_length=1,
+        max_length=253,
+        strip_whitespace=True,
+        description="Hostname or IP address to look up",
+    )
     record_type: str = "ALL"
-    
+
 class WhoisRequest(BaseModel):
     target: str = Field(
         min_length=1,
@@ -23,19 +28,39 @@ class WhoisRequest(BaseModel):
     )
     
 class PingRequest(BaseModel):
-    target: str
+    target: str = Field(
+        min_length=1,
+        max_length=253,
+        strip_whitespace=True,
+        description="Hostname or IP address to ping",
+    )
     count: int = Field(default=4, ge=1, le=100)
     
 class TracerouteRequest(BaseModel):
-    target: str
+    target: str = Field(
+        min_length=1,
+        max_length=253,
+        strip_whitespace=True,
+        description="Hostname or IP address to trace",
+    )
     max_hops: int = Field(default=30, ge=1, le=64)
     
 class SslRequest(BaseModel):
-    host: str
+    host: str = Field(
+        min_length=1,
+        max_length=253,
+        strip_whitespace=True,
+        description="Hostname to check SSL certificate for",
+    )
     port: int = Field(default=443, ge=1, le=65535)
     
 class HttpHeadersRequest(BaseModel):
-    target: str
+    target: str = Field(
+        min_length=1,
+        max_length=253,
+        strip_whitespace=True,
+        description="Hostname or URL to check HTTP headers for",
+    )
     path: str = "/"
     
     @field_validator("path")
@@ -77,14 +102,29 @@ class SubdomainRequest(BaseModel):
         return v.lower()
     
 class GeoipRequest(BaseModel):
-    target: str
+    target: str = Field(
+        min_length=1,
+        max_length=253,
+        strip_whitespace=True,
+        description="Hostname or IP address to geolocate",
+    )
 
 class OsFingerprintRequest(BaseModel):
-    target: str
+    target: str = Field(
+        min_length=1,
+        max_length=253,
+        strip_whitespace=True,
+        description="Hostname or IP address to fingerprint",
+    )
     timeout: float = Field(default=2.0, ge=0.5, le=10.0)
 
 class PortScanRequest(BaseModel):
-    target: str
+    target: str = Field(
+        min_length=1,
+        max_length=253,
+        strip_whitespace=True,
+        description="Hostname or IP address to scan",
+    )
     ports: list[int] | None = None
     start_port: int | None = Field(default=None, ge=1, le=65535)
     end_port: int | None = Field(default=None, ge=1, le=65535)
